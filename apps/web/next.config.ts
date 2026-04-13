@@ -6,6 +6,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = dirname(dirname(configDir));
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   turbopack: {
     root: monorepoRoot,
   },

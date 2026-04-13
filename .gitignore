@@ -2,6 +2,10 @@
 
 # dependencies
 /node_modules
+/apps/*/node_modules
+/packages/*/node_modules
+/services/*/node_modules
+/apps/web/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,7 +19,11 @@
 
 # next.js
 /.next/
+/apps/*/.next/
+/apps/web/.next/
 /out/
+/apps/*/out/
+/apps/web/out/
 
 # production
 /build
@@ -39,3 +47,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# keep agent config files tracked
+!AGENTS.md
+!CLAUDE.md

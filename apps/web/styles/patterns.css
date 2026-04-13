@@ -1,0 +1,5 @@
+@layer utilities {
+  .surface-panel {
+    @apply rounded-2xl bg-white/88 backdrop-blur-sm;
+  }
+}

@@ -3,12 +3,7 @@ export type RegistrationHighlight = {
   description: string;
 };
 
-export type RegistrationField = {
-  id: string;
-  label: string;
-  placeholder: string;
-  type?: 'text';
-};
+import type { RegistrationStepMeta } from '@/features/registration/types';
 
 export const registrationHighlights: RegistrationHighlight[] = [
   {
@@ -27,11 +22,31 @@ export const registrationHighlights: RegistrationHighlight[] = [
   },
 ];
 
-export const registrationFields: RegistrationField[] = [
+export const registrationStepMeta: RegistrationStepMeta[] = [
   {
     id: 'student-id',
     label: 'Student ID',
-    placeholder: 'e.g. 221-15-0001',
-    type: 'text',
+    title: 'Check Registration Status',
   },
+  {
+    id: 'basic-info',
+    label: 'Basic Info',
+    title: 'Basic Information',
+  },
+  {
+    id: 'face-prep',
+    label: 'Face Prep',
+    title: 'Face Verification',
+  },
+  {
+    id: 'success',
+    label: 'Complete',
+    title: 'Registration Complete',
+  },
+];
+
+export const registrationPrepTips = [
+  'Ensure good lighting.',
+  'Keep your face clearly visible.',
+  'Hold your device steady.',
 ];

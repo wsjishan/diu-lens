@@ -32,8 +32,8 @@ export function BasicInfoStep({
         </p>
       </header>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1">
           <Label
             htmlFor="basic-student-id"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -44,11 +44,11 @@ export function BasicInfoStep({
             id="basic-student-id"
             value={values.studentId}
             readOnly
-            className="h-10 rounded-lg border-slate-300/80 bg-slate-100/80 px-3.5 text-sm text-slate-700 transition-all duration-200 ease-out dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-300"
+            className="h-10 w-full rounded-lg border-slate-300/80 bg-slate-100/80 px-3.5 text-sm text-slate-700 transition-all duration-200 ease-out dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-300"
           />
         </div>
 
-        <div className="space-y-2">
+          <div className="flex flex-col gap-1">
           <Label
             htmlFor="full-name"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -59,12 +59,12 @@ export function BasicInfoStep({
             id="full-name"
             value={values.fullName}
             onChange={(event) => onFieldChange('fullName', event.target.value)}
-            className="h-10 rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
             required
           />
         </div>
 
-        <div className="space-y-2">
+          <div className="flex flex-col gap-1">
           <Label
             htmlFor="phone-number"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -78,12 +78,12 @@ export function BasicInfoStep({
             onChange={(event) =>
               onFieldChange('phoneNumber', event.target.value)
             }
-            className="h-10 rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
             required
           />
         </div>
 
-        <div className="space-y-2">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
           <Label
             htmlFor="university-email"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -98,7 +98,7 @@ export function BasicInfoStep({
             onChange={(event) =>
               onFieldChange('universityEmail', event.target.value)
             }
-            className="h-10 rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
             required
           />
         </div>
@@ -120,7 +120,7 @@ export function BasicInfoStep({
           disabled={
             !values.fullName || !values.phoneNumber || !values.universityEmail
           }
-          className="h-10 gap-2 rounded-lg bg-gradient-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] dark:bg-gradient-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
+          className="h-10 gap-2 rounded-lg bg-linear-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] dark:bg-linear-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
         >
           Continue
           <ArrowRight className="size-4" />

@@ -8,7 +8,7 @@ export function HeroSection({ highlights }: HeroSectionProps) {
   return (
     <section className="space-y-5 lg:pr-3">
       <div className="space-y-4">
-        <h1 className="max-w-[15ch] text-[2.25rem] leading-none font-bold tracking-[-0.02em] text-slate-900 dark:text-slate-50 sm:text-[2.65rem] lg:text-[2.85rem]">
+        <h1 className="max-w-[18ch] break-words text-3xl leading-tight font-bold tracking-[-0.02em] text-slate-900 dark:text-slate-50 sm:text-4xl lg:max-w-[15ch] lg:text-6xl">
           <span className="bg-linear-to-r from-slate-900 to-blue-700 bg-clip-text text-transparent dark:from-slate-100 dark:via-sky-300 dark:to-indigo-400 dark:[text-shadow:0_0_22px_rgba(56,189,248,0.24)]">
             Smart{' '}
             <span className="bg-linear-to-r from-blue-500 to-indigo-400 bg-clip-text text-transparent dark:from-sky-300 dark:to-indigo-300">
@@ -21,7 +21,7 @@ export function HeroSection({ highlights }: HeroSectionProps) {
         </h1>
         <p
           id="how-it-works"
-          className="max-w-[56ch] text-[0.96rem] leading-6 text-slate-700 dark:text-slate-300 sm:text-base"
+          className="max-w-[56ch] text-sm leading-6 text-slate-700 dark:text-slate-300 sm:text-base"
         >
           Verify once and access DIU campus services without repeated
           verification steps.

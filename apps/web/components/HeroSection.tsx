@@ -7,8 +7,12 @@ type HeroSectionProps = {
 export function HeroSection({ highlights }: HeroSectionProps) {
   return (
     <section className="space-y-5 lg:pr-3">
+      <div className="ai-float inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-white/75 px-3 py-1.5 text-[0.68rem] font-semibold tracking-[0.16em] text-blue-700 uppercase shadow-[0_10px_24px_-20px_rgba(37,99,235,0.7)] backdrop-blur-sm dark:border-sky-300/30 dark:bg-sky-950/35 dark:text-sky-200 dark:shadow-[0_0_24px_rgba(56,189,248,0.26)]">
+        <span className="ai-pulse-ring inline-flex size-2 rounded-full bg-sky-400" />
+        AI Identity Layer Online
+      </div>
       <div className="space-y-4">
-        <h1 className="max-w-[18ch] break-words text-3xl leading-tight font-bold tracking-[-0.02em] text-slate-900 dark:text-slate-50 sm:text-4xl lg:max-w-[15ch] lg:text-6xl">
+        <h1 className="max-w-[18ch] wrap-break-word text-3xl leading-tight font-bold tracking-[-0.02em] text-slate-900 dark:text-slate-50 sm:text-4xl lg:max-w-[15ch] lg:text-6xl">
           <span className="bg-linear-to-r from-slate-900 to-blue-700 bg-clip-text text-transparent dark:from-slate-100 dark:via-sky-300 dark:to-indigo-400 dark:[text-shadow:0_0_22px_rgba(56,189,248,0.24)]">
             Smart{' '}
             <span className="bg-linear-to-r from-blue-500 to-indigo-400 bg-clip-text text-transparent dark:from-sky-300 dark:to-indigo-300">
@@ -34,36 +38,36 @@ export function HeroSection({ highlights }: HeroSectionProps) {
         <p className="text-[0.65rem] font-semibold tracking-widest text-slate-500/85 uppercase dark:text-slate-400">
           Registration flow
         </p>
-        <ol className="grid gap-y-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-[auto_auto] sm:items-center sm:gap-x-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2.5 lg:gap-y-2">
-          <li className="inline-flex items-center gap-1.5">
-            <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-sky-500/16 dark:text-sky-300 dark:ring-1 dark:ring-sky-300/25">
+        <ol className="ai-flow-track flex flex-col gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid sm:grid-cols-[auto_auto] sm:items-center sm:gap-x-2.5 lg:flex lg:flex-wrap lg:flex-row lg:items-center lg:gap-x-2.5 lg:gap-y-2">
+          <li className="ai-flow-step inline-flex items-center gap-1.5">
+            <span className="ai-flow-node inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-sky-500/16 dark:text-sky-300 dark:ring-1 dark:ring-sky-300/25">
               1
             </span>
-            <span>Student ID check</span>
+            <span className="ai-flow-label">Student ID check</span>
           </li>
           <span
-            className="text-xs text-slate-300/80 dark:text-slate-600"
+            className="ai-flow-arrow hidden text-xs text-slate-300/80 dark:text-slate-600 sm:inline"
             aria-hidden="true"
           >
             →
           </span>
-          <li className="inline-flex items-center gap-1.5">
-            <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-sky-500/16 dark:text-sky-300 dark:ring-1 dark:ring-sky-300/25">
+          <li className="ai-flow-step inline-flex items-center gap-1.5">
+            <span className="ai-flow-node inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-sky-500/16 dark:text-sky-300 dark:ring-1 dark:ring-sky-300/25">
               2
             </span>
-            <span>Basic information</span>
+            <span className="ai-flow-label">Basic information</span>
           </li>
           <span
-            className="text-xs text-slate-300/80 dark:text-slate-600 sm:hidden lg:inline"
+            className="ai-flow-arrow hidden text-xs text-slate-300/80 dark:text-slate-600 lg:inline"
             aria-hidden="true"
           >
             →
           </span>
-          <li className="inline-flex items-center gap-1.5 sm:col-span-2 lg:col-span-1">
-            <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-sky-500/16 dark:text-sky-300 dark:ring-1 dark:ring-sky-300/25">
+          <li className="ai-flow-step inline-flex items-center gap-1.5 sm:col-span-2 lg:col-span-1">
+            <span className="ai-flow-node inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-sky-500/16 dark:text-sky-300 dark:ring-1 dark:ring-sky-300/25">
               3
             </span>
-            <span>Face verification</span>
+            <span className="ai-flow-label">Face verification</span>
           </li>
         </ol>
         <ul

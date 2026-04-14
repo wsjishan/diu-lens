@@ -87,48 +87,52 @@
 }
 
 .dark {
-  --background: oklch(0.2 0.01 250);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.24 0.01 250);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.24 0.01 250);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.76 0.08 210);
-  --primary-foreground: oklch(0.2 0.01 250);
-  --secondary: oklch(0.3 0.01 250);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.3 0.01 250);
-  --muted-foreground: oklch(0.8 0 0);
-  --accent: oklch(0.35 0.04 210);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.18 0.02 258);
+  --foreground: oklch(0.96 0.01 260);
+  --card: oklch(0.235 0.02 258);
+  --card-foreground: oklch(0.96 0.01 260);
+  --popover: oklch(0.235 0.02 258);
+  --popover-foreground: oklch(0.96 0.01 260);
+  --primary: oklch(0.75 0.14 252);
+  --primary-foreground: oklch(0.19 0.02 258);
+  --secondary: oklch(0.29 0.02 258);
+  --secondary-foreground: oklch(0.93 0.01 260);
+  --muted: oklch(0.275 0.015 258);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --accent: oklch(0.33 0.05 240);
+  --accent-foreground: oklch(0.95 0.01 260);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.76 0.08 210);
+  --border: oklch(0.43 0.02 255 / 45%);
+  --input: oklch(0.33 0.02 255 / 60%);
+  --ring: oklch(0.72 0.14 248);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.205 0.01 258);
+  --sidebar-foreground: oklch(0.95 0.01 260);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-accent: oklch(0.27 0.01 258);
+  --sidebar-accent-foreground: oklch(0.95 0.01 260);
+  --sidebar-border: oklch(0.43 0.02 255 / 45%);
+  --sidebar-ring: oklch(0.68 0.08 245);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground selection:bg-primary/15;
-  }
   html {
     @apply font-sans;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground selection:bg-primary/20 transition-colors duration-150;
   }
   h1,
   h2,

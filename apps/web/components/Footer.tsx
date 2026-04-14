@@ -1,6 +1,6 @@
 export function Footer() {
   return (
-    <footer className="mt-6 border-t border-slate-200/90 px-6 py-4 text-center dark:border-white/10 sm:text-left">
+    <footer className="border-t border-slate-200/90 px-6 py-3 text-center dark:border-white/10 sm:text-left">
       <div className="flex flex-col items-center justify-between gap-2 sm:flex-row sm:items-center">
         <p className="text-[0.72rem] text-slate-500/75 dark:text-slate-400">
           Copyright {new Date().getFullYear()} DIU Lens. All rights reserved.

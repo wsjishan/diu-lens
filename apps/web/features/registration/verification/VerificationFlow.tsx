@@ -13,6 +13,7 @@ import { PreparationStep } from '@/features/registration/verification/Preparatio
 import { VerificationCompleteStep } from '@/features/registration/verification/VerificationCompleteStep';
 import { requiredCapturesPerAngle } from '@/features/registration/verification/constants';
 import { VerificationShell } from '@/features/registration/verification/VerificationShell';
+import { cn } from '@/lib/utils';
 import { useCamera } from '@/features/registration/verification/useCamera';
 import { useVerificationFlow } from '@/features/registration/verification/useVerificationFlow';
 import type { VerificationStage } from '@/features/registration/verification/types';
@@ -197,14 +198,22 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     isComplete,
   ]);
 
+  const isCaptureStage = stage === 'capture' && !isComplete;
+
   return (
-    <div className="min-h-115 sm:min-h-130">
+    <div
+      className={cn(
+        'flex flex-col',
+        isCaptureStage ? 'min-h-115 sm:min-h-130' : 'h-full min-h-76 sm:min-h-80'
+      )}
+    >
       <AnimatePresence
         mode="wait"
         initial={false}
       >
         <motion.div
           key={stage === 'capture' ? `${stage}-${currentAngleIndex}` : stage}
+          className={cn(!isCaptureStage && 'flex h-full flex-col')}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

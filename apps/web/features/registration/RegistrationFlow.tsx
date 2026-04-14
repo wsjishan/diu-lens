@@ -94,13 +94,14 @@ export function RegistrationFlow({
       activeIndex={activeStep}
       steps={registrationStepMeta}
     >
-      <div className="min-h-80 sm:min-h-85">
+      <div className="flex min-h-76 flex-col sm:min-h-80">
         <AnimatePresence
           mode="wait"
           initial={false}
         >
           <motion.div
             key={activeStep}
+            className="flex h-full flex-col"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}

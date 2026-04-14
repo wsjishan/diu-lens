@@ -16,8 +16,8 @@ export function VerificationShell({
   className,
 }: VerificationShellProps) {
   return (
-    <section className={cn('space-y-4', className)}>
-      <header className="space-y-1.5">
+    <section className={cn('flex flex-col gap-5 sm:gap-6', className)}>
+      <header className="space-y-2">
         <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
           {title}
         </h2>

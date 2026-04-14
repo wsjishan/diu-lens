@@ -15,13 +15,13 @@ export default function Home() {
             <div className="ai-orbital absolute bottom-[-26%] left-[-14%] h-88 w-88 rounded-full opacity-65 blur-2xl [animation-delay:-7s] dark:opacity-35" />
             <div className="ai-scan-beam absolute inset-x-0 top-0 h-24 opacity-35 dark:opacity-16" />
           </div>
-          <div className="relative z-10">
+          <div className="relative z-10 shrink-0">
             <Header />
           </div>
-          <main className="relative z-10 flex flex-1 items-center px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+          <main className="relative z-10 flex min-h-0 flex-1 items-center px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-4">
             <HomeOnboardingSection />
           </main>
-          <div className="relative z-10">
+          <div className="relative z-10 shrink-0">
             <Footer />
           </div>
         </div>

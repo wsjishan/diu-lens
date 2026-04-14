@@ -16,8 +16,8 @@ export function StudentIdStep({
   onContinue,
 }: StudentIdStepProps) {
   return (
-    <div className="space-y-4">
-      <header className="space-y-1.5">
+    <div className="space-y-5 sm:space-y-6">
+      <header className="space-y-2">
         <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
           Check Registration Status
         </h2>
@@ -26,7 +26,7 @@ export function StudentIdStep({
         </p>
       </header>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <Label
           htmlFor="student-id"
           className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -50,7 +50,7 @@ export function StudentIdStep({
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="h-10 w-full gap-2 rounded-lg bg-gradient-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-sm font-semibold tracking-tight text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] dark:bg-gradient-to-r dark:from-[#1e3a8a] dark:to-[#2563eb] sm:w-auto"
+        className="h-10 w-full gap-2 rounded-lg bg-linear-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-sm font-semibold tracking-tight text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] sm:w-auto dark:bg-linear-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
       >
         Continue
         <ArrowRight

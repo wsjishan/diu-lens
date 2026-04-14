@@ -9,14 +9,16 @@ import { cn } from '@/lib/utils';
 
 export function HomeOnboardingSection() {
   const [activeStep, setActiveStep] = useState(0);
-  const focused = activeStep > 0;
+  const step = activeStep + 1;
+  const focused = step > 1;
+  const shouldBlur = step >= 2;
 
   return (
     <section className="relative h-full w-full overflow-hidden">
       <div
         className={cn(
           'absolute inset-0 z-0 transition-all duration-500 ease-in-out',
-          focused ? 'scale-[0.98] opacity-40' : 'scale-100 opacity-100'
+          focused ? 'scale-[0.995] opacity-100' : 'scale-100 opacity-100'
         )}
       >
         <div className="grid h-full w-full grid-cols-1 items-center lg:grid-cols-2">
@@ -33,12 +35,12 @@ export function HomeOnboardingSection() {
       <div
         aria-hidden="true"
         className={cn(
-          'absolute inset-0 z-5 bg-black/20 backdrop-blur-md transition-opacity duration-500 ease-in-out',
-          focused ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+          'absolute inset-0 z-10 bg-transparent backdrop-blur-xl backdrop-saturate-125 transition-all duration-500 ease-in-out',
+          shouldBlur ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       />
 
-      <div className="absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      <div className="relative z-20 flex h-full items-center justify-center px-4 sm:px-6 lg:px-8">
         <div
           className={cn(
             'flex w-full items-center transition-all duration-500 ease-in-out',
@@ -47,7 +49,7 @@ export function HomeOnboardingSection() {
         >
           <div
             className={cn(
-              'w-full max-w-md transform-gpu transition-all duration-500 ease-in-out',
+              'w-full max-w-lg transform-gpu transition-all duration-500 ease-in-out',
               focused ? 'translate-x-0 scale-100 opacity-100' : 'translate-x-6 scale-95 opacity-100 lg:translate-x-10'
             )}
           >

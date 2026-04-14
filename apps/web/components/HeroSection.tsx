@@ -7,7 +7,7 @@ type HeroSectionProps = {
 export function HeroSection({ highlights }: HeroSectionProps) {
   return (
     <section className="space-y-5 lg:pr-3">
-      <div className="ai-float inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-white/75 px-3 py-1.5 text-[0.68rem] font-semibold tracking-[0.16em] text-blue-700 uppercase shadow-[0_10px_24px_-20px_rgba(37,99,235,0.7)] backdrop-blur-sm dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-300 dark:shadow-[0_10px_24px_rgba(0,0,0,0.28)]">
+      <div className="ai-float inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-white/75 px-3 py-1.5 text-[0.68rem] font-semibold tracking-[0.16em] text-blue-700 uppercase shadow-[0_10px_24px_-20px_rgba(37,99,235,0.7)] dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-300 dark:shadow-[0_10px_24px_rgba(0,0,0,0.28)]">
         <span className="ai-pulse-ring inline-flex size-2 rounded-full bg-sky-400" />
         AI Identity Layer Online
       </div>

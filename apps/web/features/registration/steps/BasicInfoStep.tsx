@@ -22,8 +22,8 @@ export function BasicInfoStep({
   onContinue,
 }: BasicInfoStepProps) {
   return (
-    <div className="space-y-4">
-      <header className="space-y-1.5">
+    <div className="flex h-full flex-col gap-4 sm:gap-5">
+      <header className="space-y-2">
         <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
           Basic Information
         </h2>
@@ -32,8 +32,8 @@ export function BasicInfoStep({
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
           <Label
             htmlFor="basic-student-id"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -48,7 +48,7 @@ export function BasicInfoStep({
           />
         </div>
 
-          <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           <Label
             htmlFor="full-name"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -58,13 +58,14 @@ export function BasicInfoStep({
           <Input
             id="full-name"
             value={values.fullName}
+            placeholder="Enter your full name"
             onChange={(event) => onFieldChange('fullName', event.target.value)}
-            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/85 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
             required
           />
         </div>
 
-          <div className="flex flex-col gap-1">
+        <div className="col-span-1 flex flex-col gap-1.5 md:col-span-2">
           <Label
             htmlFor="phone-number"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -75,15 +76,16 @@ export function BasicInfoStep({
             id="phone-number"
             inputMode="tel"
             value={values.phoneNumber}
+            placeholder="Enter your phone number"
             onChange={(event) =>
               onFieldChange('phoneNumber', event.target.value)
             }
-            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/85 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
             required
           />
         </div>
 
-          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
+        <div className="col-span-1 flex flex-col gap-1.5 md:col-span-2">
           <Label
             htmlFor="university-email"
             className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
@@ -95,16 +97,17 @@ export function BasicInfoStep({
             type="email"
             autoComplete="email"
             value={values.universityEmail}
+            placeholder="Enter your university email"
             onChange={(event) =>
               onFieldChange('universityEmail', event.target.value)
             }
-            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/85 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
             required
           />
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-auto flex flex-col gap-2.5 border-t border-slate-200/80 pt-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
         <Button
           type="button"
           variant="outline"

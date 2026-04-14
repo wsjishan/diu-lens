@@ -6,9 +6,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { registrationStepMeta } from '@/features/registration/constants';
 import { RegistrationShell } from '@/features/registration/RegistrationShell';
 import { BasicInfoStep } from '@/features/registration/steps/BasicInfoStep';
-import { PrepStep } from '@/features/registration/steps/PrepStep';
 import { StudentIdStep } from '@/features/registration/steps/StudentIdStep';
 import { SuccessStep } from '@/features/registration/steps/SuccessStep';
+import { VerificationFlow } from '@/features/registration/verification/VerificationFlow';
 import type {
   RegistrationFlowProps,
   RegistrationFormValues,
@@ -82,7 +82,7 @@ export function RegistrationFlow({
     }
 
     if (activeStep === 2) {
-      return <PrepStep onContinue={() => setActiveStep(3)} />;
+      return <VerificationFlow onComplete={() => setActiveStep(3)} />;
     }
 
     return <SuccessStep onDone={onDone} />;
@@ -94,7 +94,7 @@ export function RegistrationFlow({
       activeIndex={activeStep}
       steps={registrationStepMeta}
     >
-      <div className="min-h-[320px] sm:min-h-[340px]">
+      <div className="min-h-80 sm:min-h-85">
         <AnimatePresence
           mode="wait"
           initial={false}

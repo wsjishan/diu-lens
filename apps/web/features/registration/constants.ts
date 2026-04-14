@@ -46,7 +46,7 @@ export const registrationStepMeta: RegistrationStepMeta[] = [
 ];
 
 export const registrationPrepTips = [
-  'Ensure good lighting.',
-  'Keep your face clearly visible.',
-  'Hold your device steady.',
+  'Ensure good lighting',
+  'Keep your face clearly visible',
+  'Hold your device steady',
 ];

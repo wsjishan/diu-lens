@@ -27,7 +27,7 @@ type VerificationScreenProps = {
   onRetake: () => void;
   canRetake: boolean;
   autoCaptureHint: string;
-  cameraFallbackMessage: string;
+  cameraFallbackMessage?: string;
 };
 
 export function VerificationScreen({

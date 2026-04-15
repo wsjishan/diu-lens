@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-  autoCaptureDelayMs,
   betweenCapturePauseMs,
   captureConfirmedDisplayMs,
   requiredCapturesPerAngle,
+  validationTickMs,
   verificationAngles,
 } from '@/features/registration/verification/constants';
 import { useCaptureValidation } from '@/features/registration/verification/useCaptureValidation';
@@ -82,8 +82,11 @@ export function useVerificationFlow({
   const [currentAngleIndex, setCurrentAngleIndex] = useState(0);
   const [isAutoCaptureEnabled, setIsAutoCaptureEnabled] = useState(true);
   const [isManualFallback, setIsManualFallback] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [rejectedMessage, setRejectedMessage] = useState<string | null>(null);
   const [lastAcceptedAt, setLastAcceptedAt] = useState<number | null>(null);
+  const [lastAutoCaptureAt, setLastAutoCaptureAt] = useState(0);
+  const [frame, setFrame] = useState<FrameAnalysis | null>(null);
 
   const currentAngle = verificationAngles[currentAngleIndex];
   const currentAngleAccepted = capturesByAngle[currentAngle.id].length;
@@ -100,36 +103,80 @@ export function useVerificationFlow({
 
   const capturedImages = useMemo(
     () =>
-      verificationAngles.flatMap((angle) => capturesByAngle[angle.id]).sort((a, b) => {
-        return a.capturedAt - b.capturedAt;
-      }),
+      verificationAngles
+        .flatMap((angle) => capturesByAngle[angle.id])
+        .sort((a, b) => {
+          return a.capturedAt - b.capturedAt;
+        }),
     [capturesByAngle]
   );
 
   const progressPercent = Math.round((overallAccepted / totalRequired) * 100);
   const progress = progressPercent;
   const isComplete = overallAccepted >= totalRequired;
-  const recentlyCaptured = lastAcceptedAt !== null;
+
+  useEffect(() => {
+    if (!streamActive || isComplete) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setFrame(readFrameAnalysis());
+    }, validationTickMs);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isComplete, readFrameAnalysis, streamActive]);
+
+  const inferredFace = useMemo(() => {
+    if (!frame) {
+      return null;
+    }
+
+    if (frame.contrast < 0.06 || frame.sharpness < 0.08) {
+      return null;
+    }
+
+    return {
+      x: (frame.faceOffsetX + 1) / 2,
+      y: (frame.faceOffsetY + 1) / 2,
+    };
+  }, [frame]);
+
+  const yaw = useMemo(() => {
+    if (!frame) {
+      return 0;
+    }
+
+    return -(frame.horizontalBalance + frame.faceOffsetX * 0.8) * 100;
+  }, [frame]);
+
+  const pitch = useMemo(() => {
+    if (!frame) {
+      return 0;
+    }
+
+    return -(frame.verticalBalance - frame.faceOffsetY * 0.65) * 100;
+  }, [frame]);
 
   const { validation, captureState, primaryMessage, statusLabel } =
     useCaptureValidation({
-      streamActive,
-      angle: currentAngle,
-      acceptedForAngle: currentAngleAccepted,
-      recentlyCaptured,
-      readFrameAnalysis,
+      face: inferredFace,
+      yaw,
+      pitch,
+      frame,
+      currentAngle: currentAngle.id,
     });
 
-  const feedback = rejectedMessage ?? primaryMessage;
+  const feedback = rejectedMessage ?? validation.feedback ?? primaryMessage;
   const canCapture = validation.canCapture;
   const isAutoCaptureActive =
     streamActive &&
     !isComplete &&
     isAutoCaptureEnabled &&
     !isManualFallback &&
-    currentAngleAccepted < requiredCapturesPerAngle &&
-    validation.canCapture;
-  const isCapturing = isAutoCaptureActive;
+    currentAngleAccepted < requiredCapturesPerAngle;
 
   useEffect(() => {
     if (!rejectedMessage) {
@@ -148,11 +195,13 @@ export function useVerificationFlow({
   const acceptCapture = useCallback(
     (source: CaptureSource) => {
       if (!streamActive || isComplete) {
+        setIsCapturing(false);
         return;
       }
 
       if (!validation.canCapture) {
-        setRejectedMessage(primaryMessage);
+        setRejectedMessage(validation.feedback || primaryMessage);
+        setIsCapturing(false);
         return;
       }
 
@@ -161,6 +210,7 @@ export function useVerificationFlow({
         setRejectedMessage(
           'Unable to capture frame. Please hold still and retry.'
         );
+        setIsCapturing(false);
         return;
       }
 
@@ -189,8 +239,11 @@ export function useVerificationFlow({
             setCurrentAngleIndex((index) => index + 1);
           }, betweenCapturePauseMs);
         }
+        setIsCapturing(false);
         return;
       }
+
+      setIsCapturing(false);
     },
     [
       captureFrame,
@@ -200,6 +253,7 @@ export function useVerificationFlow({
       isComplete,
       primaryMessage,
       streamActive,
+      validation.feedback,
       validation.canCapture,
     ]
   );
@@ -242,18 +296,35 @@ export function useVerificationFlow({
   }, [isComplete]);
 
   useEffect(() => {
-    if (!isAutoCaptureActive) {
+    if (!isAutoCaptureActive || isCapturing) {
       return;
     }
 
-    const captureTimer = window.setTimeout(() => {
+    if (!validation.canCapture) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastAutoCaptureAt < 1000) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsCapturing(true);
+      setLastAutoCaptureAt(Date.now());
       acceptCapture('auto');
-    }, autoCaptureDelayMs);
+    }, 0);
 
     return () => {
-      window.clearTimeout(captureTimer);
+      window.clearTimeout(timer);
     };
-  }, [acceptCapture, isAutoCaptureActive]);
+  }, [
+    acceptCapture,
+    isAutoCaptureActive,
+    isCapturing,
+    lastAutoCaptureAt,
+    validation.canCapture,
+  ]);
 
   useEffect(() => {
     if (!lastAcceptedAt) {

@@ -1,25 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import {
-  autoCaptureDelayMs,
-  poseCorrectionByAngle,
-  requiredCapturesPerAngle,
-  requiredStableTicks,
-  validationTickMs,
-} from '@/features/registration/verification/constants';
 import type {
   CaptureState,
   CaptureValidation,
   FrameAnalysis,
-  VerificationAngle,
+  VerificationAngleId,
 } from '@/features/registration/verification/types';
 
+export type ValidationState = {
+  faceDetected: boolean;
+  isCentered: boolean;
+  poseMatched: boolean;
+  isStable: boolean;
+  lightingOk: boolean;
+  isSharpEnough: boolean;
+  canCapture: boolean;
+  feedback: string;
+};
+
+type FacePosition = {
+  x: number;
+  y: number;
+};
+
 type UseCaptureValidationOptions = {
-  streamActive: boolean;
-  angle: VerificationAngle;
-  acceptedForAngle: number;
-  recentlyCaptured: boolean;
-  readFrameAnalysis: () => FrameAnalysis | null;
+  face: FacePosition | null;
+  yaw: number;
+  pitch: number;
+  frame: FrameAnalysis | null;
+  currentAngle: VerificationAngleId;
 };
 
 type CaptureValidationResult = {
@@ -29,238 +38,162 @@ type CaptureValidationResult = {
   statusLabel: string;
 };
 
-function detectDirection(analysis: FrameAnalysis) {
-  const horizontal = analysis.horizontalBalance + analysis.faceOffsetX * 0.8;
-  const vertical = analysis.verticalBalance - analysis.faceOffsetY * 0.65;
+const stabilityTickMs = 100;
+const requiredStableTimeMs = 600;
+const sharpnessThreshold = 80;
 
-  const horizontalThreshold = 0.04;
-  const verticalThreshold = 0.035;
+function getPoseInstruction(angle: VerificationAngleId) {
+  switch (angle) {
+    case 'front':
+      return 'Look straight at the camera';
+    case 'left':
+      return 'Turn slightly left';
+    case 'right':
+      return 'Turn slightly right';
+    case 'up':
+      return 'Look slightly up';
+    case 'down':
+      return 'Look slightly down';
+    default:
+      return 'Adjust your pose';
+  }
+}
 
-  const strongestHorizontal = Math.abs(horizontal) >= Math.abs(vertical);
+function checkPose(angle: VerificationAngleId, yaw: number, pitch: number) {
+  switch (angle) {
+    case 'front':
+      return Math.abs(yaw) < 10 && Math.abs(pitch) < 10;
+    case 'left':
+      return yaw < -15 && yaw > -40;
+    case 'right':
+      return yaw > 15 && yaw < 40;
+    case 'up':
+      return pitch < -10;
+    case 'down':
+      return pitch > 10;
+    default:
+      return false;
+  }
+}
 
-  if (strongestHorizontal && horizontal > horizontalThreshold) {
-    return 'left' as const;
+function getAverageBrightness(frame: FrameAnalysis | null) {
+  if (!frame) {
+    return 0;
   }
 
-  if (strongestHorizontal && horizontal < -horizontalThreshold) {
-    return 'right' as const;
+  return frame.brightness * 255;
+}
+
+function varianceOfLaplacian(frame: FrameAnalysis | null) {
+  if (!frame) {
+    return 0;
   }
 
-  if (!strongestHorizontal && vertical > verticalThreshold) {
-    return 'up' as const;
-  }
-
-  if (!strongestHorizontal && vertical < -verticalThreshold) {
-    return 'down' as const;
-  }
-
-  return 'front' as const;
+  // Camera analysis does not expose laplacian directly, so we map sharpness.
+  return frame.sharpness * 1000;
 }
 
 export function useCaptureValidation({
-  streamActive,
-  angle,
-  acceptedForAngle,
-  recentlyCaptured,
-  readFrameAnalysis,
+  face,
+  yaw,
+  pitch,
+  frame,
+  currentAngle,
 }: UseCaptureValidationOptions): CaptureValidationResult {
-  const [analysis, setAnalysis] = useState<FrameAnalysis | null>(null);
-  const [stableTicks, setStableTicks] = useState(0);
+  const faceDetected = !!face;
+  const isCentered =
+    !!face && face.x > 0.3 && face.x < 0.7 && face.y > 0.3 && face.y < 0.7;
+  const poseMatched = checkPose(currentAngle, yaw, pitch);
+
+  const [stableTime, setStableTime] = useState(0);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setAnalysis(null);
-      setStableTicks(0);
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [acceptedForAngle, angle.id]);
-
-  useEffect(() => {
-    if (!streamActive || acceptedForAngle >= requiredCapturesPerAngle) {
-      return;
-    }
-
     const timer = window.setInterval(() => {
-      const nextAnalysis = readFrameAnalysis();
-
-      if (!nextAnalysis) {
-        return;
-      }
-
-      setAnalysis(nextAnalysis);
-
-      const faceDetected =
-        nextAnalysis.sharpness > 0.08 && nextAnalysis.contrast > 0.06;
-      const lightingOk =
-        nextAnalysis.brightness > 0.24 && nextAnalysis.brightness < 0.88;
-      const isCentered = nextAnalysis.centerContrastRatio > 0.88;
-      const isSharpEnough = nextAnalysis.sharpness > 0.1;
-      const detectedDirection = detectDirection(nextAnalysis);
-
-      const poseMatched = detectedDirection === angle.id;
-
-      const enoughForStability =
-        faceDetected &&
-        lightingOk &&
-        isCentered &&
-        poseMatched &&
-        isSharpEnough;
-
-      setStableTicks((value) => {
-        if (!enoughForStability) {
-          return 0;
+      setStableTime((value) => {
+        if (poseMatched && isCentered) {
+          return value + stabilityTickMs;
         }
 
-        return nextAnalysis.motion < 0.03 ? value + 1 : 0;
+        return 0;
       });
-    }, validationTickMs);
+    }, stabilityTickMs);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [acceptedForAngle, angle.id, readFrameAnalysis, streamActive]);
+  }, [isCentered, poseMatched]);
 
-  const validation = useMemo<CaptureValidation>(() => {
-    if (!streamActive || !analysis) {
-      return {
-        faceDetected: false,
-        isCentered: false,
-        poseMatched: false,
-        detectedDirection: null,
-        isSharpEnough: false,
-        lightingOk: false,
-        isStable: false,
-        holdProgress: 0,
-        canCapture: false,
-      };
-    }
+  const isStable = stableTime > requiredStableTimeMs;
 
-    const faceDetected = analysis.sharpness > 0.08 && analysis.contrast > 0.06;
-    const lightingOk = analysis.brightness > 0.24 && analysis.brightness < 0.88;
-    const isCentered = analysis.centerContrastRatio > 0.88;
-    const detectedDirection = detectDirection(analysis);
-    const poseMatched = detectedDirection === angle.id;
+  const brightness = getAverageBrightness(frame);
+  const lightingOk = brightness > 60 && brightness < 200;
 
-    const isSharpEnough = analysis.sharpness > 0.1;
-    const isStable =
-      stableTicks >= requiredStableTicks && analysis.motion < 0.03;
-    const holdTicksNeeded = Math.max(
-      requiredStableTicks,
-      Math.ceil(autoCaptureDelayMs / validationTickMs)
-    );
-    const holdProgress = Math.min(stableTicks / holdTicksNeeded, 1);
+  const sharpness = varianceOfLaplacian(frame);
+  const isSharpEnough = sharpness > sharpnessThreshold;
 
-    const canCapture =
-      faceDetected &&
-      isCentered &&
-      poseMatched &&
-      isSharpEnough &&
-      lightingOk &&
-      isStable;
+  const canCapture =
+    faceDetected &&
+    isCentered &&
+    poseMatched &&
+    isStable &&
+    lightingOk &&
+    isSharpEnough;
 
-    return {
+  let feedback = '';
+
+  if (!faceDetected) {
+    feedback = 'No face detected';
+  } else if (!isCentered) {
+    feedback = 'Center your face';
+  } else if (!poseMatched) {
+    feedback = getPoseInstruction(currentAngle);
+  } else if (!lightingOk) {
+    feedback = 'Adjust lighting';
+  } else if (!isSharpEnough) {
+    feedback = 'Image too blurry';
+  } else if (!isStable) {
+    feedback = 'Hold still';
+  } else {
+    feedback = 'Ready';
+  }
+
+  const validation = useMemo<CaptureValidation>(
+    () => ({
       faceDetected,
       isCentered,
       poseMatched,
-      detectedDirection,
+      detectedDirection: poseMatched ? currentAngle : null,
       isSharpEnough,
       lightingOk,
       isStable,
-      holdProgress,
+      holdProgress: Math.min(stableTime / requiredStableTimeMs, 1),
       canCapture,
-    };
-  }, [analysis, angle.id, stableTicks, streamActive]);
+      feedback,
+    }),
+    [
+      canCapture,
+      currentAngle,
+      faceDetected,
+      feedback,
+      isCentered,
+      isSharpEnough,
+      isStable,
+      lightingOk,
+      poseMatched,
+      stableTime,
+    ]
+  );
 
-  const status = useMemo(() => {
-    if (acceptedForAngle >= requiredCapturesPerAngle) {
-      return {
-        captureState: 'angle-complete' as const,
-        statusLabel: 'Angle complete',
-        primaryMessage: 'Angle complete. Preparing next instruction.',
-      };
-    }
-
-    if (!streamActive) {
-      return {
-        captureState: 'waiting' as const,
-        statusLabel: 'Waiting',
-        primaryMessage: 'Enable your camera to begin validation.',
-      };
-    }
-
-    if (recentlyCaptured) {
-      return {
-        captureState: 'captured' as const,
-        statusLabel: 'Captured',
-        primaryMessage: 'Valid capture accepted.',
-      };
-    }
-
-    if (!validation.faceDetected) {
-      return {
-        captureState: 'aligning' as const,
-        statusLabel: 'Aligning',
-        primaryMessage: 'Move your face into view.',
-      };
-    }
-
-    if (!validation.lightingOk) {
-      return {
-        captureState: 'aligning' as const,
-        statusLabel: 'Aligning',
-        primaryMessage: 'Lighting too low.',
-      };
-    }
-
-    if (!validation.isCentered) {
-      return {
-        captureState: 'aligning' as const,
-        statusLabel: 'Aligning',
-        primaryMessage: 'Center your face in the guide.',
-      };
-    }
-
-    if (!validation.poseMatched) {
-      return {
-        captureState: 'aligning' as const,
-        statusLabel: 'Aligning',
-        primaryMessage:
-          validation.detectedDirection && validation.detectedDirection !== 'front'
-            ? `Detected: ${validation.detectedDirection}. ${poseCorrectionByAngle[angle.id]}`
-            : poseCorrectionByAngle[angle.id],
-      };
-    }
-
-    if (!validation.isSharpEnough) {
-      return {
-        captureState: 'aligning' as const,
-        statusLabel: 'Aligning',
-        primaryMessage: 'Hold your device steady for a sharper image.',
-      };
-    }
-
-    if (!validation.isStable) {
-      return {
-        captureState: 'aligning' as const,
-        statusLabel: 'Aligning',
-        primaryMessage: 'Hold still for auto-capture.',
-      };
-    }
-
-    return {
-      captureState: 'ready' as const,
-      statusLabel: 'Ready',
-      primaryMessage: 'Ready for auto-capture.',
-    };
-  }, [acceptedForAngle, angle.id, recentlyCaptured, streamActive, validation]);
+  const captureState: CaptureState = canCapture
+    ? 'ready'
+    : faceDetected
+      ? 'aligning'
+      : 'waiting';
 
   return {
     validation,
-    captureState: status.captureState,
-    primaryMessage: status.primaryMessage,
-    statusLabel: status.statusLabel,
+    captureState,
+    primaryMessage: feedback,
+    statusLabel: canCapture ? 'Ready' : 'Aligning',
   };
 }

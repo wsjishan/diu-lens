@@ -65,6 +65,7 @@ export type CaptureValidation = {
   isStable: boolean;
   holdProgress: number;
   canCapture: boolean;
+  feedback: string;
 };
 
 export type CameraHookResult = {

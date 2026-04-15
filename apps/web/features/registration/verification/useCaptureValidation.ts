@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   CaptureState,
@@ -105,17 +105,26 @@ export function useCaptureValidation({
     !!face && face.x > 0.3 && face.x < 0.7 && face.y > 0.3 && face.y < 0.7;
   const poseMatched = checkPose(currentAngle, yaw, pitch);
 
+  const stableTimeRef = useRef(0);
+  const previousTickRef = useRef<number | null>(null);
   const [stableTime, setStableTime] = useState(0);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setStableTime((value) => {
-        if (poseMatched && isCentered) {
-          return value + stabilityTickMs;
-        }
+    previousTickRef.current = null;
 
-        return 0;
-      });
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const previous = previousTickRef.current ?? now;
+      const deltaTime = now - previous;
+      previousTickRef.current = now;
+
+      if (poseMatched && isCentered) {
+        stableTimeRef.current += deltaTime;
+      } else {
+        stableTimeRef.current = 0;
+      }
+
+      setStableTime(stableTimeRef.current);
     }, stabilityTickMs);
 
     return () => {
@@ -138,6 +147,30 @@ export function useCaptureValidation({
     isStable &&
     lightingOk &&
     isSharpEnough;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      return;
+    }
+
+    console.log({
+      faceDetected,
+      isCentered,
+      poseMatched,
+      isStable,
+      lightingOk,
+      isSharpEnough,
+      canCapture,
+    });
+  }, [
+    canCapture,
+    faceDetected,
+    isCentered,
+    isSharpEnough,
+    isStable,
+    lightingOk,
+    poseMatched,
+  ]);
 
   let feedback = '';
 

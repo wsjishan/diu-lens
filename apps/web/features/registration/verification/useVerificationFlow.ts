@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   betweenCapturePauseMs,
   captureConfirmedDisplayMs,
   requiredCapturesPerAngle,
-  validationTickMs,
   verificationAngles,
 } from '@/features/registration/verification/constants';
 import { useCaptureValidation } from '@/features/registration/verification/useCaptureValidation';
@@ -85,8 +84,9 @@ export function useVerificationFlow({
   const [isCapturing, setIsCapturing] = useState(false);
   const [rejectedMessage, setRejectedMessage] = useState<string | null>(null);
   const [lastAcceptedAt, setLastAcceptedAt] = useState<number | null>(null);
-  const [lastAutoCaptureAt, setLastAutoCaptureAt] = useState(0);
   const [frame, setFrame] = useState<FrameAnalysis | null>(null);
+  const lastCaptureTimeRef = useRef(0);
+  const CAPTURE_COOLDOWN = 1000;
 
   const currentAngle = verificationAngles[currentAngleIndex];
   const currentAngleAccepted = capturesByAngle[currentAngle.id].length;
@@ -120,12 +120,25 @@ export function useVerificationFlow({
       return;
     }
 
-    const timer = window.setInterval(() => {
+    let frameRequest = 0;
+    let mounted = true;
+
+    const readNextFrame = () => {
+      if (!mounted) {
+        return;
+      }
+
       setFrame(readFrameAnalysis());
-    }, validationTickMs);
+      frameRequest = window.requestAnimationFrame(readNextFrame);
+    };
+
+    frameRequest = window.requestAnimationFrame(readNextFrame);
 
     return () => {
-      window.clearInterval(timer);
+      mounted = false;
+      if (frameRequest) {
+        window.cancelAnimationFrame(frameRequest);
+      }
     };
   }, [isComplete, readFrameAnalysis, streamActive]);
 
@@ -296,22 +309,18 @@ export function useVerificationFlow({
   }, [isComplete]);
 
   useEffect(() => {
-    if (!isAutoCaptureActive || isCapturing) {
-      return;
-    }
-
-    if (!validation.canCapture) {
+    if (!isAutoCaptureActive || isCapturing || !validation.canCapture) {
       return;
     }
 
     const now = Date.now();
-    if (now - lastAutoCaptureAt < 1000) {
+    if (now - lastCaptureTimeRef.current < CAPTURE_COOLDOWN) {
       return;
     }
 
     const timer = window.setTimeout(() => {
+      lastCaptureTimeRef.current = Date.now();
       setIsCapturing(true);
-      setLastAutoCaptureAt(Date.now());
       acceptCapture('auto');
     }, 0);
 
@@ -320,9 +329,10 @@ export function useVerificationFlow({
     };
   }, [
     acceptCapture,
+    currentAngleAccepted,
+    currentAngle.id,
     isAutoCaptureActive,
     isCapturing,
-    lastAutoCaptureAt,
     validation.canCapture,
   ]);
 

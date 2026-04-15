@@ -71,16 +71,30 @@ export function useCamera(): CameraHookResult {
     }
 
     videoElement.srcObject = stream;
+    videoElement.muted = true;
+    videoElement.playsInline = true;
 
     const playVideo = async () => {
       try {
         await videoElement.play();
       } catch {
-        videoElement.pause();
+        // Ignore initial autoplay races and retry on media readiness events.
       }
     };
 
+    const retryPlayback = () => {
+      void playVideo();
+    };
+
+    videoElement.addEventListener('loadedmetadata', retryPlayback);
+    videoElement.addEventListener('canplay', retryPlayback);
+
     void playVideo();
+
+    return () => {
+      videoElement.removeEventListener('loadedmetadata', retryPlayback);
+      videoElement.removeEventListener('canplay', retryPlayback);
+    };
   }, [stream, videoAttachVersion]);
 
   const requestAccess = useCallback(async () => {

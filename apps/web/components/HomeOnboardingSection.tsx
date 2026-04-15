@@ -12,6 +12,7 @@ export function HomeOnboardingSection() {
   const step = activeStep + 1;
   const focused = step > 1;
   const shouldBlur = step >= 2;
+  const isVerificationStep = activeStep === 2;
 
   return (
     <section className="relative w-full min-h-0 lg:h-full">
@@ -51,7 +52,8 @@ export function HomeOnboardingSection() {
         >
           <div
             className={cn(
-              'w-full max-w-lg transform-gpu transition-all duration-500 ease-in-out',
+              'w-full transform-gpu transition-all duration-500 ease-in-out',
+              isVerificationStep ? 'max-w-5xl' : 'max-w-lg',
               focused
                 ? 'translate-x-0 scale-100 opacity-100'
                 : 'translate-x-0 scale-100 opacity-100 lg:translate-x-10 lg:scale-95'

@@ -13,6 +13,7 @@ import type {
   RegistrationFlowProps,
   RegistrationFormValues,
 } from '@/features/registration/types';
+import { cn } from '@/lib/utils';
 
 const transition = {
   duration: 0.24,
@@ -88,29 +89,39 @@ export function RegistrationFlow({
     return <SuccessStep onDone={onDone} />;
   }, [activeStep, onDone, values]);
 
+  const isVerificationStep = activeStep === 2;
+
+  const stepContent = (
+    <div className="flex min-h-76 flex-col sm:min-h-80">
+      <AnimatePresence
+        mode="wait"
+        initial={false}
+      >
+        <motion.div
+          key={activeStep}
+          className="flex h-full flex-col"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={transition}
+        >
+          {renderedStep}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+
+  if (isVerificationStep) {
+    return <section className={cn('w-full', className)}>{stepContent}</section>;
+  }
+
   return (
     <RegistrationShell
       className={className}
       activeIndex={activeStep}
       steps={registrationStepMeta}
     >
-      <div className="flex min-h-76 flex-col sm:min-h-80">
-        <AnimatePresence
-          mode="wait"
-          initial={false}
-        >
-          <motion.div
-            key={activeStep}
-            className="flex h-full flex-col"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={transition}
-          >
-            {renderedStep}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      {stepContent}
     </RegistrationShell>
   );
 }

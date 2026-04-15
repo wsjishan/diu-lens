@@ -1,22 +1,13 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 
-import { registrationPrepTips } from '@/features/registration/constants';
-import { AngleGuide } from '@/features/registration/verification/AngleGuide';
-import { CameraPreview } from '@/features/registration/verification/CameraPreview';
-import { CameraPermissionStep } from '@/features/registration/verification/CameraPermissionStep';
-import { CaptureControls } from '@/features/registration/verification/CaptureControls';
-import { CaptureProgress } from '@/features/registration/verification/CaptureProgress';
-import { PreparationStep } from '@/features/registration/verification/PreparationStep';
-import { VerificationCompleteStep } from '@/features/registration/verification/VerificationCompleteStep';
 import { requiredCapturesPerAngle } from '@/features/registration/verification/constants';
-import { VerificationShell } from '@/features/registration/verification/VerificationShell';
-import { cn } from '@/lib/utils';
+import { VerificationScreen } from '@/features/registration/verification/VerificationScreen';
 import { useCamera } from '@/features/registration/verification/useCamera';
 import { useVerificationFlow } from '@/features/registration/verification/useVerificationFlow';
-import type { VerificationStage } from '@/features/registration/verification/types';
+import { Button } from '@/components/ui/button';
 
 const transition = {
   duration: 0.24,
@@ -39,29 +30,23 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     resetPermission,
     stopStream,
   } = useCamera();
-  const [stage, setStage] = useState<VerificationStage>('preparation');
+
   const {
     angles,
     currentAngle,
     currentAngleIndex,
     currentAngleAccepted,
     currentCaptureIndex,
-    capturesByAngle,
     feedback,
     statusLabel,
-    captureState,
-    validation,
-    overallAccepted,
-    totalRequired,
-    progressPercent,
     isAutoCaptureEnabled,
     isAutoCaptureActive,
     isManualFallback,
     isComplete,
     captureManually,
     retakeCurrentShot,
-    enableManualFallback,
     resumeAutoCapture,
+    canCapture,
   } = useVerificationFlow({
     streamActive,
     captureFrame,
@@ -69,151 +54,137 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
   });
 
   useEffect(() => {
-    if (stage === 'complete' || isComplete) {
+    if (isComplete) {
       stopStream();
     }
-  }, [isComplete, stage, stopStream]);
+  }, [isComplete, stopStream]);
+
+  useEffect(() => {
+    if (permissionState === 'idle') {
+      void requestAccess();
+    }
+  }, [permissionState, requestAccess]);
+
+  useEffect(() => {
+    return () => {
+      stopStream();
+    };
+  }, [stopStream]);
 
   const renderedStep = useMemo(() => {
-    if (stage === 'preparation') {
+    if (isComplete) {
       return (
-        <PreparationStep
-          tips={registrationPrepTips}
-          onOpenCamera={() => setStage('permission')}
-        />
-      );
-    }
-
-    if (stage === 'permission') {
-      return (
-        <CameraPermissionStep
-          status={permissionState}
-          errorMessage={errorMessage}
-          onAllowAccess={async () => {
-            const granted = await requestAccess();
-
-            if (granted) {
-              setStage('capture');
-            }
-          }}
-          onRetry={() => {
-            resetPermission();
-            requestAccess().then((granted) => {
-              if (granted) {
-                setStage('capture');
-              }
-            });
-          }}
-        />
-      );
-    }
-
-    if (stage === 'capture' && !isComplete) {
-      return (
-        <VerificationShell
-          title={currentAngle.title}
-          description={currentAngle.guidance}
-        >
-          <div className="space-y-4">
-            <CaptureProgress
-              angleIndex={currentAngleIndex}
-              totalAngles={angles.length}
-              captureIndex={currentCaptureIndex}
-              acceptedForAngle={currentAngleAccepted}
-              overallAccepted={overallAccepted}
-              totalRequired={totalRequired}
-              progressPercent={progressPercent}
-              capturesForAngle={capturesByAngle[currentAngle.id]}
-              captureState={captureState}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-              <CameraPreview
-                videoRef={videoRef}
-                streamActive={streamActive}
-                captureState={captureState}
-                isAligned={validation.isCentered && validation.poseMatched}
-              />
-
-              <AngleGuide
-                angle={currentAngle}
-                feedback={feedback}
-                captureState={captureState}
-                statusLabel={statusLabel}
-                validation={validation}
-              />
-            </div>
-
-            <CaptureControls
-              isAutoCaptureActive={isAutoCaptureActive}
-              isAutoCaptureEnabled={isAutoCaptureEnabled}
-              isManualFallback={isManualFallback}
-              captureState={captureState}
-              canRetake={currentAngleAccepted > 0}
-              onManualCapture={captureManually}
-              onRetake={retakeCurrentShot}
-              onEnableManual={enableManualFallback}
-              onResumeAuto={resumeAutoCapture}
-            />
-
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Each angle requires {requiredCapturesPerAngle} accepted captures
-              before moving forward.
+        <section className="flex h-full min-h-0 items-center justify-center px-2 py-2 sm:px-4 sm:py-4">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 text-center shadow-[0_14px_40px_-30px_rgba(15,23,42,0.45)]">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+              Verification complete
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              All 5 angles were captured successfully. Continue to finish your
+              registration.
             </p>
+            <Button
+              type="button"
+              size="lg"
+              onClick={onComplete}
+              className="mt-6 h-11 rounded-xl px-6"
+            >
+              Finish Registration
+            </Button>
           </div>
-        </VerificationShell>
+        </section>
       );
     }
 
-    return <VerificationCompleteStep onFinish={onComplete} />;
+    const permissionBlocked = permissionState !== 'granted';
+    const helperText = permissionBlocked
+      ? 'Allow camera access to continue with guided face verification.'
+      : currentAngle.guidance;
+
+    const permissionFeedback =
+      errorMessage ??
+      (permissionState === 'unsupported'
+        ? 'Camera is not supported in this browser.'
+        : 'Enable your camera to start the live preview.');
+
+    const feedbackText = permissionBlocked ? permissionFeedback : feedback;
+
+    return (
+      <VerificationScreen
+        instruction={currentAngle.title}
+        helperText={helperText}
+        feedback={feedbackText}
+        stepIndex={currentAngleIndex}
+        totalSteps={angles.length}
+        captureIndex={currentCaptureIndex}
+        requiredCaptures={requiredCapturesPerAngle}
+        videoRef={videoRef}
+        streamActive={streamActive}
+        permissionBlocked={permissionBlocked}
+        isRequestingPermission={permissionState === 'requesting'}
+        isAutoCaptureActive={isAutoCaptureActive}
+        isAutoCaptureEnabled={isAutoCaptureEnabled}
+        isManualFallback={isManualFallback}
+        canCaptureNow={canCapture}
+        onEnableCamera={() => {
+          if (permissionBlocked) {
+            resetPermission();
+            void requestAccess();
+          }
+        }}
+        onCaptureNow={() => {
+          captureManually();
+        }}
+        onResumeAutoCapture={resumeAutoCapture}
+        onRetake={retakeCurrentShot}
+        canRetake={currentAngleAccepted > 0}
+        autoCaptureHint={
+          permissionBlocked
+            ? permissionFeedback
+            : isAutoCaptureActive
+              ? 'Hold still. Auto-capture in progress.'
+              : isManualFallback
+                ? 'Manual mode active. Resume auto-capture anytime.'
+                : isAutoCaptureEnabled
+                  ? 'Align your face and hold still for auto-capture.'
+                  : statusLabel
+        }
+      />
+    );
   }, [
     angles.length,
+    canCapture,
     captureManually,
-    capturesByAngle,
     currentAngle,
     currentAngleAccepted,
     currentAngleIndex,
     currentCaptureIndex,
-    captureState,
-    enableManualFallback,
     feedback,
     errorMessage,
     isAutoCaptureActive,
     isAutoCaptureEnabled,
     isManualFallback,
     onComplete,
-    overallAccepted,
     permissionState,
-    progressPercent,
     requestAccess,
     resetPermission,
     resumeAutoCapture,
     retakeCurrentShot,
     statusLabel,
-    stage,
     streamActive,
-    totalRequired,
-    validation,
     videoRef,
     isComplete,
   ]);
 
-  const isCaptureStage = stage === 'capture' && !isComplete;
-
   return (
-    <div
-      className={cn(
-        'flex flex-col',
-        isCaptureStage ? 'min-h-115 sm:min-h-130' : 'h-full min-h-76 sm:min-h-80'
-      )}
-    >
+    <div className="flex h-full min-h-80 flex-col">
       <AnimatePresence
         mode="wait"
         initial={false}
       >
         <motion.div
-          key={stage === 'capture' ? `${stage}-${currentAngleIndex}` : stage}
-          className={cn(!isCaptureStage && 'flex h-full flex-col')}
+          key={isComplete ? 'complete' : `capture-${currentAngleIndex}`}
+          className="flex h-full flex-col"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

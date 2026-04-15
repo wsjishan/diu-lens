@@ -22,10 +22,13 @@ import type {
 type VerificationFlowState = {
   angles: VerificationAngle[];
   currentAngle: VerificationAngle;
+  step: number;
   currentAngleIndex: number;
   currentAngleAccepted: number;
   currentCaptureIndex: number;
+  capture: number;
   capturesByAngle: CapturesByAngle;
+  capturedImages: CapturedFrame[];
   feedback: string;
   statusLabel: string;
   captureState: CaptureState;
@@ -35,9 +38,11 @@ type VerificationFlowState = {
   lastAcceptedAt: number | null;
   overallAccepted: number;
   totalRequired: number;
+  progress: number;
   progressPercent: number;
   isAutoCaptureEnabled: boolean;
   isAutoCaptureActive: boolean;
+  isCapturing: boolean;
   isManualFallback: boolean;
   isComplete: boolean;
   captureManually: () => void;
@@ -93,7 +98,16 @@ export function useVerificationFlow({
     [capturesByAngle]
   );
 
+  const capturedImages = useMemo(
+    () =>
+      verificationAngles.flatMap((angle) => capturesByAngle[angle.id]).sort((a, b) => {
+        return a.capturedAt - b.capturedAt;
+      }),
+    [capturesByAngle]
+  );
+
   const progressPercent = Math.round((overallAccepted / totalRequired) * 100);
+  const progress = progressPercent;
   const isComplete = overallAccepted >= totalRequired;
   const recentlyCaptured = lastAcceptedAt !== null;
 
@@ -115,6 +129,7 @@ export function useVerificationFlow({
     !isManualFallback &&
     currentAngleAccepted < requiredCapturesPerAngle &&
     validation.canCapture;
+  const isCapturing = isAutoCaptureActive;
 
   useEffect(() => {
     if (!rejectedMessage) {
@@ -257,13 +272,16 @@ export function useVerificationFlow({
   return {
     angles: verificationAngles,
     currentAngle,
+    step: currentAngleIndex,
     currentAngleIndex,
     currentAngleAccepted,
     currentCaptureIndex: Math.min(
       currentAngleAccepted + 1,
       requiredCapturesPerAngle
     ),
+    capture: Math.min(currentAngleAccepted + 1, requiredCapturesPerAngle),
     capturesByAngle,
+    capturedImages,
     feedback,
     statusLabel,
     captureState,
@@ -273,9 +291,11 @@ export function useVerificationFlow({
     lastAcceptedAt,
     overallAccepted,
     totalRequired,
+    progress,
     progressPercent,
     isAutoCaptureEnabled,
     isAutoCaptureActive,
+    isCapturing,
     isManualFallback,
     isComplete,
     captureManually,

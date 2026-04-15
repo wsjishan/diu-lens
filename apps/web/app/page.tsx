@@ -18,7 +18,7 @@ export default function Home() {
           <div className="relative z-10 shrink-0">
             <Header />
           </div>
-          <main className="relative z-10 flex min-h-0 flex-1 items-start px-4 py-3 sm:px-6 sm:py-4 lg:items-center lg:px-8 lg:py-4">
+          <main className="relative z-10 flex min-h-0 flex-1 items-start px-4 py-2 sm:px-6 sm:py-3 lg:items-center lg:px-8 lg:py-2">
             <HomeOnboardingSection />
           </main>
           <div className="relative z-10 shrink-0">

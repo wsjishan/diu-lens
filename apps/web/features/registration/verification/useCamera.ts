@@ -27,11 +27,16 @@ export function useCamera(): CameraHookResult {
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousLumaRef = useRef<Float32Array | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [videoAttachVersion, setVideoAttachVersion] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<PermissionState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const streamActive = Boolean(stream);
+
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
 
   const videoRef = useCallback((node: HTMLVideoElement | null) => {
     videoElementRef.current = node;
@@ -46,9 +51,11 @@ export function useCamera(): CameraHookResult {
       videoElement.srcObject = null;
     }
 
-    stopMediaTracks(stream);
+    stopMediaTracks(streamRef.current);
+    streamRef.current = null;
     setStream(null);
-  }, [stream]);
+    previousLumaRef.current = null;
+  }, []);
 
   useEffect(() => {
     const videoElement = videoElementRef.current;
@@ -90,23 +97,41 @@ export function useCamera(): CameraHookResult {
       const nextStream =
         await navigator.mediaDevices.getUserMedia(mediaConstraints);
 
-      if (stream) {
-        stopMediaTracks(stream);
+      if (streamRef.current) {
+        stopMediaTracks(streamRef.current);
       }
 
+      streamRef.current = nextStream;
       setStream(nextStream);
 
       setStatus('granted');
       return true;
-    } catch {
+    } catch (error) {
       stopStream();
       setStatus('denied');
+
+      const errorName =
+        error instanceof DOMException ? error.name : 'UnknownError';
+
+      const messageByError: Record<string, string> = {
+        NotAllowedError:
+          'Camera permission was denied. Please allow access and try again.',
+        NotFoundError: 'No camera device was found on this device.',
+        NotReadableError:
+          'Camera is currently in use by another app. Close other camera apps and retry.',
+        OverconstrainedError:
+          'Camera constraints could not be satisfied. Try a different device or browser.',
+        SecurityError:
+          'Camera access requires a secure context (HTTPS or localhost).',
+      };
+
       setErrorMessage(
-        'Camera permission was denied. Please allow access and try again.'
+        messageByError[errorName] ??
+          'Unable to start camera. Check camera permissions and try again.'
       );
       return false;
     }
-  }, [stopStream, stream]);
+  }, [stopStream]);
 
   const captureFrame = useCallback(() => {
     const videoElement = videoElementRef.current;
@@ -181,6 +206,9 @@ export function useCamera(): CameraHookResult {
     let centerSum = 0;
     let centerCount = 0;
     let edgeSum = 0;
+    let weightedX = 0;
+    let weightedY = 0;
+    let gradientWeightSum = 0;
 
     const luma = new Float32Array(pixelCount);
 
@@ -219,12 +247,18 @@ export function useCamera(): CameraHookResult {
           centerCount += 1;
         }
 
-        if (x > 0) {
-          edgeSum += Math.abs(value - (luma[pixelIndex - 1] ?? value));
-        }
+        const horizontalGradient =
+          x > 0 ? Math.abs(value - (luma[pixelIndex - 1] ?? value)) : 0;
+        const verticalGradient =
+          y > 0 ? Math.abs(value - (luma[pixelIndex - width] ?? value)) : 0;
+        const gradientWeight = horizontalGradient + verticalGradient;
 
-        if (y > 0) {
-          edgeSum += Math.abs(value - (luma[pixelIndex - width] ?? value));
+        edgeSum += gradientWeight;
+
+        if (gradientWeight > 0) {
+          weightedX += x * gradientWeight;
+          weightedY += y * gradientWeight;
+          gradientWeightSum += gradientWeight;
         }
       }
     }
@@ -280,6 +314,16 @@ export function useCamera(): CameraHookResult {
     const topAverage = topSum / (pixelCount / 2);
     const bottomAverage = bottomSum / (pixelCount / 2);
 
+    const estimatedCenterX =
+      gradientWeightSum > 0 ? weightedX / gradientWeightSum : width / 2;
+    const estimatedCenterY =
+      gradientWeightSum > 0 ? weightedY / gradientWeightSum : height / 2;
+
+    const faceOffsetX = (estimatedCenterX - width / 2) / (width / 2);
+    const faceOffsetY = (estimatedCenterY - height / 2) / (height / 2);
+
+    const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+
     return {
       brightness: avgBrightness / 255,
       contrast: Math.sqrt(variance) / 255,
@@ -287,6 +331,8 @@ export function useCamera(): CameraHookResult {
       motion: hadPrevious ? motionSum / (pixelCount * 255) : 1,
       horizontalBalance: (rightAverage - leftAverage) / 255,
       verticalBalance: (topAverage - bottomAverage) / 255,
+      faceOffsetX: clamp(faceOffsetX),
+      faceOffsetY: clamp(faceOffsetY),
       centerContrastRatio:
         Math.sqrt(centerVariance) / (Math.sqrt(variance) + 0.0001),
     };
@@ -301,10 +347,11 @@ export function useCamera(): CameraHookResult {
 
   useEffect(() => {
     return () => {
-      stopMediaTracks(stream);
+      stopMediaTracks(streamRef.current);
+      streamRef.current = null;
       previousLumaRef.current = null;
     };
-  }, [stream]);
+  }, []);
 
   return {
     videoRef,

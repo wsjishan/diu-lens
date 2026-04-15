@@ -34,13 +34,18 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
   const {
     angles,
     currentAngle,
+    step,
+    capture,
+    progress,
     currentAngleIndex,
     currentAngleAccepted,
     currentCaptureIndex,
     feedback,
     statusLabel,
+    validation,
     isAutoCaptureEnabled,
     isAutoCaptureActive,
+    isCapturing,
     isManualFallback,
     isComplete,
     captureManually,
@@ -116,8 +121,10 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         feedback={feedbackText}
         stepIndex={currentAngleIndex}
         totalSteps={angles.length}
-        captureIndex={currentCaptureIndex}
+        captureIndex={capture}
         requiredCaptures={requiredCapturesPerAngle}
+        progressPercent={progress}
+        holdProgress={validation.holdProgress}
         videoRef={videoRef}
         streamActive={streamActive}
         permissionBlocked={permissionBlocked}
@@ -141,49 +148,54 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         autoCaptureHint={
           permissionBlocked
             ? permissionFeedback
-            : isAutoCaptureActive
-              ? 'Hold still. Auto-capture in progress.'
+            : isCapturing
+              ? `Hold still. Capturing step ${step + 1}...`
               : isManualFallback
                 ? 'Manual mode active. Resume auto-capture anytime.'
                 : isAutoCaptureEnabled
                   ? 'Align your face and hold still for auto-capture.'
                   : statusLabel
         }
+        cameraFallbackMessage={permissionBlocked ? permissionFeedback : undefined}
       />
     );
   }, [
     angles.length,
+    capture,
     canCapture,
     captureManually,
     currentAngle,
     currentAngleAccepted,
     currentAngleIndex,
-    currentCaptureIndex,
     feedback,
     errorMessage,
+    isCapturing,
     isAutoCaptureActive,
     isAutoCaptureEnabled,
     isManualFallback,
     onComplete,
     permissionState,
+    progress,
     requestAccess,
     resetPermission,
     resumeAutoCapture,
     retakeCurrentShot,
     statusLabel,
     streamActive,
+    step,
+    validation.holdProgress,
     videoRef,
     isComplete,
   ]);
 
   return (
-    <div className="flex h-full min-h-80 flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <AnimatePresence
         mode="wait"
         initial={false}
       >
         <motion.div
-          key={isComplete ? 'complete' : `capture-${currentAngleIndex}`}
+          key={isComplete ? 'complete' : `capture-${currentAngleIndex}-${currentCaptureIndex}`}
           className="flex h-full flex-col"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

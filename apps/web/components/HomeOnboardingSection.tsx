@@ -43,16 +43,16 @@ export function HomeOnboardingSection() {
         )}
       />
 
-      <div className="relative z-20 mt-6 flex w-full justify-center pb-2 sm:mt-7 lg:absolute lg:inset-0 lg:mt-0 lg:h-full lg:items-center lg:px-8 lg:pb-0">
+      <div className="relative z-20 mt-4 flex min-h-0 w-full justify-center pb-1 sm:mt-5 lg:absolute lg:inset-0 lg:mt-0 lg:h-full lg:items-center lg:px-8 lg:pb-0">
         <div
           className={cn(
-            'flex w-full items-center transition-all duration-500 ease-in-out lg:max-w-none',
+            'flex min-h-0 w-full items-center transition-all duration-500 ease-in-out lg:max-w-none',
             focused ? 'justify-center' : 'justify-center lg:justify-end'
           )}
         >
           <div
             className={cn(
-              'w-full transform-gpu transition-all duration-500 ease-in-out',
+              'w-full transform-gpu transition-all duration-500 ease-in-out lg:min-h-0',
               isVerificationStep ? 'max-w-5xl' : 'max-w-lg',
               focused
                 ? 'translate-x-0 scale-100 opacity-100'

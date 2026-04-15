@@ -16,9 +16,9 @@ export function RegistrationCard({ onStepIndexChange }: RegistrationCardProps) {
   return (
     <aside
       className={cn(
-        'mx-auto w-full transition-all duration-400 ease-out lg:self-center',
+        'mx-auto flex min-h-0 w-full transition-all duration-400 ease-out lg:self-center',
         isVerificationStep
-          ? 'max-w-5xl lg:max-w-5xl'
+          ? 'max-w-5xl lg:h-full lg:max-w-5xl'
           : 'max-w-md lg:max-w-lg lg:justify-self-end lg:pl-2'
       )}
     >

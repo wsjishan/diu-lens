@@ -92,7 +92,7 @@ export function RegistrationFlow({
   const isVerificationStep = activeStep === 2;
 
   const stepContent = (
-    <div className="flex min-h-76 flex-col sm:min-h-80">
+    <div className="flex min-h-0 flex-col">
       <AnimatePresence
         mode="wait"
         initial={false}
@@ -112,7 +112,16 @@ export function RegistrationFlow({
   );
 
   if (isVerificationStep) {
-    return <section className={cn('w-full', className)}>{stepContent}</section>;
+    return (
+      <section
+        className={cn(
+          'flex h-[min(600px,calc(100dvh-9.75rem))] max-h-[600px] w-full flex-col',
+          className
+        )}
+      >
+        {stepContent}
+      </section>
+    );
   }
 
   return (

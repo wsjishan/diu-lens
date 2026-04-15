@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  autoCaptureDelayMs,
   poseCorrectionByAngle,
+  requiredCapturesPerAngle,
   requiredStableTicks,
   validationTickMs,
 } from '@/features/registration/verification/constants';
@@ -27,6 +29,34 @@ type CaptureValidationResult = {
   statusLabel: string;
 };
 
+function detectDirection(analysis: FrameAnalysis) {
+  const horizontal = analysis.horizontalBalance + analysis.faceOffsetX * 0.8;
+  const vertical = analysis.verticalBalance - analysis.faceOffsetY * 0.65;
+
+  const horizontalThreshold = 0.04;
+  const verticalThreshold = 0.035;
+
+  const strongestHorizontal = Math.abs(horizontal) >= Math.abs(vertical);
+
+  if (strongestHorizontal && horizontal > horizontalThreshold) {
+    return 'left' as const;
+  }
+
+  if (strongestHorizontal && horizontal < -horizontalThreshold) {
+    return 'right' as const;
+  }
+
+  if (!strongestHorizontal && vertical > verticalThreshold) {
+    return 'up' as const;
+  }
+
+  if (!strongestHorizontal && vertical < -verticalThreshold) {
+    return 'down' as const;
+  }
+
+  return 'front' as const;
+}
+
 export function useCaptureValidation({
   streamActive,
   angle,
@@ -49,7 +79,7 @@ export function useCaptureValidation({
   }, [acceptedForAngle, angle.id]);
 
   useEffect(() => {
-    if (!streamActive || acceptedForAngle >= 3) {
+    if (!streamActive || acceptedForAngle >= requiredCapturesPerAngle) {
       return;
     }
 
@@ -68,18 +98,9 @@ export function useCaptureValidation({
         nextAnalysis.brightness > 0.24 && nextAnalysis.brightness < 0.88;
       const isCentered = nextAnalysis.centerContrastRatio > 0.88;
       const isSharpEnough = nextAnalysis.sharpness > 0.1;
+      const detectedDirection = detectDirection(nextAnalysis);
 
-      const poseMatched =
-        angle.id === 'front'
-          ? Math.abs(nextAnalysis.horizontalBalance) < 0.05 &&
-            Math.abs(nextAnalysis.verticalBalance) < 0.05
-          : angle.id === 'left'
-            ? nextAnalysis.horizontalBalance > 0.02
-            : angle.id === 'right'
-              ? nextAnalysis.horizontalBalance < -0.02
-              : angle.id === 'up'
-                ? nextAnalysis.verticalBalance > 0.02
-                : nextAnalysis.verticalBalance < -0.02;
+      const poseMatched = detectedDirection === angle.id;
 
       const enoughForStability =
         faceDetected &&
@@ -108,9 +129,11 @@ export function useCaptureValidation({
         faceDetected: false,
         isCentered: false,
         poseMatched: false,
+        detectedDirection: null,
         isSharpEnough: false,
         lightingOk: false,
         isStable: false,
+        holdProgress: 0,
         canCapture: false,
       };
     }
@@ -118,22 +141,18 @@ export function useCaptureValidation({
     const faceDetected = analysis.sharpness > 0.08 && analysis.contrast > 0.06;
     const lightingOk = analysis.brightness > 0.24 && analysis.brightness < 0.88;
     const isCentered = analysis.centerContrastRatio > 0.88;
-
-    const poseMatched =
-      angle.id === 'front'
-        ? Math.abs(analysis.horizontalBalance) < 0.05 &&
-          Math.abs(analysis.verticalBalance) < 0.05
-        : angle.id === 'left'
-          ? analysis.horizontalBalance > 0.02
-          : angle.id === 'right'
-            ? analysis.horizontalBalance < -0.02
-            : angle.id === 'up'
-              ? analysis.verticalBalance > 0.02
-              : analysis.verticalBalance < -0.02;
+    const detectedDirection = detectDirection(analysis);
+    const poseMatched = detectedDirection === angle.id;
 
     const isSharpEnough = analysis.sharpness > 0.1;
     const isStable =
       stableTicks >= requiredStableTicks && analysis.motion < 0.03;
+    const holdTicksNeeded = Math.max(
+      requiredStableTicks,
+      Math.ceil(autoCaptureDelayMs / validationTickMs)
+    );
+    const holdProgress = Math.min(stableTicks / holdTicksNeeded, 1);
+
     const canCapture =
       faceDetected &&
       isCentered &&
@@ -146,15 +165,17 @@ export function useCaptureValidation({
       faceDetected,
       isCentered,
       poseMatched,
+      detectedDirection,
       isSharpEnough,
       lightingOk,
       isStable,
+      holdProgress,
       canCapture,
     };
   }, [analysis, angle.id, stableTicks, streamActive]);
 
   const status = useMemo(() => {
-    if (acceptedForAngle >= 3) {
+    if (acceptedForAngle >= requiredCapturesPerAngle) {
       return {
         captureState: 'angle-complete' as const,
         statusLabel: 'Angle complete',
@@ -206,7 +227,10 @@ export function useCaptureValidation({
       return {
         captureState: 'aligning' as const,
         statusLabel: 'Aligning',
-        primaryMessage: poseCorrectionByAngle[angle.id],
+        primaryMessage:
+          validation.detectedDirection && validation.detectedDirection !== 'front'
+            ? `Detected: ${validation.detectedDirection}. ${poseCorrectionByAngle[angle.id]}`
+            : poseCorrectionByAngle[angle.id],
       };
     }
 
@@ -222,7 +246,7 @@ export function useCaptureValidation({
       return {
         captureState: 'aligning' as const,
         statusLabel: 'Aligning',
-        primaryMessage: 'Hold still.',
+        primaryMessage: 'Hold still for auto-capture.',
       };
     }
 

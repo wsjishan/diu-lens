@@ -50,6 +50,8 @@ export type FrameAnalysis = {
   motion: number;
   horizontalBalance: number;
   verticalBalance: number;
+  faceOffsetX: number;
+  faceOffsetY: number;
   centerContrastRatio: number;
 };
 
@@ -57,9 +59,11 @@ export type CaptureValidation = {
   faceDetected: boolean;
   isCentered: boolean;
   poseMatched: boolean;
+  detectedDirection: VerificationAngleId | null;
   isSharpEnough: boolean;
   lightingOk: boolean;
   isStable: boolean;
+  holdProgress: number;
   canCapture: boolean;
 };
 

@@ -1,0 +1,34 @@
+# DIU Lens API (FastAPI)
+
+Minimal backend foundation for DIU Lens under `apps/api`.
+
+## 1. Create a virtual environment
+
+```bash
+cd apps/api
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+## 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+## 3. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+## 4. Run the server
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 5. Quick checks
+
+- Health check: `GET http://127.0.0.1:8000/health`
+- Enrollment placeholder: `POST http://127.0.0.1:8000/enroll`

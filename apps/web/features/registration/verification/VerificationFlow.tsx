@@ -4,10 +4,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo } from 'react';
 
 import {
+  requiredShotsPerAngle,
+  totalRequiredShots,
+  verificationAngles,
   verificationNote,
   verificationTitle,
 } from '@/features/registration/verification/constants';
 import { VerificationScreen } from '@/features/registration/verification/VerificationScreen';
+import type { VerificationCompletionSummary } from '@/features/registration/verification/types';
 import { useCamera } from '@/features/registration/verification/useCamera';
 
 const transition = {
@@ -16,10 +20,16 @@ const transition = {
 };
 
 type VerificationFlowProps = {
-  onComplete: () => void;
+  onComplete: (summary: VerificationCompletionSummary) => void | Promise<void>;
+  isSubmittingCompletion?: boolean;
+  completionErrorMessage?: string | null;
 };
 
-export function VerificationFlow({ onComplete }: VerificationFlowProps) {
+export function VerificationFlow({
+  onComplete,
+  isSubmittingCompletion = false,
+  completionErrorMessage,
+}: VerificationFlowProps) {
   const {
     videoRef,
     status: permissionState,
@@ -42,6 +52,24 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     };
   }, [stopStream]);
 
+  const completionSummary = useMemo<VerificationCompletionSummary>(() => {
+    const angles = verificationAngles.map((angle) => ({
+      angle,
+      acceptedShots: requiredShotsPerAngle,
+      requiredShots: requiredShotsPerAngle,
+    }));
+
+    return {
+      verificationCompleted: true,
+      totalRequiredShots,
+      totalAcceptedShots: angles.reduce(
+        (total, current) => total + current.acceptedShots,
+        0
+      ),
+      angles,
+    };
+  }, []);
+
   const renderedStep = useMemo(() => {
     const permissionBlocked = permissionState !== 'granted';
     const permissionFeedback =
@@ -49,16 +77,22 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
       (permissionState === 'unsupported'
         ? 'Camera is not supported in this browser.'
         : 'Enable your camera to start the live preview.');
-    const statusText = permissionBlocked
-      ? permissionFeedback
-      : 'Live camera preview is ready.';
-    const actionLabel =
-      permissionState === 'requesting'
+    const statusText = isSubmittingCompletion
+      ? 'Submitting verification details...'
+      : completionErrorMessage
+        ? completionErrorMessage
+        : permissionBlocked
+          ? permissionFeedback
+          : 'Live camera preview is ready.';
+    const actionLabel = isSubmittingCompletion
+      ? 'Completing registration...'
+      : permissionState === 'requesting'
         ? 'Starting verification...'
         : permissionBlocked
           ? 'Start Verification'
           : 'Continue';
-    const actionDisabled = permissionState === 'requesting';
+    const actionDisabled =
+      permissionState === 'requesting' || isSubmittingCompletion;
 
     return (
       <VerificationScreen
@@ -70,13 +104,17 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         actionLabel={actionLabel}
         actionDisabled={actionDisabled}
         onAction={() => {
+          if (isSubmittingCompletion) {
+            return;
+          }
+
           if (permissionBlocked) {
             resetPermission();
             void requestAccess();
             return;
           }
-          stopStream();
-          onComplete();
+
+          void onComplete(completionSummary);
         }}
         cameraFallbackMessage={
           permissionBlocked ? permissionFeedback : undefined
@@ -84,12 +122,14 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
       />
     );
   }, [
+    completionErrorMessage,
+    completionSummary,
     errorMessage,
+    isSubmittingCompletion,
     onComplete,
     permissionState,
     requestAccess,
     resetPermission,
-    stopStream,
     streamActive,
     videoRef,
   ]);

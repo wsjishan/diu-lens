@@ -1,3 +1,5 @@
+import type { VerificationCapturesByAngle } from '@/features/registration/verification/types';
+
 const GENERIC_ENROLLMENT_ERROR =
   'Unable to continue right now. Please try again.';
 const GENERIC_REGISTRATION_COMPLETION_ERROR =
@@ -55,10 +57,12 @@ export async function submitEnrollment(payload: EnrollmentPayload) {
 }
 
 export async function submitEnrollmentCompletion(
-  payload: EnrollmentCompletionPayload
+  payload: EnrollmentCompletionPayload,
+  capturesByAngle: VerificationCapturesByAngle
 ) {
-  return submitEnrollmentRequest(
+  return submitEnrollmentCompletionRequest(
     payload,
+    capturesByAngle,
     GENERIC_REGISTRATION_COMPLETION_ERROR
   );
 }
@@ -73,6 +77,55 @@ async function submitEnrollmentRequest(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(errorMessage);
+  }
+
+  let data: unknown;
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(errorMessage);
+  }
+
+  if (!isEnrollmentResponse(data) || !data.success) {
+    throw new Error(errorMessage);
+  }
+
+  return data;
+}
+
+async function submitEnrollmentCompletionRequest(
+  payload: EnrollmentCompletionPayload,
+  capturesByAngle: VerificationCapturesByAngle,
+  errorMessage: string
+) {
+  const formData = new FormData();
+  formData.append('metadata', JSON.stringify(payload));
+
+  let appendedFiles = 0;
+
+  for (const [angle, captures] of Object.entries(capturesByAngle)) {
+    if (!Array.isArray(captures)) {
+      continue;
+    }
+
+    for (const [index, capture] of captures.entries()) {
+      formData.append(angle, capture, `${angle}_${index + 1}.jpg`);
+      appendedFiles += 1;
+    }
+  }
+
+  if (appendedFiles === 0) {
+    throw new Error(errorMessage);
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/enroll`, {
+    method: 'POST',
+    body: formData,
   });
 
   if (!response.ok) {

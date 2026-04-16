@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   requiredShotsPerAngle,
@@ -11,7 +11,10 @@ import {
   verificationTitle,
 } from '@/features/registration/verification/constants';
 import { VerificationScreen } from '@/features/registration/verification/VerificationScreen';
-import type { VerificationCompletionSummary } from '@/features/registration/verification/types';
+import type {
+  VerificationCapturesByAngle,
+  VerificationCompletionSummary,
+} from '@/features/registration/verification/types';
 import { useCamera } from '@/features/registration/verification/useCamera';
 
 const transition = {
@@ -30,6 +33,9 @@ export function VerificationFlow({
   isSubmittingCompletion = false,
   completionErrorMessage,
 }: VerificationFlowProps) {
+  const [captureErrorMessage, setCaptureErrorMessage] = useState<string | null>(
+    null
+  );
   const {
     videoRef,
     status: permissionState,
@@ -38,6 +44,7 @@ export function VerificationFlow({
     requestAccess,
     resetPermission,
     stopStream,
+    captureSnapshot,
   } = useCamera();
 
   useEffect(() => {
@@ -52,7 +59,9 @@ export function VerificationFlow({
     };
   }, [stopStream]);
 
-  const completionSummary = useMemo<VerificationCompletionSummary>(() => {
+  const completionSummary = useMemo<
+    Omit<VerificationCompletionSummary, 'capturesByAngle'>
+  >(() => {
     const angles = verificationAngles.map((angle) => ({
       angle,
       acceptedShots: requiredShotsPerAngle,
@@ -70,6 +79,25 @@ export function VerificationFlow({
     };
   }, []);
 
+  const captureAcceptedImages = useCallback(async () => {
+    const capturesByAngle = verificationAngles.reduce((result, angle) => {
+      result[angle] = [];
+      return result;
+    }, {} as VerificationCapturesByAngle);
+
+    for (const angle of verificationAngles) {
+      for (let index = 0; index < requiredShotsPerAngle; index += 1) {
+        const snapshot = await captureSnapshot();
+        if (!snapshot) {
+          throw new Error('Capture failed');
+        }
+        capturesByAngle[angle].push(snapshot);
+      }
+    }
+
+    return capturesByAngle;
+  }, [captureSnapshot]);
+
   const renderedStep = useMemo(() => {
     const permissionBlocked = permissionState !== 'granted';
     const permissionFeedback =
@@ -79,11 +107,13 @@ export function VerificationFlow({
         : 'Enable your camera to start the live preview.');
     const statusText = isSubmittingCompletion
       ? 'Submitting verification details...'
-      : completionErrorMessage
-        ? completionErrorMessage
-        : permissionBlocked
-          ? permissionFeedback
-          : 'Live camera preview is ready.';
+      : captureErrorMessage
+        ? captureErrorMessage
+        : completionErrorMessage
+          ? completionErrorMessage
+          : permissionBlocked
+            ? permissionFeedback
+            : 'Live camera preview is ready.';
     const actionLabel = isSubmittingCompletion
       ? 'Completing registration...'
       : permissionState === 'requesting'
@@ -109,12 +139,26 @@ export function VerificationFlow({
           }
 
           if (permissionBlocked) {
+            setCaptureErrorMessage(null);
             resetPermission();
             void requestAccess();
             return;
           }
 
-          void onComplete(completionSummary);
+          void (async () => {
+            try {
+              setCaptureErrorMessage(null);
+              const capturesByAngle = await captureAcceptedImages();
+              await onComplete({
+                ...completionSummary,
+                capturesByAngle,
+              });
+            } catch {
+              setCaptureErrorMessage(
+                'Unable to capture verification images. Please try again.'
+              );
+            }
+          })();
         }}
         cameraFallbackMessage={
           permissionBlocked ? permissionFeedback : undefined
@@ -124,6 +168,8 @@ export function VerificationFlow({
   }, [
     completionErrorMessage,
     completionSummary,
+    captureAcceptedImages,
+    captureErrorMessage,
     errorMessage,
     isSubmittingCompletion,
     onComplete,

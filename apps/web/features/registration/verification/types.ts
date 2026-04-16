@@ -15,11 +15,14 @@ export type AngleCaptureSummary = {
   requiredShots: number;
 };
 
+export type VerificationCapturesByAngle = Record<VerificationAngle, Blob[]>;
+
 export type VerificationCompletionSummary = {
   verificationCompleted: boolean;
   totalRequiredShots: number;
   totalAcceptedShots: number;
   angles: AngleCaptureSummary[];
+  capturesByAngle: VerificationCapturesByAngle;
 };
 
 export type CameraHookResult = {
@@ -30,4 +33,5 @@ export type CameraHookResult = {
   requestAccess: () => Promise<boolean>;
   resetPermission: () => void;
   stopStream: () => void;
+  captureSnapshot: () => Promise<Blob | null>;
 };

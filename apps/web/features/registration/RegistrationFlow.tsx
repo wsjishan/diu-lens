@@ -113,20 +113,23 @@ export function RegistrationFlow({
       setIsCompletingRegistration(true);
 
       try {
-        await submitEnrollmentCompletion({
-          student_id: values.studentId,
-          full_name: values.fullName.trim(),
-          phone: values.phoneNumber.trim(),
-          university_email: values.universityEmail.trim(),
-          verification_completed: summary.verificationCompleted,
-          total_required_shots: summary.totalRequiredShots,
-          total_accepted_shots: summary.totalAcceptedShots,
-          angles: summary.angles.map((entry) => ({
-            angle: entry.angle,
-            accepted_shots: entry.acceptedShots,
-            required_shots: entry.requiredShots,
-          })),
-        });
+        await submitEnrollmentCompletion(
+          {
+            student_id: values.studentId,
+            full_name: values.fullName.trim(),
+            phone: values.phoneNumber.trim(),
+            university_email: values.universityEmail.trim(),
+            verification_completed: summary.verificationCompleted,
+            total_required_shots: summary.totalRequiredShots,
+            total_accepted_shots: summary.totalAcceptedShots,
+            angles: summary.angles.map((entry) => ({
+              angle: entry.angle,
+              accepted_shots: entry.acceptedShots,
+              required_shots: entry.requiredShots,
+            })),
+          },
+          summary.capturesByAngle
+        );
 
         setActiveStep(3);
       } catch {

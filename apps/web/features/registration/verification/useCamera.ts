@@ -150,6 +150,34 @@ export function useCamera(): CameraHookResult {
     }
   }, [status]);
 
+  const captureSnapshot = useCallback(async () => {
+    const videoElement = videoElementRef.current;
+
+    if (
+      !videoElement ||
+      !streamRef.current ||
+      videoElement.videoWidth === 0 ||
+      videoElement.videoHeight === 0
+    ) {
+      return null;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = videoElement.videoWidth;
+    canvas.height = videoElement.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return null;
+    }
+
+    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.92);
+    });
+  }, []);
+
   useEffect(() => {
     return () => {
       stopMediaTracks(streamRef.current);
@@ -165,5 +193,6 @@ export function useCamera(): CameraHookResult {
     requestAccess,
     resetPermission,
     stopStream,
+    captureSnapshot,
   };
 }

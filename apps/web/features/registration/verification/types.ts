@@ -63,9 +63,31 @@ export type CaptureValidation = {
   isSharpEnough: boolean;
   lightingOk: boolean;
   isStable: boolean;
+  poseHoldSatisfied: boolean;
+  stabilityMs: number;
+  requiredStabilityMs: number;
+  poseHoldMs: number;
+  requiredPoseHoldMs: number;
+  expectedYawRange: [number, number] | null;
+  expectedPitchRange: [number, number] | null;
   holdProgress: number;
   canCapture: boolean;
   feedback: string;
+};
+
+export type PoseReading = {
+  face: { x: number; y: number } | null;
+  yaw: number;
+  pitch: number;
+  confidence: number;
+  rawYaw: number;
+  rawPitch: number;
+  rawFaceCenter: { x: number; y: number } | null;
+  landmarkModelLoaded: boolean;
+  landmarksDetected: boolean;
+  fallbackPoseUsed: boolean;
+  rawLandmarkCount: number | null;
+  cameraReady: boolean;
 };
 
 export type CameraHookResult = {
@@ -76,6 +98,7 @@ export type CameraHookResult = {
   requestAccess: () => Promise<boolean>;
   captureFrame: () => string | null;
   readFrameAnalysis: () => FrameAnalysis | null;
+  readPoseEstimation: () => PoseReading | null;
   resetPermission: () => void;
   stopStream: () => void;
 };

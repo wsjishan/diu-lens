@@ -4,6 +4,7 @@ import type {
   CameraHookResult,
   FrameAnalysis,
   PermissionState,
+  PoseReading,
 } from '@/features/registration/verification/types';
 
 const mediaConstraints: MediaStreamConstraints = {
@@ -23,11 +24,17 @@ function stopMediaTracks(stream: MediaStream | null) {
   stream.getTracks().forEach((track) => track.stop());
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 export function useCamera(): CameraHookResult {
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousLumaRef = useRef<Float32Array | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const poseRef = useRef<PoseReading | null>(null);
+  const lastPoseAtRef = useRef(0);
   const [videoAttachVersion, setVideoAttachVersion] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<PermissionState>('idle');
@@ -55,6 +62,7 @@ export function useCamera(): CameraHookResult {
     streamRef.current = null;
     setStream(null);
     previousLumaRef.current = null;
+    poseRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -336,7 +344,7 @@ export function useCamera(): CameraHookResult {
     const faceOffsetX = (estimatedCenterX - width / 2) / (width / 2);
     const faceOffsetY = (estimatedCenterY - height / 2) / (height / 2);
 
-    const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+    const bounded = (value: number) => Math.max(-1, Math.min(1, value));
 
     return {
       brightness: avgBrightness / 255,
@@ -345,12 +353,90 @@ export function useCamera(): CameraHookResult {
       motion: hadPrevious ? motionSum / (pixelCount * 255) : 1,
       horizontalBalance: (rightAverage - leftAverage) / 255,
       verticalBalance: (topAverage - bottomAverage) / 255,
-      faceOffsetX: clamp(faceOffsetX),
-      faceOffsetY: clamp(faceOffsetY),
+      faceOffsetX: bounded(faceOffsetX),
+      faceOffsetY: bounded(faceOffsetY),
       centerContrastRatio:
         Math.sqrt(centerVariance) / (Math.sqrt(variance) + 0.0001),
     };
   }, [stream]);
+
+  const readPoseEstimation = useCallback((): PoseReading | null => {
+    const videoElement = videoElementRef.current;
+    const cameraReady = Boolean(
+      videoElement &&
+      stream &&
+      videoElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+    );
+
+    if (!videoElement || !stream) {
+      return null;
+    }
+
+    if (videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      return null;
+    }
+
+    const now = performance.now();
+    if (now - lastPoseAtRef.current < 66) {
+      return poseRef.current;
+    }
+
+    lastPoseAtRef.current = now;
+    const analysis = readFrameAnalysis();
+    if (!analysis) {
+      return poseRef.current;
+    }
+
+    const detectableFace =
+      analysis.contrast > 0.018 &&
+      analysis.sharpness > 0.012 &&
+      analysis.centerContrastRatio > 0.42;
+
+    if (!detectableFace) {
+      poseRef.current = null;
+      return null;
+    }
+
+    const yaw = clamp(
+      -(analysis.faceOffsetX * 36 + analysis.horizontalBalance * 92),
+      -45,
+      45
+    );
+    const pitch = clamp(
+      analysis.faceOffsetY * 30 - analysis.verticalBalance * 58,
+      -30,
+      30
+    );
+
+    const confidence = clamp(
+      analysis.contrast * 3 + analysis.centerContrastRatio * 0.7,
+      0,
+      1
+    );
+
+    poseRef.current = {
+      face: {
+        x: clamp((analysis.faceOffsetX + 1) / 2, 0, 1),
+        y: clamp((analysis.faceOffsetY + 1) / 2, 0, 1),
+      },
+      yaw,
+      pitch,
+      confidence,
+      rawYaw: yaw,
+      rawPitch: pitch,
+      rawFaceCenter: {
+        x: clamp((analysis.faceOffsetX + 1) / 2, 0, 1),
+        y: clamp((analysis.faceOffsetY + 1) / 2, 0, 1),
+      },
+      landmarkModelLoaded: false,
+      landmarksDetected: true,
+      fallbackPoseUsed: true,
+      rawLandmarkCount: null,
+      cameraReady,
+    };
+
+    return poseRef.current;
+  }, [readFrameAnalysis, stream]);
 
   const resetPermission = useCallback(() => {
     setErrorMessage(null);
@@ -364,6 +450,7 @@ export function useCamera(): CameraHookResult {
       stopMediaTracks(streamRef.current);
       streamRef.current = null;
       previousLumaRef.current = null;
+      poseRef.current = null;
     };
   }, []);
 
@@ -375,6 +462,7 @@ export function useCamera(): CameraHookResult {
     requestAccess,
     captureFrame,
     readFrameAnalysis,
+    readPoseEstimation,
     resetPermission,
     stopStream,
   };

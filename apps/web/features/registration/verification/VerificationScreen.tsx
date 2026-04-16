@@ -9,8 +9,10 @@ type VerificationScreenProps = {
   feedback: string;
   stepIndex: number;
   totalSteps: number;
-  captureIndex: number;
+  acceptedShotsForCurrentAngle: number;
   requiredCaptures: number;
+  totalAcceptedShots: number;
+  totalRequiredShots: number;
   progressPercent: number;
   holdProgress: number;
   videoRef: (node: HTMLVideoElement | null) => void;
@@ -28,6 +30,44 @@ type VerificationScreenProps = {
   canRetake: boolean;
   autoCaptureHint: string;
   cameraFallbackMessage?: string;
+  debugState?: {
+    currentAngle: string;
+    yaw: number;
+    rawYaw: number;
+    pitch: number;
+    rawPitch: number;
+    rawFaceCenter: { x: number; y: number } | null;
+    faceDetected: boolean;
+    isCentered: boolean;
+    poseMatched: boolean;
+    isStable: boolean;
+    lightingOk: boolean;
+    isSharpEnough: boolean;
+    canCapture: boolean;
+    poseHoldSatisfied: boolean;
+    isCapturing: boolean;
+    autoCaptureEnabled: boolean;
+    acceptedShotsForCurrentAngle: number;
+    totalAcceptedShots: number;
+    cooldownRemainingMs: number;
+    cameraReady: boolean;
+    landmarkModelLoaded: boolean;
+    landmarksDetected: boolean;
+    fallbackPoseUsed: boolean;
+    rawLandmarkCount: number | null;
+    captureTriggerCount: number;
+    blockingReason: string;
+    expectedYawRange: [number, number] | null;
+    expectedPitchRange: [number, number] | null;
+    poseHoldMs: number;
+    requiredPoseHoldMs: number;
+    stabilityMs: number;
+    requiredStabilityMs: number;
+    debugModeEnabled: boolean;
+    relaxThresholdsEnabled: boolean;
+    onToggleDebugMode: () => void;
+    onToggleRelaxThresholds: () => void;
+  };
 };
 
 export function VerificationScreen({
@@ -36,8 +76,10 @@ export function VerificationScreen({
   feedback,
   stepIndex,
   totalSteps,
-  captureIndex,
+  acceptedShotsForCurrentAngle,
   requiredCaptures,
+  totalAcceptedShots,
+  totalRequiredShots,
   progressPercent,
   holdProgress,
   videoRef,
@@ -55,6 +97,7 @@ export function VerificationScreen({
   canRetake,
   autoCaptureHint,
   cameraFallbackMessage,
+  debugState,
 }: VerificationScreenProps) {
   const stepNumber = stepIndex + 1;
 
@@ -94,9 +137,33 @@ export function VerificationScreen({
             </p>
             {requiredCaptures > 1 ? (
               <p className="text-xs text-muted-foreground">
-                Capture {captureIndex} of {requiredCaptures}
+                Accepted {acceptedShotsForCurrentAngle} of {requiredCaptures}{' '}
+                for this angle
               </p>
             ) : null}
+            {requiredCaptures > 1 ? (
+              <div className="mx-auto mt-1.5 flex w-fit items-center gap-1.5">
+                {Array.from({ length: requiredCaptures }).map((_, index) => {
+                  const isFilled = index < acceptedShotsForCurrentAngle;
+
+                  return (
+                    <span
+                      key={index}
+                      className="size-2 rounded-full"
+                      style={{
+                        backgroundColor: isFilled
+                          ? 'var(--primary)'
+                          : 'var(--border)',
+                        opacity: isFilled ? 1 : 0.55,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Total accepted {totalAcceptedShots} of {totalRequiredShots}
+            </p>
             <p className="text-xs font-medium text-primary/90">
               Progress {progressPercent}%
             </p>
@@ -120,6 +187,94 @@ export function VerificationScreen({
           <p className="text-center text-sm text-muted-foreground">
             {feedback}
           </p>
+
+          {process.env.NODE_ENV !== 'production' && debugState ? (
+            <div className="rounded-md border border-dashed border-border/70 bg-muted/45 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
+              <p className="font-semibold text-foreground/80">
+                Debug (temporary)
+              </p>
+              <div className="mb-1 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={debugState.onToggleDebugMode}
+                  className="rounded border border-border/80 px-2 py-0.5 text-[10px] font-medium"
+                >
+                  Debug mode: {debugState.debugModeEnabled ? 'On' : 'Off'}
+                </button>
+                <button
+                  type="button"
+                  onClick={debugState.onToggleRelaxThresholds}
+                  className="rounded border border-border/80 px-2 py-0.5 text-[10px] font-medium"
+                >
+                  Relax thresholds:{' '}
+                  {debugState.relaxThresholdsEnabled ? 'On' : 'Off'}
+                </button>
+              </div>
+              <p>blockingReason: {debugState.blockingReason}</p>
+              <p>
+                currentAngle: {debugState.currentAngle} | cameraReady:{' '}
+                {String(debugState.cameraReady)} | landmarksDetected:{' '}
+                {String(debugState.landmarksDetected)}
+              </p>
+              <p>
+                landmarkModelLoaded: {String(debugState.landmarkModelLoaded)} |
+                fallbackPoseUsed: {String(debugState.fallbackPoseUsed)} |
+                rawLandmarkCount: {debugState.rawLandmarkCount ?? 'n/a'}
+              </p>
+              <p>
+                yaw: {debugState.yaw.toFixed(1)} (raw{' '}
+                {debugState.rawYaw.toFixed(1)}) | pitch:{' '}
+                {debugState.pitch.toFixed(1)} (raw{' '}
+                {debugState.rawPitch.toFixed(1)})
+              </p>
+              <p>
+                rawFaceCenter:{' '}
+                {debugState.rawFaceCenter
+                  ? `${debugState.rawFaceCenter.x.toFixed(2)}, ${debugState.rawFaceCenter.y.toFixed(2)}`
+                  : 'n/a'}
+              </p>
+              <p>
+                expectedYawRange:{' '}
+                {debugState.expectedYawRange
+                  ? `[${debugState.expectedYawRange[0]}, ${debugState.expectedYawRange[1]}]`
+                  : 'n/a'}{' '}
+                | expectedPitchRange:{' '}
+                {debugState.expectedPitchRange
+                  ? `[${debugState.expectedPitchRange[0]}, ${debugState.expectedPitchRange[1]}]`
+                  : 'n/a'}
+              </p>
+              <p>
+                faceDetected: {String(debugState.faceDetected)} | isCentered:{' '}
+                {String(debugState.isCentered)} | poseMatched:{' '}
+                {String(debugState.poseMatched)}
+              </p>
+              <p>
+                isStable: {String(debugState.isStable)} | lightingOk:{' '}
+                {String(debugState.lightingOk)} | isSharpEnough:{' '}
+                {String(debugState.isSharpEnough)}
+              </p>
+              <p>
+                stabilityMs: {debugState.stabilityMs} /{' '}
+                {debugState.requiredStabilityMs} | poseHoldMs:{' '}
+                {debugState.poseHoldMs} / {debugState.requiredPoseHoldMs}
+              </p>
+              <p>
+                poseHoldSatisfied: {String(debugState.poseHoldSatisfied)} |
+                canCapture: {String(debugState.canCapture)}
+              </p>
+              <p>
+                isCapturing: {String(debugState.isCapturing)} |
+                autoCaptureEnabled: {String(debugState.autoCaptureEnabled)} |
+                cooldownRemainingMs: {debugState.cooldownRemainingMs}
+              </p>
+              <p>
+                acceptedShotsForCurrentAngle:{' '}
+                {debugState.acceptedShotsForCurrentAngle} | totalAcceptedShots:{' '}
+                {debugState.totalAcceptedShots} | captureTriggerCount:{' '}
+                {debugState.captureTriggerCount}
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

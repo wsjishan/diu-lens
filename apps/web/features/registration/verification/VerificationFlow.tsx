@@ -27,6 +27,7 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     requestAccess,
     captureFrame,
     readFrameAnalysis,
+    readPoseEstimation,
     resetPermission,
     stopStream,
   } = useCamera();
@@ -35,7 +36,6 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     angles,
     currentAngle,
     step,
-    capture,
     progress,
     currentAngleIndex,
     currentAngleAccepted,
@@ -46,17 +46,35 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     isAutoCaptureEnabled,
     isAutoCaptureActive,
     isCapturing,
+    isDebugModeEnabled,
+    isRelaxThresholdsEnabled,
     isManualFallback,
     isComplete,
+    overallAccepted,
+    totalRequired,
+    debug,
+    toggleDebugMode,
+    toggleRelaxThresholds,
     captureManually,
     retakeCurrentShot,
     resumeAutoCapture,
-    canCapture,
   } = useVerificationFlow({
     streamActive,
     captureFrame,
     readFrameAnalysis,
+    readPoseEstimation,
   });
+
+  const {
+    holdProgress,
+    faceDetected,
+    isCentered,
+    poseMatched,
+    isStable,
+    lightingOk,
+    isSharpEnough,
+    canCapture: validationCanCapture,
+  } = validation;
 
   useEffect(() => {
     if (isComplete) {
@@ -104,7 +122,7 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     const permissionBlocked = permissionState !== 'granted';
     const helperText = permissionBlocked
       ? 'Allow camera access to continue with guided face verification.'
-      : currentAngle.guidance;
+      : 'Keep your face centered and hold still.';
 
     const permissionFeedback =
       errorMessage ??
@@ -113,6 +131,12 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         : 'Enable your camera to start the live preview.');
 
     const feedbackText = permissionBlocked ? permissionFeedback : feedback;
+    const canCaptureAction =
+      streamActive &&
+      !permissionBlocked &&
+      !isCapturing &&
+      !isComplete &&
+      currentAngleAccepted < requiredCapturesPerAngle;
 
     return (
       <VerificationScreen
@@ -121,10 +145,12 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         feedback={feedbackText}
         stepIndex={currentAngleIndex}
         totalSteps={angles.length}
-        captureIndex={capture}
+        acceptedShotsForCurrentAngle={currentAngleAccepted}
         requiredCaptures={requiredCapturesPerAngle}
+        totalAcceptedShots={overallAccepted}
+        totalRequiredShots={totalRequired}
         progressPercent={progress}
-        holdProgress={validation.holdProgress}
+        holdProgress={holdProgress}
         videoRef={videoRef}
         streamActive={streamActive}
         permissionBlocked={permissionBlocked}
@@ -132,7 +158,7 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         isAutoCaptureActive={isAutoCaptureActive}
         isAutoCaptureEnabled={isAutoCaptureEnabled}
         isManualFallback={isManualFallback}
-        canCaptureNow={canCapture}
+        canCaptureNow={canCaptureAction}
         onEnableCamera={() => {
           if (permissionBlocked) {
             resetPermission();
@@ -156,13 +182,51 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
                   ? 'Align your face and hold still for auto-capture.'
                   : statusLabel
         }
-        cameraFallbackMessage={permissionBlocked ? permissionFeedback : undefined}
+        cameraFallbackMessage={
+          permissionBlocked ? permissionFeedback : undefined
+        }
+        debugState={{
+          currentAngle: debug.currentAngle,
+          yaw: debug.yaw,
+          rawYaw: debug.rawYaw,
+          pitch: debug.pitch,
+          rawPitch: debug.rawPitch,
+          rawFaceCenter: debug.rawFaceCenter,
+          faceDetected,
+          isCentered,
+          poseMatched,
+          isStable,
+          lightingOk,
+          isSharpEnough,
+          poseHoldSatisfied: debug.poseHoldSatisfied,
+          canCapture: validationCanCapture,
+          isCapturing,
+          autoCaptureEnabled: isAutoCaptureEnabled,
+          acceptedShotsForCurrentAngle: debug.acceptedShotsForCurrentAngle,
+          totalAcceptedShots: debug.totalAcceptedShots,
+          cooldownRemainingMs: debug.cooldownRemainingMs,
+          cameraReady: debug.cameraReady,
+          landmarkModelLoaded: debug.landmarkModelLoaded,
+          landmarksDetected: debug.landmarksDetected,
+          fallbackPoseUsed: debug.fallbackPoseUsed,
+          rawLandmarkCount: debug.rawLandmarkCount,
+          captureTriggerCount: debug.captureTriggerCount,
+          blockingReason: debug.blockingReason,
+          expectedYawRange: debug.expectedYawRange,
+          expectedPitchRange: debug.expectedPitchRange,
+          poseHoldMs: debug.poseHoldMs,
+          requiredPoseHoldMs: debug.requiredPoseHoldMs,
+          stabilityMs: debug.stabilityMs,
+          requiredStabilityMs: debug.requiredStabilityMs,
+          debugModeEnabled: isDebugModeEnabled,
+          relaxThresholdsEnabled: isRelaxThresholdsEnabled,
+          onToggleDebugMode: toggleDebugMode,
+          onToggleRelaxThresholds: toggleRelaxThresholds,
+        }}
       />
     );
   }, [
     angles.length,
-    capture,
-    canCapture,
     captureManually,
     currentAngle,
     currentAngleAccepted,
@@ -172,8 +236,34 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     isCapturing,
     isAutoCaptureActive,
     isAutoCaptureEnabled,
+    isDebugModeEnabled,
+    isRelaxThresholdsEnabled,
+    debug.currentAngle,
+    debug.rawYaw,
+    debug.rawPitch,
+    debug.rawFaceCenter,
+    debug.poseHoldSatisfied,
+    debug.acceptedShotsForCurrentAngle,
+    debug.totalAcceptedShots,
+    debug.cooldownRemainingMs,
+    debug.cameraReady,
+    debug.landmarkModelLoaded,
+    debug.landmarksDetected,
+    debug.fallbackPoseUsed,
+    debug.rawLandmarkCount,
+    debug.captureTriggerCount,
+    debug.blockingReason,
+    debug.expectedYawRange,
+    debug.expectedPitchRange,
+    debug.poseHoldMs,
+    debug.requiredPoseHoldMs,
+    debug.stabilityMs,
+    debug.requiredStabilityMs,
+    debug.pitch,
+    debug.yaw,
     isManualFallback,
     onComplete,
+    overallAccepted,
     permissionState,
     progress,
     requestAccess,
@@ -183,7 +273,17 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     statusLabel,
     streamActive,
     step,
-    validation.holdProgress,
+    holdProgress,
+    faceDetected,
+    isCentered,
+    poseMatched,
+    isStable,
+    lightingOk,
+    isSharpEnough,
+    validationCanCapture,
+    totalRequired,
+    toggleDebugMode,
+    toggleRelaxThresholds,
     videoRef,
     isComplete,
   ]);
@@ -195,7 +295,11 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         initial={false}
       >
         <motion.div
-          key={isComplete ? 'complete' : `capture-${currentAngleIndex}-${currentCaptureIndex}`}
+          key={
+            isComplete
+              ? 'complete'
+              : `capture-${currentAngleIndex}-${currentCaptureIndex}`
+          }
           className="flex h-full flex-col"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

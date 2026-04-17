@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Aperture } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
@@ -25,18 +26,12 @@ export function Header() {
             aria-label="Primary"
             className="hidden items-center gap-6 md:flex"
           >
-            <a
-              href="#features"
+            <Link
+              href="/faq"
               className="text-sm text-slate-500/85 transition-colors duration-150 hover:text-slate-800 dark:text-slate-400/90 dark:hover:text-slate-200"
             >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-sm text-slate-500/85 transition-colors duration-150 hover:text-slate-800 dark:text-slate-400/90 dark:hover:text-slate-200"
-            >
-              How DIU Lens Works
-            </a>
+              FAQ
+            </Link>
           </nav>
           <ThemeToggle />
         </div>

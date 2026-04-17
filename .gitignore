@@ -51,3 +51,6 @@ next-env.d.ts
 # keep agent config files tracked
 !AGENTS.md
 !CLAUDE.md
+
+# Uploads / temporary images
+apps/api/storage/uploads/

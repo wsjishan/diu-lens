@@ -81,6 +81,16 @@ def append_enrollment(entry: dict[str, Any]) -> None:
         _save_enrollments(enrollments)
 
 
+def get_enrollments_snapshot() -> dict[str, Any]:
+    enrollments = load_enrollments()
+    latest = enrollments[-1] if enrollments else None
+    return {
+        "total": len(enrollments),
+        "latest": latest,
+        "enrollments": enrollments,
+    }
+
+
 def _next_image_index(angle_dir: Path) -> int:
     max_index = 0
     for path in angle_dir.iterdir():
@@ -101,6 +111,24 @@ def _ensure_student_upload_dirs(student_id: str) -> tuple[str, Path]:
     for angle in ALLOWED_ANGLES:
         (student_dir / angle).mkdir(parents=True, exist_ok=True)
     return sanitized_student_id, student_dir
+
+
+def list_uploaded_images_for_student(student_id: str) -> dict[str, list[str]]:
+    sanitized_student_id = _sanitize_student_id(student_id)
+    student_dir = _UPLOADS_DIR / sanitized_student_id
+    if not student_dir.exists() or not student_dir.is_dir():
+        raise FileNotFoundError(f"No uploads found for student_id: {student_id}")
+
+    grouped: dict[str, list[str]] = empty_uploaded_images()
+    for angle in ALLOWED_ANGLES:
+        angle_dir = student_dir / angle
+        if not angle_dir.exists() or not angle_dir.is_dir():
+            continue
+
+        files = sorted(path.name for path in angle_dir.iterdir() if path.is_file())
+        grouped[angle] = files
+
+    return grouped
 
 
 async def save_uploaded_images(

@@ -13,6 +13,7 @@ ALLOWED_IMAGE_CONTENT_TYPES: dict[str, str] = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
+MAX_UPLOAD_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 
 _STORAGE_LOCK = Lock()
 _BASE_DIR = Path(__file__).resolve().parents[2]
@@ -120,15 +121,14 @@ async def save_uploaded_images(
                 content_type = (upload.content_type or "").lower()
                 extension = ALLOWED_IMAGE_CONTENT_TYPES.get(content_type)
                 if not extension:
-                    allowed = ", ".join(sorted(ALLOWED_IMAGE_CONTENT_TYPES.keys()))
-                    raise ValueError(
-                        f"Invalid file type '{content_type}' for '{angle}'. "
-                        f"Allowed types: {allowed}."
-                    )
+                    raise ValueError(f"Unsupported file type for angle: {angle}")
 
                 file_bytes = await upload.read()
                 if not file_bytes:
                     raise ValueError(f"Uploaded file for '{angle}' is empty.")
+
+                if len(file_bytes) > MAX_UPLOAD_IMAGE_SIZE_BYTES:
+                    raise ValueError(f"File too large for angle: {angle}")
 
                 filename = f"{angle}_{next_index}{extension}"
                 destination = angle_dir / filename

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
   CameraHookResult,
-  FrameAnalysis,
   PermissionState,
 } from '@/features/registration/verification/types';
 
@@ -25,8 +24,6 @@ function stopMediaTracks(stream: MediaStream | null) {
 
 export function useCamera(): CameraHookResult {
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
-  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const previousLumaRef = useRef<Float32Array | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [videoAttachVersion, setVideoAttachVersion] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -54,7 +51,6 @@ export function useCamera(): CameraHookResult {
     stopMediaTracks(streamRef.current);
     streamRef.current = null;
     setStream(null);
-    previousLumaRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -71,16 +67,30 @@ export function useCamera(): CameraHookResult {
     }
 
     videoElement.srcObject = stream;
+    videoElement.muted = true;
+    videoElement.playsInline = true;
 
     const playVideo = async () => {
       try {
         await videoElement.play();
       } catch {
-        videoElement.pause();
+        // Ignore initial autoplay races and retry on media readiness events.
       }
     };
 
+    const retryPlayback = () => {
+      void playVideo();
+    };
+
+    videoElement.addEventListener('loadedmetadata', retryPlayback);
+    videoElement.addEventListener('canplay', retryPlayback);
+
     void playVideo();
+
+    return () => {
+      videoElement.removeEventListener('loadedmetadata', retryPlayback);
+      videoElement.removeEventListener('canplay', retryPlayback);
+    };
   }, [stream, videoAttachVersion]);
 
   const requestAccess = useCallback(async () => {
@@ -133,211 +143,6 @@ export function useCamera(): CameraHookResult {
     }
   }, [stopStream]);
 
-  const captureFrame = useCallback(() => {
-    const videoElement = videoElementRef.current;
-
-    if (!videoElement || !stream) {
-      return null;
-    }
-
-    if (videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      return null;
-    }
-
-    const width = videoElement.videoWidth;
-    const height = videoElement.videoHeight;
-
-    if (!width || !height) {
-      return null;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      return null;
-    }
-
-    context.drawImage(videoElement, 0, 0, width, height);
-    return canvas.toDataURL('image/jpeg', 0.9);
-  }, [stream]);
-
-  const readFrameAnalysis = useCallback((): FrameAnalysis | null => {
-    const videoElement = videoElementRef.current;
-
-    if (!videoElement || !stream) {
-      return null;
-    }
-
-    if (videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      return null;
-    }
-
-    const width = 96;
-    const height = 72;
-
-    if (!analysisCanvasRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      analysisCanvasRef.current = canvas;
-    }
-
-    const canvas = analysisCanvasRef.current;
-    const context = canvas.getContext('2d', {
-      willReadFrequently: true,
-    });
-
-    if (!context) {
-      return null;
-    }
-
-    context.drawImage(videoElement, 0, 0, width, height);
-    const data = context.getImageData(0, 0, width, height).data;
-    const pixelCount = width * height;
-
-    let brightnessSum = 0;
-    let leftSum = 0;
-    let rightSum = 0;
-    let topSum = 0;
-    let bottomSum = 0;
-    let centerSum = 0;
-    let centerCount = 0;
-    let edgeSum = 0;
-    let weightedX = 0;
-    let weightedY = 0;
-    let gradientWeightSum = 0;
-
-    const luma = new Float32Array(pixelCount);
-
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const pixelIndex = y * width + x;
-        const i = pixelIndex * 4;
-
-        const r = data[i] ?? 0;
-        const g = data[i + 1] ?? 0;
-        const b = data[i + 2] ?? 0;
-
-        const value = 0.299 * r + 0.587 * g + 0.114 * b;
-        luma[pixelIndex] = value;
-        brightnessSum += value;
-
-        if (x < width / 2) {
-          leftSum += value;
-        } else {
-          rightSum += value;
-        }
-
-        if (y < height / 2) {
-          topSum += value;
-        } else {
-          bottomSum += value;
-        }
-
-        if (
-          x >= width * 0.28 &&
-          x <= width * 0.72 &&
-          y >= height * 0.24 &&
-          y <= height * 0.76
-        ) {
-          centerSum += value;
-          centerCount += 1;
-        }
-
-        const horizontalGradient =
-          x > 0 ? Math.abs(value - (luma[pixelIndex - 1] ?? value)) : 0;
-        const verticalGradient =
-          y > 0 ? Math.abs(value - (luma[pixelIndex - width] ?? value)) : 0;
-        const gradientWeight = horizontalGradient + verticalGradient;
-
-        edgeSum += gradientWeight;
-
-        if (gradientWeight > 0) {
-          weightedX += x * gradientWeight;
-          weightedY += y * gradientWeight;
-          gradientWeightSum += gradientWeight;
-        }
-      }
-    }
-
-    const avgBrightness = brightnessSum / pixelCount;
-
-    let varianceSum = 0;
-    let centerVarianceSum = 0;
-
-    for (let i = 0; i < pixelCount; i += 1) {
-      const value = luma[i] ?? avgBrightness;
-      varianceSum += (value - avgBrightness) ** 2;
-    }
-
-    const centerAverage =
-      centerCount > 0 ? centerSum / centerCount : avgBrightness;
-
-    for (
-      let y = Math.floor(height * 0.24);
-      y <= Math.floor(height * 0.76);
-      y += 1
-    ) {
-      for (
-        let x = Math.floor(width * 0.28);
-        x <= Math.floor(width * 0.72);
-        x += 1
-      ) {
-        const index = y * width + x;
-        const value = luma[index] ?? centerAverage;
-        centerVarianceSum += (value - centerAverage) ** 2;
-      }
-    }
-
-    const variance = varianceSum / pixelCount;
-    const centerVariance =
-      centerCount > 0 ? centerVarianceSum / centerCount : variance;
-
-    let motionSum = 0;
-    const hadPrevious = Boolean(previousLumaRef.current);
-
-    if (hadPrevious && previousLumaRef.current) {
-      for (let i = 0; i < pixelCount; i += 1) {
-        motionSum += Math.abs(
-          (luma[i] ?? 0) - (previousLumaRef.current[i] ?? 0)
-        );
-      }
-    }
-
-    previousLumaRef.current = luma;
-
-    const leftAverage = leftSum / (pixelCount / 2);
-    const rightAverage = rightSum / (pixelCount / 2);
-    const topAverage = topSum / (pixelCount / 2);
-    const bottomAverage = bottomSum / (pixelCount / 2);
-
-    const estimatedCenterX =
-      gradientWeightSum > 0 ? weightedX / gradientWeightSum : width / 2;
-    const estimatedCenterY =
-      gradientWeightSum > 0 ? weightedY / gradientWeightSum : height / 2;
-
-    const faceOffsetX = (estimatedCenterX - width / 2) / (width / 2);
-    const faceOffsetY = (estimatedCenterY - height / 2) / (height / 2);
-
-    const clamp = (value: number) => Math.max(-1, Math.min(1, value));
-
-    return {
-      brightness: avgBrightness / 255,
-      contrast: Math.sqrt(variance) / 255,
-      sharpness: edgeSum / (pixelCount * 255 * 2),
-      motion: hadPrevious ? motionSum / (pixelCount * 255) : 1,
-      horizontalBalance: (rightAverage - leftAverage) / 255,
-      verticalBalance: (topAverage - bottomAverage) / 255,
-      faceOffsetX: clamp(faceOffsetX),
-      faceOffsetY: clamp(faceOffsetY),
-      centerContrastRatio:
-        Math.sqrt(centerVariance) / (Math.sqrt(variance) + 0.0001),
-    };
-  }, [stream]);
-
   const resetPermission = useCallback(() => {
     setErrorMessage(null);
     if (status === 'denied' || status === 'unsupported') {
@@ -345,11 +150,38 @@ export function useCamera(): CameraHookResult {
     }
   }, [status]);
 
+  const captureSnapshot = useCallback(async () => {
+    const videoElement = videoElementRef.current;
+
+    if (
+      !videoElement ||
+      !streamRef.current ||
+      videoElement.videoWidth === 0 ||
+      videoElement.videoHeight === 0
+    ) {
+      return null;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = videoElement.videoWidth;
+    canvas.height = videoElement.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return null;
+    }
+
+    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.92);
+    });
+  }, []);
+
   useEffect(() => {
     return () => {
       stopMediaTracks(streamRef.current);
       streamRef.current = null;
-      previousLumaRef.current = null;
     };
   }, []);
 
@@ -359,9 +191,8 @@ export function useCamera(): CameraHookResult {
     errorMessage,
     streamActive,
     requestAccess,
-    captureFrame,
-    readFrameAnalysis,
     resetPermission,
     stopStream,
+    captureSnapshot,
   };
 }

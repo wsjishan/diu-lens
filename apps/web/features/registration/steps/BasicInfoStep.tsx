@@ -13,6 +13,8 @@ type BasicInfoStepProps = {
   ) => void;
   onBack: () => void;
   onContinue: () => void;
+  isSubmitting?: boolean;
+  errorMessage?: string | null;
 };
 
 export function BasicInfoStep({
@@ -20,6 +22,8 @@ export function BasicInfoStep({
   onFieldChange,
   onBack,
   onContinue,
+  isSubmitting = false,
+  errorMessage,
 }: BasicInfoStepProps) {
   return (
     <div className="flex h-full flex-col gap-4 sm:gap-5">
@@ -30,6 +34,14 @@ export function BasicInfoStep({
         <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
           Confirm your profile details before starting identity verification.
         </p>
+        {errorMessage ? (
+          <p
+            role="alert"
+            className="text-sm font-medium text-red-600 dark:text-red-400"
+          >
+            {errorMessage}
+          </p>
+        ) : null}
       </header>
 
       <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2">
@@ -112,6 +124,7 @@ export function BasicInfoStep({
           type="button"
           variant="outline"
           onClick={onBack}
+          disabled={isSubmitting}
           className="h-10 rounded-lg px-4"
         >
           <ArrowLeft className="size-4" />
@@ -121,11 +134,14 @@ export function BasicInfoStep({
           type="button"
           onClick={onContinue}
           disabled={
-            !values.fullName || !values.phoneNumber || !values.universityEmail
+            isSubmitting ||
+            !values.fullName.trim() ||
+            !values.phoneNumber.trim() ||
+            !values.universityEmail.trim()
           }
           className="h-10 gap-2 rounded-lg bg-linear-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] dark:bg-linear-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
         >
-          Continue
+          {isSubmitting ? 'Continuing...' : 'Continue'}
           <ArrowRight className="size-4" />
         </Button>
       </div>

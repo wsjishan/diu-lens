@@ -1,14 +1,21 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { registrationStepMeta } from '@/features/registration/constants';
+import {
+  GENERIC_ENROLLMENT_ERROR,
+  GENERIC_REGISTRATION_COMPLETION_ERROR,
+  submitEnrollment,
+  submitEnrollmentCompletion,
+} from '@/features/registration/api';
 import { RegistrationShell } from '@/features/registration/RegistrationShell';
 import { BasicInfoStep } from '@/features/registration/steps/BasicInfoStep';
 import { StudentIdStep } from '@/features/registration/steps/StudentIdStep';
 import { SuccessStep } from '@/features/registration/steps/SuccessStep';
 import { VerificationFlow } from '@/features/registration/verification/VerificationFlow';
+import type { VerificationCompletionSummary } from '@/features/registration/verification/types';
 import type {
   RegistrationFlowProps,
   RegistrationFormValues,
@@ -48,6 +55,97 @@ export function RegistrationFlow({
 }: RegistrationFlowProps) {
   const [activeStep, setActiveStep] = useState(0);
   const [values, setValues] = useState<RegistrationFormValues>(initialValues);
+  const [isSubmittingBasicInfo, setIsSubmittingBasicInfo] = useState(false);
+  const [basicInfoError, setBasicInfoError] = useState<string | null>(null);
+  const [isCompletingRegistration, setIsCompletingRegistration] =
+    useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null
+  );
+
+  const handleBasicInfoContinue = useCallback(async () => {
+    if (isSubmittingBasicInfo) {
+      return;
+    }
+
+    const fullName = values.fullName.trim();
+    const phoneNumber = values.phoneNumber.trim();
+    const universityEmail = values.universityEmail.trim();
+
+    if (!fullName || !phoneNumber || !universityEmail) {
+      setBasicInfoError(GENERIC_ENROLLMENT_ERROR);
+      return;
+    }
+
+    setBasicInfoError(null);
+    setIsSubmittingBasicInfo(true);
+
+    try {
+      await submitEnrollment({
+        student_id: values.studentId,
+        full_name: fullName,
+        phone: phoneNumber,
+        university_email: universityEmail,
+      });
+
+      setVerificationError(null);
+      setActiveStep(2);
+    } catch {
+      setBasicInfoError(GENERIC_ENROLLMENT_ERROR);
+    } finally {
+      setIsSubmittingBasicInfo(false);
+    }
+  }, [
+    isSubmittingBasicInfo,
+    values.fullName,
+    values.phoneNumber,
+    values.studentId,
+    values.universityEmail,
+  ]);
+
+  const handleVerificationComplete = useCallback(
+    async (summary: VerificationCompletionSummary) => {
+      if (isCompletingRegistration) {
+        return;
+      }
+
+      setVerificationError(null);
+      setIsCompletingRegistration(true);
+
+      try {
+        await submitEnrollmentCompletion(
+          {
+            student_id: values.studentId,
+            full_name: values.fullName.trim(),
+            phone: values.phoneNumber.trim(),
+            university_email: values.universityEmail.trim(),
+            verification_completed: summary.verificationCompleted,
+            total_required_shots: summary.totalRequiredShots,
+            total_accepted_shots: summary.totalAcceptedShots,
+            angles: summary.angles.map((entry) => ({
+              angle: entry.angle,
+              accepted_shots: entry.acceptedShots,
+              required_shots: entry.requiredShots,
+            })),
+          },
+          summary.capturesByAngle
+        );
+
+        setActiveStep(3);
+      } catch {
+        setVerificationError(GENERIC_REGISTRATION_COMPLETION_ERROR);
+      } finally {
+        setIsCompletingRegistration(false);
+      }
+    },
+    [
+      isCompletingRegistration,
+      values.fullName,
+      values.phoneNumber,
+      values.studentId,
+      values.universityEmail,
+    ]
+  );
 
   useEffect(() => {
     onStepIndexChange?.(activeStep);
@@ -73,21 +171,43 @@ export function RegistrationFlow({
       return (
         <BasicInfoStep
           values={values}
-          onFieldChange={(field, value) =>
-            setValues((current) => ({ ...current, [field]: value }))
-          }
-          onBack={() => setActiveStep(0)}
-          onContinue={() => setActiveStep(2)}
+          onFieldChange={(field, value) => {
+            setBasicInfoError(null);
+            setValues((current) => ({ ...current, [field]: value }));
+          }}
+          onBack={() => {
+            setBasicInfoError(null);
+            setActiveStep(0);
+          }}
+          onContinue={handleBasicInfoContinue}
+          isSubmitting={isSubmittingBasicInfo}
+          errorMessage={basicInfoError}
         />
       );
     }
 
     if (activeStep === 2) {
-      return <VerificationFlow onComplete={() => setActiveStep(3)} />;
+      return (
+        <VerificationFlow
+          onComplete={handleVerificationComplete}
+          isSubmittingCompletion={isCompletingRegistration}
+          completionErrorMessage={verificationError}
+        />
+      );
     }
 
     return <SuccessStep onDone={onDone} />;
-  }, [activeStep, onDone, values]);
+  }, [
+    activeStep,
+    basicInfoError,
+    handleVerificationComplete,
+    handleBasicInfoContinue,
+    isCompletingRegistration,
+    isSubmittingBasicInfo,
+    onDone,
+    verificationError,
+    values,
+  ]);
 
   const isVerificationStep = activeStep === 2;
 

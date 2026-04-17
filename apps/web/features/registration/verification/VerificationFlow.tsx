@@ -1,13 +1,21 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { requiredCapturesPerAngle } from '@/features/registration/verification/constants';
+import {
+  requiredShotsPerAngle,
+  totalRequiredShots,
+  verificationAngles,
+  verificationNote,
+  verificationTitle,
+} from '@/features/registration/verification/constants';
 import { VerificationScreen } from '@/features/registration/verification/VerificationScreen';
+import type {
+  VerificationCapturesByAngle,
+  VerificationCompletionSummary,
+} from '@/features/registration/verification/types';
 import { useCamera } from '@/features/registration/verification/useCamera';
-import { useVerificationFlow } from '@/features/registration/verification/useVerificationFlow';
-import { Button } from '@/components/ui/button';
 
 const transition = {
   duration: 0.24,
@@ -15,54 +23,29 @@ const transition = {
 };
 
 type VerificationFlowProps = {
-  onComplete: () => void;
+  onComplete: (summary: VerificationCompletionSummary) => void | Promise<void>;
+  isSubmittingCompletion?: boolean;
+  completionErrorMessage?: string | null;
 };
 
-export function VerificationFlow({ onComplete }: VerificationFlowProps) {
+export function VerificationFlow({
+  onComplete,
+  isSubmittingCompletion = false,
+  completionErrorMessage,
+}: VerificationFlowProps) {
+  const [captureErrorMessage, setCaptureErrorMessage] = useState<string | null>(
+    null
+  );
   const {
     videoRef,
     status: permissionState,
     errorMessage,
     streamActive,
     requestAccess,
-    captureFrame,
-    readFrameAnalysis,
     resetPermission,
     stopStream,
+    captureSnapshot,
   } = useCamera();
-
-  const {
-    angles,
-    currentAngle,
-    step,
-    capture,
-    progress,
-    currentAngleIndex,
-    currentAngleAccepted,
-    currentCaptureIndex,
-    feedback,
-    statusLabel,
-    validation,
-    isAutoCaptureEnabled,
-    isAutoCaptureActive,
-    isCapturing,
-    isManualFallback,
-    isComplete,
-    captureManually,
-    retakeCurrentShot,
-    resumeAutoCapture,
-    canCapture,
-  } = useVerificationFlow({
-    streamActive,
-    captureFrame,
-    readFrameAnalysis,
-  });
-
-  useEffect(() => {
-    if (isComplete) {
-      stopStream();
-    }
-  }, [isComplete, stopStream]);
 
   useEffect(() => {
     if (permissionState === 'idle') {
@@ -76,116 +59,125 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
     };
   }, [stopStream]);
 
-  const renderedStep = useMemo(() => {
-    if (isComplete) {
-      return (
-        <section className="flex h-full min-h-0 items-center justify-center px-2 py-2 sm:px-4 sm:py-4">
-          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 text-center shadow-[0_14px_40px_-30px_rgba(15,23,42,0.45)]">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-              Verification complete
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              All 5 angles were captured successfully. Continue to finish your
-              registration.
-            </p>
-            <Button
-              type="button"
-              size="lg"
-              onClick={onComplete}
-              className="mt-6 h-11 rounded-xl px-6"
-            >
-              Finish Registration
-            </Button>
-          </div>
-        </section>
-      );
+  const completionSummary = useMemo<
+    Omit<VerificationCompletionSummary, 'capturesByAngle'>
+  >(() => {
+    const angles = verificationAngles.map((angle) => ({
+      angle,
+      acceptedShots: requiredShotsPerAngle,
+      requiredShots: requiredShotsPerAngle,
+    }));
+
+    return {
+      verificationCompleted: true,
+      totalRequiredShots,
+      totalAcceptedShots: angles.reduce(
+        (total, current) => total + current.acceptedShots,
+        0
+      ),
+      angles,
+    };
+  }, []);
+
+  const captureAcceptedImages = useCallback(async () => {
+    const capturesByAngle = verificationAngles.reduce((result, angle) => {
+      result[angle] = [];
+      return result;
+    }, {} as VerificationCapturesByAngle);
+
+    for (const angle of verificationAngles) {
+      for (let index = 0; index < requiredShotsPerAngle; index += 1) {
+        const snapshot = await captureSnapshot();
+        if (!snapshot) {
+          throw new Error('Capture failed');
+        }
+        capturesByAngle[angle].push(snapshot);
+      }
     }
 
-    const permissionBlocked = permissionState !== 'granted';
-    const helperText = permissionBlocked
-      ? 'Allow camera access to continue with guided face verification.'
-      : currentAngle.guidance;
+    return capturesByAngle;
+  }, [captureSnapshot]);
 
+  const renderedStep = useMemo(() => {
+    const permissionBlocked = permissionState !== 'granted';
     const permissionFeedback =
       errorMessage ??
       (permissionState === 'unsupported'
         ? 'Camera is not supported in this browser.'
         : 'Enable your camera to start the live preview.');
-
-    const feedbackText = permissionBlocked ? permissionFeedback : feedback;
+    const statusText = isSubmittingCompletion
+      ? 'Submitting verification details...'
+      : captureErrorMessage
+        ? captureErrorMessage
+        : completionErrorMessage
+          ? completionErrorMessage
+          : permissionBlocked
+            ? permissionFeedback
+            : 'Live camera preview is ready.';
+    const actionLabel = isSubmittingCompletion
+      ? 'Completing registration...'
+      : permissionState === 'requesting'
+        ? 'Starting verification...'
+        : permissionBlocked
+          ? 'Start Verification'
+          : 'Continue';
+    const actionDisabled =
+      permissionState === 'requesting' || isSubmittingCompletion;
 
     return (
       <VerificationScreen
-        instruction={currentAngle.title}
-        helperText={helperText}
-        feedback={feedbackText}
-        stepIndex={currentAngleIndex}
-        totalSteps={angles.length}
-        captureIndex={capture}
-        requiredCaptures={requiredCapturesPerAngle}
-        progressPercent={progress}
-        holdProgress={validation.holdProgress}
+        instruction={verificationTitle}
+        note={verificationNote}
+        statusText={statusText}
         videoRef={videoRef}
         streamActive={streamActive}
-        permissionBlocked={permissionBlocked}
-        isRequestingPermission={permissionState === 'requesting'}
-        isAutoCaptureActive={isAutoCaptureActive}
-        isAutoCaptureEnabled={isAutoCaptureEnabled}
-        isManualFallback={isManualFallback}
-        canCaptureNow={canCapture}
-        onEnableCamera={() => {
+        actionLabel={actionLabel}
+        actionDisabled={actionDisabled}
+        onAction={() => {
+          if (isSubmittingCompletion) {
+            return;
+          }
+
           if (permissionBlocked) {
+            setCaptureErrorMessage(null);
             resetPermission();
             void requestAccess();
+            return;
           }
+
+          void (async () => {
+            try {
+              setCaptureErrorMessage(null);
+              const capturesByAngle = await captureAcceptedImages();
+              await onComplete({
+                ...completionSummary,
+                capturesByAngle,
+              });
+            } catch {
+              setCaptureErrorMessage(
+                'Unable to capture verification images. Please try again.'
+              );
+            }
+          })();
         }}
-        onCaptureNow={() => {
-          captureManually();
-        }}
-        onResumeAutoCapture={resumeAutoCapture}
-        onRetake={retakeCurrentShot}
-        canRetake={currentAngleAccepted > 0}
-        autoCaptureHint={
-          permissionBlocked
-            ? permissionFeedback
-            : isCapturing
-              ? `Hold still. Capturing step ${step + 1}...`
-              : isManualFallback
-                ? 'Manual mode active. Resume auto-capture anytime.'
-                : isAutoCaptureEnabled
-                  ? 'Align your face and hold still for auto-capture.'
-                  : statusLabel
+        cameraFallbackMessage={
+          permissionBlocked ? permissionFeedback : undefined
         }
-        cameraFallbackMessage={permissionBlocked ? permissionFeedback : undefined}
       />
     );
   }, [
-    angles.length,
-    capture,
-    canCapture,
-    captureManually,
-    currentAngle,
-    currentAngleAccepted,
-    currentAngleIndex,
-    feedback,
+    completionErrorMessage,
+    completionSummary,
+    captureAcceptedImages,
+    captureErrorMessage,
     errorMessage,
-    isCapturing,
-    isAutoCaptureActive,
-    isAutoCaptureEnabled,
-    isManualFallback,
+    isSubmittingCompletion,
     onComplete,
     permissionState,
-    progress,
     requestAccess,
     resetPermission,
-    resumeAutoCapture,
-    retakeCurrentShot,
-    statusLabel,
     streamActive,
-    step,
-    validation.holdProgress,
     videoRef,
-    isComplete,
   ]);
 
   return (
@@ -195,7 +187,7 @@ export function VerificationFlow({ onComplete }: VerificationFlowProps) {
         initial={false}
       >
         <motion.div
-          key={isComplete ? 'complete' : `capture-${currentAngleIndex}-${currentCaptureIndex}`}
+          key={permissionState}
           className="flex h-full flex-col"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

@@ -47,7 +47,3 @@ apps/
 packages/
 services/
 ```
-
-## Notes
-
-- Frontend product logic and UI were kept unchanged during the monorepo refactor.

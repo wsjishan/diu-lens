@@ -15,48 +15,32 @@ export function HomeOnboardingSection() {
   const isVerificationStep = activeStep === 2;
 
   return (
-    <section className="relative w-full min-h-0 lg:h-full">
-      <div
-        className={cn(
-          'relative z-0 transition-all duration-500 ease-in-out lg:absolute lg:inset-0',
-          focused
-            ? 'scale-100 opacity-100 lg:scale-[0.995]'
-            : 'scale-100 opacity-100'
-        )}
-      >
-        <div className="grid w-full grid-cols-1 gap-6 lg:h-full lg:grid-cols-2 lg:items-center">
-          <div className="max-w-2xl lg:pr-8">
-            <HeroSection highlights={registrationHighlights} />
-          </div>
-          <div
-            aria-hidden="true"
-            className="hidden lg:block"
-          />
-        </div>
-      </div>
-
-      <div
-        aria-hidden="true"
-        className={cn(
-          'absolute inset-0 z-10 hidden bg-transparent backdrop-blur-xl backdrop-saturate-125 transition-all duration-500 ease-in-out lg:block',
-          shouldBlur ? 'opacity-100' : 'pointer-events-none opacity-0'
-        )}
-      />
-
-      <div className="relative z-20 mt-4 flex min-h-0 w-full justify-center pb-1 sm:mt-5 lg:absolute lg:inset-0 lg:mt-0 lg:h-full lg:items-center lg:px-8 lg:pb-0">
+    <section className="relative w-full min-h-0">
+      <div className="grid min-h-0 grid-cols-1 gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div
           className={cn(
-            'flex min-h-0 w-full items-center transition-all duration-500 ease-in-out lg:max-w-none',
-            focused ? 'justify-center' : 'justify-center lg:justify-end'
+            'relative z-0 transition-transform duration-500 ease-in-out lg:pr-6',
+            focused ? 'lg:translate-y-1' : 'lg:translate-y-0'
           )}
         >
           <div
             className={cn(
-              'w-full transform-gpu transition-all duration-500 ease-in-out lg:min-h-0',
-              isVerificationStep ? 'max-w-5xl' : 'max-w-lg',
+              'rounded-3xl bg-white/60 p-4 shadow-[0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-slate-200/70 backdrop-blur-sm transition-all duration-500 dark:bg-[#0f172a]/80 dark:ring-white/10 sm:p-6',
+              shouldBlur ? 'opacity-70 lg:grayscale' : 'opacity-100'
+            )}
+          >
+            <HeroSection highlights={registrationHighlights} />
+          </div>
+        </div>
+
+        <div className="relative z-10 flex min-h-0 w-full items-center justify-center lg:justify-end">
+          <div
+            className={cn(
+              'w-full transform-gpu transition-all duration-500 ease-in-out',
+              isVerificationStep ? 'max-w-5xl lg:max-w-5xl' : 'max-w-xl sm:max-w-2xl lg:max-w-lg',
               focused
                 ? 'translate-x-0 scale-100 opacity-100'
-                : 'translate-x-0 scale-100 opacity-100 lg:translate-x-10 lg:scale-95'
+                : 'translate-x-0 scale-100 opacity-100 lg:translate-x-4 lg:scale-[0.99]'
             )}
           >
             <RegistrationCard onStepIndexChange={setActiveStep} />

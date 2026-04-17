@@ -232,6 +232,7 @@ async def enroll(request: Request) -> EnrollmentResponse:
         "full_name": payload.full_name,
         "phone": payload.phone,
         "university_email": payload.university_email,
+        "status": "uploaded",
         "verification_completed": payload.verification_completed,
         "total_required_shots": payload.total_required_shots,
         "total_accepted_shots": payload.total_accepted_shots,

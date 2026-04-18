@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
+from app.core.auth import bearer_scheme, require_admin, require_super_admin
 from app.core.enrollment_db import (
     EnrollmentPersistenceError,
     approve_enrollment,
@@ -18,8 +20,12 @@ class RejectEnrollmentRequest(BaseModel):
 
 
 @router.post("/enrollments/{student_id}/approve")
-async def approve_enrollment_admin(student_id: str) -> dict[str, object]:
+async def approve_enrollment_admin(
+    student_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
     # TODO(auth): Restrict to admin/super-admin role.
+    require_admin(credentials)
     if not student_id.strip():
         return JSONResponse(
             status_code=400,
@@ -39,9 +45,12 @@ async def approve_enrollment_admin(student_id: str) -> dict[str, object]:
 
 @router.post("/enrollments/{student_id}/reject")
 async def reject_enrollment_admin(
-    student_id: str, payload: RejectEnrollmentRequest | None = None
+    student_id: str,
+    payload: RejectEnrollmentRequest | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, object]:
     # TODO(auth): Restrict to admin/super-admin role.
+    require_admin(credentials)
     if not student_id.strip():
         return JSONResponse(
             status_code=400,
@@ -63,8 +72,12 @@ async def reject_enrollment_admin(
 
 
 @router.post("/enrollments/{student_id}/reset")
-async def reset_enrollment_admin(student_id: str) -> dict[str, object]:
+async def reset_enrollment_admin(
+    student_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
     # TODO(auth): Restrict to super-admin role only.
+    require_super_admin(credentials)
     if not student_id.strip():
         return JSONResponse(
             status_code=400,

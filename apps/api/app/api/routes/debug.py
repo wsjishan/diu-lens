@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
+from app.core.auth import bearer_scheme, require_super_admin
 from app.core.config import settings
 from app.core.enrollment_db import (
     approve_enrollment,
@@ -85,7 +87,11 @@ async def debug_uploads(student_id: str) -> dict[str, object]:
 
 
 @router.post("/debug/process/{student_id}")
-async def debug_process_student_uploads(student_id: str) -> dict[str, object]:
+async def debug_process_student_uploads(
+    student_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
+    require_super_admin(credentials)
     if not student_id.strip():
         raise HTTPException(
             status_code=400,
@@ -117,8 +123,12 @@ async def debug_process_student_uploads(student_id: str) -> dict[str, object]:
 
 
 @router.post("/debug/admin/approve/{student_id}")
-async def admin_approve_enrollment(student_id: str) -> dict[str, object]:
+async def admin_approve_enrollment(
+    student_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
     # TODO(auth): Restrict to admin/super-admin role.
+    require_super_admin(credentials)
     if not student_id.strip():
         return JSONResponse(
             status_code=400,
@@ -138,9 +148,12 @@ async def admin_approve_enrollment(student_id: str) -> dict[str, object]:
 
 @router.post("/debug/admin/reject/{student_id}")
 async def admin_reject_enrollment(
-    student_id: str, payload: RejectEnrollmentRequest | None = None
+    student_id: str,
+    payload: RejectEnrollmentRequest | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, object]:
     # TODO(auth): Restrict to admin/super-admin role.
+    require_super_admin(credentials)
     if not student_id.strip():
         return JSONResponse(
             status_code=400,
@@ -162,8 +175,12 @@ async def admin_reject_enrollment(
 
 
 @router.post("/debug/admin/reset/{student_id}")
-async def admin_reset_enrollment(student_id: str) -> dict[str, object]:
+async def admin_reset_enrollment(
+    student_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
     # TODO(auth): Restrict to super-admin role only.
+    require_super_admin(credentials)
     if not student_id.strip():
         return JSONResponse(
             status_code=400,

@@ -28,6 +28,15 @@ cp .env.example .env
 DATABASE_URL=postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens
 ```
 
+Auth settings are also required:
+
+```bash
+SECRET_KEY=replace_with_a_long_random_secret
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+APP_ENV=development
+```
+
 ## 4. Run the server
 
 ```bash
@@ -43,8 +52,21 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Admin approve: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/approve`
 - Admin reject: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/reject`
 - Admin reset: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/reset`
+- Admin login: `POST http://127.0.0.1:8000/auth/admin/login`
+- Admin me: `GET http://127.0.0.1:8000/auth/admin/me`
 
-## 6. Database migrations (Phase 5 foundation)
+## 6. Bootstrap first super admin
+
+```bash
+cd apps/api
+python -m app.scripts.create_super_admin \
+  --email admin@example.com \
+  --full-name \"Initial Super Admin\" \
+  --password \"change-me\" \
+  --role super_admin
+```
+
+## 7. Database migrations
 
 ```bash
 cd apps/api

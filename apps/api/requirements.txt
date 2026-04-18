@@ -10,3 +10,5 @@ insightface
 SQLAlchemy
 alembic
 psycopg[binary]
+python-jose[cryptography]
+passlib

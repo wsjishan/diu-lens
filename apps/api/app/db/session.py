@@ -10,18 +10,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import settings
 
 
-def _is_sqlite(url: str) -> bool:
-    return url.startswith("sqlite")
-
-
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     """Create and cache the SQLAlchemy engine."""
-    engine_kwargs: dict[str, object] = {"pool_pre_ping": True}
-    if _is_sqlite(settings.database_url):
-        engine_kwargs["connect_args"] = {"check_same_thread": False}
-
-    return create_engine(settings.database_url, **engine_kwargs)
+    return create_engine(settings.database_url, pool_pre_ping=True)
 
 
 @lru_cache(maxsize=1)

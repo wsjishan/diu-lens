@@ -12,34 +12,58 @@ def _parse_origins(raw_origins: str) -> list[str]:
     return [origin for origin in origins if origin]
 
 
-def _require_database_url() -> str:
-    database_url = os.getenv("DATABASE_URL", "").strip()
-    if database_url:
-        return database_url
-
+def _require_env(name: str, hint: str | None = None) -> str:
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    suffix = f" {hint}" if hint else ""
     raise RuntimeError(
-        "DATABASE_URL is required. "
-        "Set a PostgreSQL DSN, for example: "
-        "'postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens'."
+        f"{name} is required.{suffix}"
     )
+
+
+def _require_positive_int(name: str, hint: str | None = None) -> int:
+    raw = _require_env(name, hint)
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer value.") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be greater than 0.")
+    return value
 
 
 @dataclass(frozen=True)
 class Settings:
     app_name: str
     version: str
+    environment: str
     allowed_origins: list[str]
     database_url: str
+    secret_key: str
+    algorithm: str
+    access_token_expire_minutes: int
 
 
 settings = Settings(
     app_name=os.getenv("APP_NAME", "DIU Lens API"),
     version=os.getenv("APP_VERSION", "0.1.0"),
+    environment=os.getenv("APP_ENV", "development").strip().lower() or "development",
     allowed_origins=_parse_origins(
         os.getenv(
             "ALLOWED_ORIGINS",
             "http://localhost:3000,http://127.0.0.1:3000",
         )
     ),
-    database_url=_require_database_url(),
+    database_url=_require_env(
+        "DATABASE_URL",
+        "Set a PostgreSQL DSN, for example: "
+        "'postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens'.",
+    ),
+    secret_key=_require_env("SECRET_KEY", "Set a long random secret."),
+    algorithm=_require_env("ALGORITHM", "Use 'HS256' unless you have a different JWT setup."),
+    access_token_expire_minutes=_require_positive_int(
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        "Set a positive integer like 60.",
+    ),
 )

@@ -33,6 +33,19 @@ def _require_positive_int(name: str, hint: str | None = None) -> int:
     return value
 
 
+def _require_postgresql_url() -> str:
+    database_url = _require_env(
+        "DATABASE_URL",
+        "Set a PostgreSQL DSN, for example: "
+        "'postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens'.",
+    )
+    if not database_url.startswith("postgresql"):
+        raise RuntimeError(
+            "DATABASE_URL must be a PostgreSQL URL (postgresql+psycopg://...)."
+        )
+    return database_url
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -55,11 +68,7 @@ settings = Settings(
             "http://localhost:3000,http://127.0.0.1:3000",
         )
     ),
-    database_url=_require_env(
-        "DATABASE_URL",
-        "Set a PostgreSQL DSN, for example: "
-        "'postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens'.",
-    ),
+    database_url=_require_postgresql_url(),
     secret_key=_require_env("SECRET_KEY", "Set a long random secret."),
     algorithm=_require_env("ALGORITHM", "Use 'HS256' unless you have a different JWT setup."),
     access_token_expire_minutes=_require_positive_int(

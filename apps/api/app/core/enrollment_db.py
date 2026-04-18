@@ -9,7 +9,14 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.storage import ALLOWED_ANGLES, empty_uploaded_images
-from app.db.models import AuditLog, Enrollment, EnrollmentImage, SelectedCrop, Student
+from app.db.models import (
+    AuditLog,
+    Enrollment,
+    EnrollmentImage,
+    FaceEmbedding,
+    SelectedCrop,
+    Student,
+)
 from app.db.session import get_session_factory
 
 
@@ -234,6 +241,7 @@ def reset_enrollment_by_student_id(db: Session, student_id: str) -> None:
         db.execute(
             delete(SelectedCrop).where(SelectedCrop.enrollment_id.in_(enrollment_ids))
         )
+    db.execute(delete(FaceEmbedding).where(FaceEmbedding.student_id == student_id))
     db.execute(delete(Enrollment).where(Enrollment.student_id == student_id))
     db.execute(delete(Student).where(Student.student_id == student_id))
 

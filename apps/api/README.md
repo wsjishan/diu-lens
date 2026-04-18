@@ -78,3 +78,12 @@ Create a new migration later with:
 ```bash
 alembic revision --autogenerate -m "add tables"
 ```
+
+## 8. pgvector prerequisites
+
+`face_embeddings` uses PostgreSQL `pgvector`. Install it on the database server, then verify:
+
+```bash
+psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql "$DATABASE_URL" -c "SELECT extname FROM pg_extension WHERE extname='vector';"
+```

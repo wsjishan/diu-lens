@@ -12,3 +12,4 @@ alembic
 psycopg[binary]
 python-jose[cryptography]
 passlib
+pgvector

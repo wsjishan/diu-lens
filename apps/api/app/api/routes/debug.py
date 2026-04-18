@@ -12,6 +12,11 @@ from app.core.enrollment_db import (
     record_processing_completed_in_db,
     reset_enrollment,
 )
+from app.core.embeddings_db import (
+    FaceEmbeddingPersistenceError,
+    list_active_embeddings_for_student,
+    persist_face_embeddings,
+)
 from app.core.face_pipeline import FacePipelineError, process_student_images
 from app.db.session import check_database_connection
 from app.core.storage import (
@@ -101,14 +106,24 @@ async def debug_process_student_uploads(
     try:
         result = process_student_images(student_id, storage=get_storage_service())
         try:
+            if bool(result.get("processing_passed")) and int(
+                result.get("embeddings_generated_count", 0)
+            ) > 0:
+                persist_face_embeddings(
+                    student_id=student_id,
+                    processed_crops=list(result.get("processed_crops", [])),
+                )
+
             record_processing_completed_in_db(
                 student_id,
                 processed_images_count=int(result.get("processed_images_count", 0)),
                 processing_passed=bool(result.get("processing_passed", False)),
             )
-        except (EnrollmentPersistenceError, RuntimeError):
-            # Keep debug processing route behavior unchanged if DB persistence is unavailable.
-            pass
+        except (EnrollmentPersistenceError, FaceEmbeddingPersistenceError, RuntimeError) as exc:
+            raise HTTPException(
+                status_code=500,
+                detail={"message": str(exc)},
+            ) from exc
         return result
     except FacePipelineError as exc:
         raise HTTPException(
@@ -120,6 +135,33 @@ async def debug_process_student_uploads(
             status_code=500,
             detail={"message": "Failed to write processed outputs."},
         ) from exc
+
+
+@router.get("/debug/embeddings/{student_id}")
+async def debug_embeddings(
+    student_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
+    require_super_admin(credentials)
+    if not student_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "student_id is required."},
+        )
+
+    try:
+        rows = list_active_embeddings_for_student(student_id)
+    except FaceEmbeddingPersistenceError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"message": str(exc)},
+        ) from exc
+
+    return {
+        "student_id": student_id,
+        "active_embeddings_count": len(rows),
+        "embeddings": rows,
+    }
 
 
 @router.post("/debug/admin/approve/{student_id}")

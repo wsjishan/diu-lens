@@ -32,3 +32,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - Health check: `GET http://127.0.0.1:8000/health`
 - Enrollment placeholder: `POST http://127.0.0.1:8000/enroll`
+- DB debug check: `GET http://127.0.0.1:8000/debug/db`
+
+## 6. Database migrations (Phase 5 foundation)
+
+```bash
+cd apps/api
+alembic upgrade head
+```
+
+Create a new migration later with:
+
+```bash
+alembic revision --autogenerate -m "add tables"
+```

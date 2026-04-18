@@ -17,6 +17,7 @@ class Settings:
     app_name: str
     version: str
     allowed_origins: list[str]
+    database_url: str | None
 
 
 settings = Settings(
@@ -28,4 +29,5 @@ settings = Settings(
             "http://localhost:3000,http://127.0.0.1:3000",
         )
     ),
+    database_url=os.getenv("DATABASE_URL"),
 )

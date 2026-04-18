@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
+from app.core.config import settings
+from app.db.session import check_database_connection
 from app.core.storage import get_enrollments_snapshot, list_uploaded_images_for_student
 
 
@@ -8,6 +10,17 @@ router = APIRouter(tags=["debug"])
 
 def _not_found(message: str) -> HTTPException:
     return HTTPException(status_code=404, detail={"message": message})
+
+
+@router.get("/debug/db")
+async def debug_db() -> dict[str, object]:
+    configured = bool(settings.database_url)
+    connected, message = check_database_connection()
+    return {
+        "configured": configured,
+        "connected": connected,
+        "message": message,
+    }
 
 
 @router.get("/debug/enrollments")

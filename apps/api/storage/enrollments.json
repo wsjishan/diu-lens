@@ -393,5 +393,312 @@
         "uploads/222-15-6226/down/down_3.jpg"
       ]
     }
+  },
+  {
+    "student_id": "888",
+    "full_name": "u8u8",
+    "phone": "88",
+    "university_email": "a@gmail.com",
+    "status": "uploaded",
+    "verification_completed": false,
+    "total_required_shots": 0,
+    "total_accepted_shots": 0,
+    "angles": [
+      {
+        "angle": "front",
+        "accepted_shots": 0,
+        "required_shots": 0
+      },
+      {
+        "angle": "left",
+        "accepted_shots": 0,
+        "required_shots": 0
+      },
+      {
+        "angle": "right",
+        "accepted_shots": 0,
+        "required_shots": 0
+      },
+      {
+        "angle": "up",
+        "accepted_shots": 0,
+        "required_shots": 0
+      },
+      {
+        "angle": "down",
+        "accepted_shots": 0,
+        "required_shots": 0
+      }
+    ],
+    "uploaded_images": {
+      "front": [],
+      "left": [],
+      "right": [],
+      "up": [],
+      "down": []
+    },
+    "validation": {
+      "validation_passed": true,
+      "total_images_checked": 0,
+      "total_images_passed": 0,
+      "failed_images_count": 0,
+      "image_reports": []
+    },
+    "created_at": "2026-04-17T18:34:21.271540+00:00",
+    "updated_at": "2026-04-17T18:34:21.271540+00:00"
+  },
+  {
+    "student_id": "888",
+    "full_name": "u8u8",
+    "phone": "88",
+    "university_email": "a@gmail.com",
+    "status": "validated",
+    "verification_completed": true,
+    "total_required_shots": 15,
+    "total_accepted_shots": 15,
+    "angles": [
+      {
+        "angle": "front",
+        "accepted_shots": 3,
+        "required_shots": 3
+      },
+      {
+        "angle": "left",
+        "accepted_shots": 3,
+        "required_shots": 3
+      },
+      {
+        "angle": "right",
+        "accepted_shots": 3,
+        "required_shots": 3
+      },
+      {
+        "angle": "up",
+        "accepted_shots": 3,
+        "required_shots": 3
+      },
+      {
+        "angle": "down",
+        "accepted_shots": 3,
+        "required_shots": 3
+      }
+    ],
+    "uploaded_images": {
+      "front": [
+        "uploads/888/front/front_1.jpg",
+        "uploads/888/front/front_2.jpg",
+        "uploads/888/front/front_3.jpg"
+      ],
+      "left": [
+        "uploads/888/left/left_1.jpg",
+        "uploads/888/left/left_2.jpg",
+        "uploads/888/left/left_3.jpg"
+      ],
+      "right": [
+        "uploads/888/right/right_1.jpg",
+        "uploads/888/right/right_2.jpg",
+        "uploads/888/right/right_3.jpg"
+      ],
+      "up": [
+        "uploads/888/up/up_1.jpg",
+        "uploads/888/up/up_2.jpg",
+        "uploads/888/up/up_3.jpg"
+      ],
+      "down": [
+        "uploads/888/down/down_1.jpg",
+        "uploads/888/down/down_2.jpg",
+        "uploads/888/down/down_3.jpg"
+      ]
+    },
+    "validation": {
+      "validation_passed": true,
+      "total_images_checked": 15,
+      "total_images_passed": 15,
+      "failed_images_count": 0,
+      "image_reports": [
+        {
+          "file_name": "front_1.jpg",
+          "angle": "front",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "front_2.jpg",
+          "angle": "front",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "front_3.jpg",
+          "angle": "front",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "left_1.jpg",
+          "angle": "left",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "left_2.jpg",
+          "angle": "left",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "left_3.jpg",
+          "angle": "left",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "right_1.jpg",
+          "angle": "right",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "right_2.jpg",
+          "angle": "right",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "right_3.jpg",
+          "angle": "right",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "up_1.jpg",
+          "angle": "up",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "up_2.jpg",
+          "angle": "up",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "up_3.jpg",
+          "angle": "up",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "down_1.jpg",
+          "angle": "down",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "down_2.jpg",
+          "angle": "down",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        },
+        {
+          "file_name": "down_3.jpg",
+          "angle": "down",
+          "passed": true,
+          "blur_ok": true,
+          "brightness_ok": true,
+          "dimensions_ok": true,
+          "face_detected": true,
+          "face_centered": true,
+          "eyes_visible": "not_yet_implemented",
+          "failure_reasons": []
+        }
+      ]
+    },
+    "created_at": "2026-04-17T18:34:27.609953+00:00",
+    "updated_at": "2026-04-17T18:34:27.609953+00:00"
   }
 ]

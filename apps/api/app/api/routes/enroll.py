@@ -1,11 +1,12 @@
 import json
 from collections import Counter
 from datetime import datetime, timezone
-from typing import cast
+from typing import Literal, cast
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field, ValidationError
 
+from app.core.image_validation import build_validation_summary, validate_uploaded_image
 from app.core.storage import (
     ALLOWED_ANGLES,
     ALLOWED_IMAGE_CONTENT_TYPES,
@@ -18,6 +19,21 @@ from app.core.storage import (
 
 REQUIRED_IMAGES_PER_ANGLE = 3
 REQUIRED_TOTAL_SHOTS = 15
+EYES_VISIBLE_VALUES: tuple[str, ...] = ("passed", "failed", "not_yet_implemented")
+ENROLLMENT_STATUSES: tuple[str, ...] = (
+    "uploaded",
+    "validated",
+    "failed",
+    "processing",
+    "processed",
+)
+EnrollmentStatus = Literal[
+    "uploaded",
+    "validated",
+    "failed",
+    "processing",
+    "processed",
+]
 
 
 class AngleCaptureSummary(BaseModel):
@@ -167,7 +183,9 @@ def _validate_file_counts(files_by_angle: dict[str, list[UploadFile]]) -> None:
             )
 
 
-async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> None:
+async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[str, object]:
+    image_reports: list[dict[str, object]] = []
+
     for angle in ALLOWED_ANGLES:
         for upload in files_by_angle.get(angle, []):
             content_type = (upload.content_type or "").lower()
@@ -183,6 +201,27 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> None:
             if len(sample) > MAX_UPLOAD_IMAGE_SIZE_BYTES:
                 raise _bad_request(f"File too large for angle: {angle}")
 
+            file_name = upload.filename or "unknown"
+            image_report = validate_uploaded_image(
+                image_bytes=sample,
+                file_name=file_name,
+                angle=angle,
+            )
+            image_reports.append(image_report)
+
+    summary = build_validation_summary(image_reports)
+    if not summary["validation_passed"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "failed",
+                "message": "Image quality validation failed for uploaded enrollment images.",
+                "validation": summary,
+            },
+        )
+
+    return summary
+
 
 async def _close_upload_files(files_by_angle: dict[str, list[UploadFile]]) -> None:
     for angle_files in files_by_angle.values():
@@ -190,56 +229,213 @@ async def _close_upload_files(files_by_angle: dict[str, list[UploadFile]]) -> No
             await upload.close()
 
 
-@router.post("/enroll", response_model=EnrollmentResponse)
-async def enroll(request: Request) -> EnrollmentResponse:
-    content_type = request.headers.get("content-type", "").lower()
-    uploaded_images = empty_uploaded_images()
+def _default_validation_summary() -> dict[str, object]:
+    return {
+        "validation_passed": True,
+        "total_images_checked": 0,
+        "total_images_passed": 0,
+        "failed_images_count": 0,
+        "image_reports": [],
+    }
 
-    if "multipart/form-data" in content_type:
-        form_data = await request.form()
-        payload = _parse_multipart_metadata(form_data.get("metadata"))
-        files_by_angle = _extract_multipart_files(form_data)
 
-        try:
-            _validate_final_multipart_metadata(payload)
-            _validate_file_counts(files_by_angle)
-            await _validate_files(files_by_angle)
-        except HTTPException as exc:
-            await _close_upload_files(files_by_angle)
-            raise exc
+def _normalize_angle_summaries(
+    angles: list[AngleCaptureSummary],
+) -> list[dict[str, object]]:
+    by_angle: dict[str, dict[str, object]] = {
+        angle: {
+            "angle": angle,
+            "accepted_shots": 0,
+            "required_shots": 0,
+        }
+        for angle in ALLOWED_ANGLES
+    }
 
-        try:
-            uploaded_images = await save_uploaded_images(
-                payload.student_id,
-                files_by_angle,
+    for angle_summary in angles:
+        if angle_summary.angle not in by_angle:
+            continue
+        by_angle[angle_summary.angle] = {
+            "angle": angle_summary.angle,
+            "accepted_shots": int(angle_summary.accepted_shots),
+            "required_shots": int(angle_summary.required_shots),
+        }
+
+    return [by_angle[angle] for angle in ALLOWED_ANGLES]
+
+
+def _normalize_uploaded_images(
+    uploaded_images: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    normalized = empty_uploaded_images()
+    for angle in ALLOWED_ANGLES:
+        normalized[angle] = list(uploaded_images.get(angle, []))
+    return normalized
+
+
+def _normalize_validation_summary(
+    validation_summary: dict[str, object],
+) -> dict[str, object]:
+    image_reports_input = validation_summary.get("image_reports", [])
+    image_reports: list[dict[str, object]] = []
+
+    if isinstance(image_reports_input, list):
+        for report in image_reports_input:
+            if not isinstance(report, dict):
+                continue
+
+            eyes_visible = str(report.get("eyes_visible", "not_yet_implemented"))
+            if eyes_visible not in EYES_VISIBLE_VALUES:
+                eyes_visible = "not_yet_implemented"
+
+            failure_reasons_raw = report.get("failure_reasons", [])
+            failure_reasons = (
+                [str(reason) for reason in failure_reasons_raw]
+                if isinstance(failure_reasons_raw, list)
+                else []
             )
-        except ValueError as exc:
-            raise _bad_request(str(exc)) from exc
-        except OSError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to save uploaded verification images.",
-            ) from exc
-    else:
-        try:
-            raw_payload = await request.json()
-        except json.JSONDecodeError as exc:
-            raise _bad_request("Invalid JSON body.") from exc
-        payload = _parse_enrollment_payload(raw_payload)
 
-    entry = {
+            image_reports.append(
+                {
+                    "file_name": str(report.get("file_name", "unknown")),
+                    "angle": str(report.get("angle", "unknown")),
+                    "passed": bool(report.get("passed", False)),
+                    "blur_ok": bool(report.get("blur_ok", False)),
+                    "brightness_ok": bool(report.get("brightness_ok", False)),
+                    "dimensions_ok": bool(report.get("dimensions_ok", False)),
+                    "face_detected": bool(report.get("face_detected", False)),
+                    "face_centered": bool(report.get("face_centered", False)),
+                    "eyes_visible": eyes_visible,
+                    "failure_reasons": failure_reasons,
+                }
+            )
+
+    total_images_checked = len(image_reports)
+    total_images_passed = sum(1 for report in image_reports if bool(report["passed"]))
+    failed_images_count = total_images_checked - total_images_passed
+    validation_passed = bool(validation_summary.get("validation_passed", True))
+    if total_images_checked > 0:
+        validation_passed = failed_images_count == 0
+
+    return {
+        "validation_passed": validation_passed,
+        "total_images_checked": total_images_checked,
+        "total_images_passed": total_images_passed,
+        "failed_images_count": failed_images_count,
+        "image_reports": image_reports,
+    }
+
+
+def _resolve_enrollment_status(
+    payload: EnrollmentRequest,
+    validation_summary: dict[str, object],
+) -> EnrollmentStatus:
+    if (
+        payload.verification_completed
+        and bool(validation_summary.get("validation_passed"))
+        and int(validation_summary.get("total_images_checked", 0)) > 0
+    ):
+        return "validated"
+
+    return "uploaded"
+
+
+def _build_enrollment_entry(
+    payload: EnrollmentRequest,
+    uploaded_images: dict[str, list[str]],
+    validation_summary: dict[str, object],
+) -> dict[str, object]:
+    normalized_validation = _normalize_validation_summary(validation_summary)
+    normalized_uploaded_images = _normalize_uploaded_images(uploaded_images)
+    normalized_angles = _normalize_angle_summaries(payload.angles)
+    status = _resolve_enrollment_status(payload, normalized_validation)
+    if status not in ENROLLMENT_STATUSES:
+        status = "uploaded"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    return {
         "student_id": payload.student_id,
         "full_name": payload.full_name,
         "phone": payload.phone,
         "university_email": payload.university_email,
-        "status": "uploaded",
+        "status": status,
         "verification_completed": payload.verification_completed,
         "total_required_shots": payload.total_required_shots,
         "total_accepted_shots": payload.total_accepted_shots,
-        "angles": [angle.model_dump() for angle in payload.angles],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "uploaded_images": uploaded_images,
+        "angles": normalized_angles,
+        "uploaded_images": normalized_uploaded_images,
+        "validation": normalized_validation,
+        "created_at": now_iso,
+        "updated_at": now_iso,
     }
+
+
+async def _handle_json_enrollment(
+    request: Request,
+) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object]]:
+    try:
+        raw_payload = await request.json()
+    except json.JSONDecodeError as exc:
+        raise _bad_request("Invalid JSON body.") from exc
+
+    payload = _parse_enrollment_payload(raw_payload)
+    return payload, empty_uploaded_images(), _default_validation_summary()
+
+
+async def _handle_multipart_enrollment(
+    request: Request,
+) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object]]:
+    form_data = await request.form()
+    payload = _parse_multipart_metadata(form_data.get("metadata"))
+    files_by_angle = _extract_multipart_files(form_data)
+    validation_summary = _default_validation_summary()
+    uploaded_images = empty_uploaded_images()
+
+    try:
+        _validate_final_multipart_metadata(payload)
+        _validate_file_counts(files_by_angle)
+        validation_summary = await _validate_files(files_by_angle)
+    except HTTPException as exc:
+        await _close_upload_files(files_by_angle)
+        raise exc
+
+    try:
+        uploaded_images = await save_uploaded_images(
+            payload.student_id,
+            files_by_angle,
+        )
+    except ValueError as exc:
+        raise _bad_request(str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save uploaded verification images.",
+        ) from exc
+
+    return payload, uploaded_images, validation_summary
+
+
+@router.post("/enroll", response_model=EnrollmentResponse)
+async def enroll(request: Request) -> EnrollmentResponse:
+    content_type = request.headers.get("content-type", "").lower()
+    if "application/json" in content_type:
+        payload, uploaded_images, validation_summary = await _handle_json_enrollment(
+            request
+        )
+    elif "multipart/form-data" in content_type:
+        payload, uploaded_images, validation_summary = await _handle_multipart_enrollment(
+            request
+        )
+    else:
+        raise HTTPException(
+            status_code=415,
+            detail={"message": "Unsupported content type for /enroll."},
+        )
+
+    entry = _build_enrollment_entry(
+        payload=payload,
+        uploaded_images=uploaded_images,
+        validation_summary=validation_summary,
+    )
 
     try:
         append_enrollment(entry)

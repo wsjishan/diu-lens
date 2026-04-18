@@ -48,6 +48,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage*
+
 # keep agent config files tracked
 !AGENTS.md
 !CLAUDE.md

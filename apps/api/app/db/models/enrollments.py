@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -29,3 +29,4 @@ class Enrollment(TimestampMixin, Base):
     total_required_shots: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_accepted_shots: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     validation_passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

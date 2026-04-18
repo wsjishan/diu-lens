@@ -21,6 +21,16 @@ class StudentAlreadyRegisteredError(EnrollmentPersistenceError):
     """Raised when a student_id already exists."""
 
 
+class EnrollmentNotFoundError(EnrollmentPersistenceError):
+    """Raised when no enrollment exists for the provided student_id."""
+
+
+@dataclass(frozen=True)
+class EnrollmentAdminActionResult:
+    success: bool
+    message: str
+
+
 @dataclass(frozen=True)
 class EnrollmentRecordInput:
     student_id: str
@@ -69,6 +79,22 @@ def _latest_enrollment_for_student(db: Session, student_id: str) -> Enrollment |
     )
 
 
+def _get_student_and_enrollment(
+    db: Session, student_id: str
+) -> tuple[Student | None, Enrollment | None]:
+    student = db.scalar(select(Student).where(Student.student_id == student_id))
+    if student is None:
+        return None, None
+
+    enrollment = db.scalar(
+        select(Enrollment)
+        .where(Enrollment.student_id == student_id)
+        .order_by(Enrollment.id.desc())
+        .limit(1)
+    )
+    return student, enrollment
+
+
 def _create_enrollment(db: Session, payload: EnrollmentRecordInput) -> Enrollment:
     enrollment = Enrollment(
         student_id=payload.student_id,
@@ -77,6 +103,7 @@ def _create_enrollment(db: Session, payload: EnrollmentRecordInput) -> Enrollmen
         total_required_shots=payload.total_required_shots,
         total_accepted_shots=payload.total_accepted_shots,
         validation_passed=payload.validation_passed,
+        rejection_reason=None,
     )
     db.add(enrollment)
     db.flush()
@@ -123,6 +150,169 @@ def _create_audit_log(
             enrollment_id=enrollment_pk,
             message=message,
         )
+    )
+
+
+def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
+    """Admin action: approve a student's enrollment."""
+    student, enrollment = _get_student_and_enrollment(db, student_id)
+    if student is None or enrollment is None:
+        raise EnrollmentNotFoundError("Enrollment not found for this student_id")
+
+    if enrollment.status == "approved":
+        return False
+
+    enrollment.status = "approved"
+    enrollment.rejection_reason = None
+    _create_audit_log(
+        db,
+        event_type="enrollment_approved",
+        student_pk=student.id,
+        enrollment_pk=enrollment.id,
+        message=f"Enrollment approved for student_id={student_id}",
+    )
+    db.flush()
+    return True
+
+
+def reject_enrollment_by_student_id(
+    db: Session, student_id: str, reason: str | None = None
+) -> bool:
+    """Admin action: reject a student's enrollment."""
+    student, enrollment = _get_student_and_enrollment(db, student_id)
+    if student is None or enrollment is None:
+        raise EnrollmentNotFoundError("Enrollment not found for this student_id")
+
+    if enrollment.status == "rejected":
+        return False
+
+    enrollment.status = "rejected"
+    reason_text = reason.strip() if reason else ""
+    enrollment.rejection_reason = reason_text or None
+    message = f"Enrollment rejected for student_id={student_id}"
+    if reason_text:
+        message = f"{message}. reason={reason_text}"
+
+    _create_audit_log(
+        db,
+        event_type="enrollment_rejected",
+        student_pk=student.id,
+        enrollment_pk=enrollment.id,
+        message=message,
+    )
+    db.flush()
+    return True
+
+
+def reset_enrollment_by_student_id(db: Session, student_id: str) -> None:
+    """Super-admin action: destructive reset so the student can enroll again."""
+    student, enrollment = _get_student_and_enrollment(db, student_id)
+    if student is None:
+        raise EnrollmentNotFoundError("Enrollment not found for this student_id")
+
+    enrollment_ids = db.scalars(
+        select(Enrollment.id).where(Enrollment.student_id == student_id)
+    ).all()
+    latest_enrollment_id = enrollment.id if enrollment is not None else None
+
+    _create_audit_log(
+        db,
+        event_type="enrollment_reset",
+        student_pk=student.id,
+        enrollment_pk=latest_enrollment_id,
+        message=(
+            f"Enrollment reset for student_id={student_id}. "
+            f"deleted_enrollments={len(enrollment_ids)}"
+        ),
+    )
+    db.flush()
+
+    if enrollment_ids:
+        db.execute(
+            delete(EnrollmentImage).where(EnrollmentImage.enrollment_id.in_(enrollment_ids))
+        )
+        db.execute(
+            delete(SelectedCrop).where(SelectedCrop.enrollment_id.in_(enrollment_ids))
+        )
+    db.execute(delete(Enrollment).where(Enrollment.student_id == student_id))
+    db.execute(delete(Student).where(Student.student_id == student_id))
+
+
+def approve_enrollment(student_id: str) -> EnrollmentAdminActionResult:
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        try:
+            updated = approve_enrollment_by_student_id(db, student_id)
+            db.commit()
+        except EnrollmentNotFoundError:
+            db.rollback()
+            return EnrollmentAdminActionResult(
+                success=False,
+                message="Enrollment not found for this student_id",
+            )
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise EnrollmentPersistenceError("Failed to approve enrollment.") from exc
+
+    if updated:
+        return EnrollmentAdminActionResult(
+            success=True,
+            message="Enrollment approved successfully",
+        )
+    return EnrollmentAdminActionResult(
+        success=True,
+        message="Enrollment is already approved",
+    )
+
+
+def reject_enrollment(
+    student_id: str, reason: str | None = None
+) -> EnrollmentAdminActionResult:
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        try:
+            updated = reject_enrollment_by_student_id(db, student_id, reason=reason)
+            db.commit()
+        except EnrollmentNotFoundError:
+            db.rollback()
+            return EnrollmentAdminActionResult(
+                success=False,
+                message="Enrollment not found for this student_id",
+            )
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise EnrollmentPersistenceError("Failed to reject enrollment.") from exc
+
+    if updated:
+        return EnrollmentAdminActionResult(
+            success=True,
+            message="Enrollment rejected successfully",
+        )
+    return EnrollmentAdminActionResult(
+        success=True,
+        message="Enrollment is already rejected",
+    )
+
+
+def reset_enrollment(student_id: str) -> EnrollmentAdminActionResult:
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        try:
+            reset_enrollment_by_student_id(db, student_id)
+            db.commit()
+        except EnrollmentNotFoundError:
+            db.rollback()
+            return EnrollmentAdminActionResult(
+                success=False,
+                message="Enrollment not found for this student_id",
+            )
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise EnrollmentPersistenceError("Failed to reset enrollment.") from exc
+
+    return EnrollmentAdminActionResult(
+        success=True,
+        message="Enrollment reset successfully",
     )
 
 

@@ -33,6 +33,9 @@ ENROLLMENT_STATUSES: tuple[str, ...] = (
     "failed",
     "processing",
     "processed",
+    "approved",
+    "rejected",
+    "reset",
 )
 EnrollmentStatus = Literal[
     "pending",
@@ -41,6 +44,9 @@ EnrollmentStatus = Literal[
     "failed",
     "processing",
     "processed",
+    "approved",
+    "rejected",
+    "reset",
 ]
 
 

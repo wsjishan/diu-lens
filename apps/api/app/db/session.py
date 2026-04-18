@@ -17,9 +17,6 @@ def _is_sqlite(url: str) -> bool:
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     """Create and cache the SQLAlchemy engine."""
-    if not settings.database_url:
-        raise RuntimeError("DATABASE_URL is not configured.")
-
     engine_kwargs: dict[str, object] = {"pool_pre_ping": True}
     if _is_sqlite(settings.database_url):
         engine_kwargs["connect_args"] = {"check_same_thread": False}
@@ -49,9 +46,6 @@ def get_db_session() -> Generator[Session, None, None]:
 
 def check_database_connection() -> tuple[bool, str | None]:
     """Return connectivity status and optional diagnostic message."""
-    if not settings.database_url:
-        return False, "DATABASE_URL is not configured."
-
     try:
         engine = get_engine()
         with engine.connect() as connection:
@@ -60,4 +54,3 @@ def check_database_connection() -> tuple[bool, str | None]:
         return False, str(exc)
 
     return True, None
-

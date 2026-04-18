@@ -12,12 +12,24 @@ def _parse_origins(raw_origins: str) -> list[str]:
     return [origin for origin in origins if origin]
 
 
+def _require_database_url() -> str:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url:
+        return database_url
+
+    raise RuntimeError(
+        "DATABASE_URL is required. "
+        "Set a PostgreSQL DSN, for example: "
+        "'postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens'."
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
     version: str
     allowed_origins: list[str]
-    database_url: str | None
+    database_url: str
 
 
 settings = Settings(
@@ -29,5 +41,5 @@ settings = Settings(
             "http://localhost:3000,http://127.0.0.1:3000",
         )
     ),
-    database_url=os.getenv("DATABASE_URL"),
+    database_url=_require_database_url(),
 )

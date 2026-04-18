@@ -65,3 +65,5 @@ htmlcov/
 
 # Uploads / temporary images
 apps/api/storage/uploads/
+apps/api/storage/processed/
+apps/api/storage/*.db

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.core.config import settings
+from app.core.face_pipeline import FacePipelineError, process_student_images
 from app.db.session import check_database_connection
 from app.core.storage import get_enrollments_snapshot, list_uploaded_images_for_student
 
@@ -64,3 +65,25 @@ async def debug_uploads(student_id: str) -> dict[str, object]:
         "student_id": student_id,
         "angles": uploads,
     }
+
+
+@router.post("/debug/process/{student_id}")
+async def debug_process_student_uploads(student_id: str) -> dict[str, object]:
+    if not student_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "student_id is required."},
+        )
+
+    try:
+        return process_student_images(student_id)
+    except FacePipelineError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": str(exc)},
+        ) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Failed to write processed outputs."},
+        ) from exc

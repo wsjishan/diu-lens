@@ -37,6 +37,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 APP_ENV=development
 ```
 
+Optional face matching settings:
+
+```bash
+FACE_MATCH_DISTANCE_THRESHOLD=0.45
+FACE_MATCH_TOP_K=5
+FACE_MATCH_CANDIDATE_POOL_LIMIT=200
+```
+
 ## 4. Run the server
 
 ```bash
@@ -54,6 +62,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Admin reset: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/reset`
 - Admin login: `POST http://127.0.0.1:8000/auth/admin/login`
 - Admin me: `GET http://127.0.0.1:8000/auth/admin/me`
+- Face matching: `POST http://127.0.0.1:8000/admin/recognition/match`
 
 ## 6. Bootstrap first super admin
 

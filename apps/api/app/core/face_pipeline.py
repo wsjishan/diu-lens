@@ -261,3 +261,25 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
 
     _save_processing_snapshot(storage, sanitized_student_id, result)
     return result
+
+
+def extract_query_face_features(image_bytes: bytes) -> dict[str, Any]:
+    """Generate a single query embedding from one probe image."""
+    if not image_bytes:
+        raise FacePipelineError("Probe image is empty.")
+
+    np_buffer = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(np_buffer, cv2.IMREAD_COLOR)
+    if image is None:
+        raise FacePipelineError("Failed to decode probe image.")
+
+    analyzer = _load_analyzer()
+    faces = analyzer.get(image)
+    face = _pick_main_face(faces)
+    _align_face(image, face)
+    embedding = _extract_embedding(face)
+
+    return {
+        "embedding": embedding,
+        "embedding_dim": len(embedding),
+    }

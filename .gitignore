@@ -67,3 +67,7 @@ htmlcov/
 apps/api/storage/uploads/
 apps/api/storage/processed/
 apps/api/storage/*.db
+
+# local developer runtime artifacts
+.dev/
+.logs/

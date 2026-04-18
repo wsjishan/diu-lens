@@ -33,6 +33,32 @@ def _require_positive_int(name: str, hint: str | None = None) -> int:
     return value
 
 
+def _get_positive_int(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer value.") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be greater than 0.")
+    return value
+
+
+def _get_positive_float(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a float value.") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be greater than 0.")
+    return value
+
+
 def _require_postgresql_url() -> str:
     database_url = _require_env(
         "DATABASE_URL",
@@ -56,6 +82,9 @@ class Settings:
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int
+    face_match_distance_threshold: float
+    face_match_top_k: int
+    face_match_candidate_pool_limit: int
 
 
 settings = Settings(
@@ -74,5 +103,14 @@ settings = Settings(
     access_token_expire_minutes=_require_positive_int(
         "ACCESS_TOKEN_EXPIRE_MINUTES",
         "Set a positive integer like 60.",
+    ),
+    face_match_distance_threshold=_get_positive_float(
+        "FACE_MATCH_DISTANCE_THRESHOLD",
+        0.45,
+    ),
+    face_match_top_k=_get_positive_int("FACE_MATCH_TOP_K", 5),
+    face_match_candidate_pool_limit=_get_positive_int(
+        "FACE_MATCH_CANDIDATE_POOL_LIMIT",
+        200,
     ),
 )

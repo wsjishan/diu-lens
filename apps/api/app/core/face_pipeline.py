@@ -9,20 +9,14 @@ Phase 7 scope:
 
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 from threading import Lock
 from typing import Any
 
 import cv2
 import numpy as np
 
-from app.core.storage import ALLOWED_ANGLES, list_uploaded_images_for_student
-
-_BASE_DIR = Path(__file__).resolve().parents[2]
-_STORAGE_DIR = _BASE_DIR / "storage"
-_PROCESSED_DIR = _STORAGE_DIR / "processed"
+from app.core.storage_service import ALLOWED_ANGLES, StorageService
 _STUDENT_ID_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 
 _ANALYZER_LOCK = Lock()
@@ -148,34 +142,45 @@ def _extract_embedding(face: Any) -> list[float]:
     return vector.tolist()
 
 
-def _ensure_processed_dir(student_id: str, angle: str) -> Path:
-    student_dir = _PROCESSED_DIR / student_id / angle
-    student_dir.mkdir(parents=True, exist_ok=True)
-    return student_dir
-
-
-def _save_crop_image(student_id: str, angle: str, source_rel_path: str, crop: np.ndarray) -> str:
-    source_name = Path(source_rel_path).stem
-    destination = _ensure_processed_dir(student_id, angle) / f"{source_name}_crop.jpg"
-    success = cv2.imwrite(str(destination), crop)
+def _save_crop_image(
+    storage: StorageService,
+    student_id: str,
+    angle: str,
+    source_rel_path: str,
+    crop: np.ndarray,
+) -> str:
+    success, encoded = cv2.imencode(".jpg", crop)
     if not success:
         raise FacePipelineError("Failed to write processed crop image.")
 
-    return (Path("processed") / student_id / angle / destination.name).as_posix()
+    try:
+        return storage.save_processed_crop(
+            student_id=student_id,
+            angle=angle,
+            source_rel_path=source_rel_path,
+            image_bytes=encoded.tobytes(),
+        )
+    except OSError as exc:
+        raise FacePipelineError("Failed to write processed crop image.") from exc
 
 
-def _save_processing_snapshot(student_id: str, result: dict[str, Any]) -> None:
-    snapshot_path = _PROCESSED_DIR / student_id / "processing_result.json"
-    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-    snapshot_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+def _save_processing_snapshot(
+    storage: StorageService,
+    student_id: str,
+    result: dict[str, Any],
+) -> None:
+    storage.save_json_artifact(
+        relative_path=f"processed/{student_id}/processing_result.json",
+        payload=result,
+    )
 
 
-def process_student_images(student_id: str) -> dict[str, Any]:
+def process_student_images(student_id: str, storage: StorageService) -> dict[str, Any]:
     """Process all saved uploaded enrollment images for a student."""
     sanitized_student_id = _sanitize_student_id(student_id)
 
     try:
-        uploads_by_angle = list_uploaded_images_for_student(sanitized_student_id)
+        uploads_by_angle = storage.list_student_uploads(sanitized_student_id)
     except FileNotFoundError as exc:
         raise FacePipelineError(str(exc)) from exc
     except ValueError as exc:
@@ -190,9 +195,9 @@ def process_student_images(student_id: str) -> dict[str, Any]:
     for angle in ALLOWED_ANGLES:
         for file_name in uploads_by_angle.get(angle, []):
             image_rel_path = (
-                Path("uploads") / sanitized_student_id / angle / file_name
-            ).as_posix()
-            source_abs_path = _STORAGE_DIR / image_rel_path
+                f"uploads/{sanitized_student_id}/{angle}/{file_name}"
+            )
+            source_abs_path = storage.resolve_relative_path(image_rel_path)
 
             try:
                 image = cv2.imread(str(source_abs_path))
@@ -204,6 +209,7 @@ def process_student_images(student_id: str) -> dict[str, Any]:
                 aligned_crop = _align_face(image, face)
                 embedding = _extract_embedding(face)
                 crop_rel_path = _save_crop_image(
+                    storage=storage,
                     student_id=sanitized_student_id,
                     angle=angle,
                     source_rel_path=image_rel_path,
@@ -253,5 +259,5 @@ def process_student_images(student_id: str) -> dict[str, Any]:
         "failure_reasons": sorted(failure_reasons),
     }
 
-    _save_processing_snapshot(sanitized_student_id, result)
+    _save_processing_snapshot(storage, sanitized_student_id, result)
     return result

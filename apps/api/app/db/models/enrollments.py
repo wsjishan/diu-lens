@@ -13,9 +13,10 @@ class Enrollment(TimestampMixin, Base):
     __tablename__ = "enrollments"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(
-        ForeignKey("students.id", ondelete="CASCADE"),
+    student_id: Mapped[str] = mapped_column(
+        ForeignKey("students.student_id", ondelete="CASCADE"),
         index=True,
+        unique=True,
         nullable=False,
     )
     status: Mapped[str] = mapped_column(

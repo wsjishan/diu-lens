@@ -1,9 +1,17 @@
 from fastapi import APIRouter, HTTPException
 
 from app.core.config import settings
+from app.core.enrollment_db import (
+    EnrollmentPersistenceError,
+    record_processing_completed_in_db,
+)
 from app.core.face_pipeline import FacePipelineError, process_student_images
 from app.db.session import check_database_connection
-from app.core.storage import get_enrollments_snapshot, list_uploaded_images_for_student
+from app.core.storage import (
+    get_enrollments_snapshot,
+    get_storage_service,
+    list_uploaded_images_for_student,
+)
 
 
 router = APIRouter(tags=["debug"])
@@ -76,7 +84,17 @@ async def debug_process_student_uploads(student_id: str) -> dict[str, object]:
         )
 
     try:
-        return process_student_images(student_id)
+        result = process_student_images(student_id, storage=get_storage_service())
+        try:
+            record_processing_completed_in_db(
+                student_id,
+                processed_images_count=int(result.get("processed_images_count", 0)),
+                processing_passed=bool(result.get("processing_passed", False)),
+            )
+        except (EnrollmentPersistenceError, RuntimeError):
+            # Keep debug processing route behavior unchanged if DB persistence is unavailable.
+            pass
+        return result
     except FacePipelineError as exc:
         raise HTTPException(
             status_code=400,

@@ -62,6 +62,13 @@ export function RegistrationFlow({
   const [verificationError, setVerificationError] = useState<string | null>(
     null
   );
+  const toErrorMessage = useCallback((error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    return fallback;
+  }, []);
 
   const handleBasicInfoContinue = useCallback(async () => {
     if (isSubmittingBasicInfo) {
@@ -81,22 +88,29 @@ export function RegistrationFlow({
     setIsSubmittingBasicInfo(true);
 
     try {
-      await submitEnrollment({
+      const result = await submitEnrollment({
         student_id: values.studentId,
         full_name: fullName,
         phone: phoneNumber,
         university_email: universityEmail,
       });
 
+      if (!result.success) {
+        setBasicInfoError(result.message || GENERIC_ENROLLMENT_ERROR);
+        return;
+      }
+
       setVerificationError(null);
       setActiveStep(2);
-    } catch {
-      setBasicInfoError(GENERIC_ENROLLMENT_ERROR);
+    } catch (error) {
+      console.error('[registration] basic info submit failed', error);
+      setBasicInfoError(toErrorMessage(error, GENERIC_ENROLLMENT_ERROR));
     } finally {
       setIsSubmittingBasicInfo(false);
     }
   }, [
     isSubmittingBasicInfo,
+    toErrorMessage,
     values.fullName,
     values.phoneNumber,
     values.studentId,
@@ -113,7 +127,7 @@ export function RegistrationFlow({
       setIsCompletingRegistration(true);
 
       try {
-        await submitEnrollmentCompletion(
+        const result = await submitEnrollmentCompletion(
           {
             student_id: values.studentId,
             full_name: values.fullName.trim(),
@@ -131,15 +145,26 @@ export function RegistrationFlow({
           summary.capturesByAngle
         );
 
+        if (!result.success) {
+          setVerificationError(
+            result.message || GENERIC_REGISTRATION_COMPLETION_ERROR
+          );
+          return;
+        }
+
         setActiveStep(3);
-      } catch {
-        setVerificationError(GENERIC_REGISTRATION_COMPLETION_ERROR);
+      } catch (error) {
+        console.error('[registration] completion submit failed', error);
+        setVerificationError(
+          toErrorMessage(error, GENERIC_REGISTRATION_COMPLETION_ERROR)
+        );
       } finally {
         setIsCompletingRegistration(false);
       }
     },
     [
       isCompletingRegistration,
+      toErrorMessage,
       values.fullName,
       values.phoneNumber,
       values.studentId,

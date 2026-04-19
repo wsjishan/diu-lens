@@ -30,6 +30,8 @@ type EnrollmentResponse = {
   message: string;
 };
 
+export type EnrollmentSubmissionResult = EnrollmentResponse;
+
 function getApiBaseUrl() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -71,31 +73,22 @@ async function submitEnrollmentRequest(
   payload: EnrollmentPayload | EnrollmentCompletionPayload,
   errorMessage: string
 ) {
-  const response = await fetch(`${getApiBaseUrl()}/enroll`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(errorMessage);
-  }
-
-  let data: unknown;
-
   try {
-    data = await response.json();
-  } catch {
-    throw new Error(errorMessage);
-  }
+    console.log('[enroll] request payload', payload);
 
-  if (!isEnrollmentResponse(data) || !data.success) {
-    throw new Error(errorMessage);
-  }
+    const response = await fetch(`${getApiBaseUrl()}/enroll`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  return data;
+    return await parseEnrollmentResponse(response, errorMessage);
+  } catch (error) {
+    console.error('[enroll] request failed', error);
+    throw error;
+  }
 }
 
 async function submitEnrollmentCompletionRequest(
@@ -103,48 +96,66 @@ async function submitEnrollmentCompletionRequest(
   capturesByAngle: VerificationCapturesByAngle,
   errorMessage: string
 ) {
-  const formData = new FormData();
-  formData.append('metadata', JSON.stringify(payload));
+  try {
+    console.log('[enroll completion] request payload', payload);
 
-  let appendedFiles = 0;
+    const formData = new FormData();
+    formData.append('metadata', JSON.stringify(payload));
 
-  for (const [angle, captures] of Object.entries(capturesByAngle)) {
-    if (!Array.isArray(captures)) {
-      continue;
+    let appendedFiles = 0;
+
+    for (const [angle, captures] of Object.entries(capturesByAngle)) {
+      if (!Array.isArray(captures)) {
+        continue;
+      }
+
+      for (const [index, capture] of captures.entries()) {
+        formData.append(angle, capture, `${angle}_${index + 1}.jpg`);
+        appendedFiles += 1;
+      }
     }
 
-    for (const [index, capture] of captures.entries()) {
-      formData.append(angle, capture, `${angle}_${index + 1}.jpg`);
-      appendedFiles += 1;
+    if (appendedFiles === 0) {
+      throw new Error(errorMessage);
     }
+
+    const response = await fetch(`${getApiBaseUrl()}/enroll/verification`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    return await parseEnrollmentResponse(response, errorMessage);
+  } catch (error) {
+    console.error('[enroll completion] request failed', error);
+    throw error;
   }
+}
 
-  if (appendedFiles === 0) {
-    throw new Error(errorMessage);
-  }
+async function parseEnrollmentResponse(
+  response: Response,
+  errorMessage: string
+): Promise<EnrollmentSubmissionResult> {
+  console.log('[enroll] response.status', response.status);
 
-  const response = await fetch(`${getApiBaseUrl()}/enroll`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(errorMessage);
-  }
-
-  let data: unknown;
+  let parsedData: unknown = null;
 
   try {
-    data = await response.json();
+    parsedData = await response.json();
+    console.log('[enroll] parsed response JSON', parsedData);
   } catch {
+    console.log('[enroll] parsed response JSON', null);
     throw new Error(errorMessage);
   }
 
-  if (!isEnrollmentResponse(data) || !data.success) {
+  if (!isEnrollmentResponse(parsedData)) {
     throw new Error(errorMessage);
   }
 
-  return data;
+  if (response.status >= 500) {
+    throw new Error(parsedData.message || errorMessage);
+  }
+
+  return parsedData;
 }
 
 export { GENERIC_ENROLLMENT_ERROR, GENERIC_REGISTRATION_COMPLETION_ERROR };

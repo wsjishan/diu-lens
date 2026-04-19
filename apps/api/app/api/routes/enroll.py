@@ -7,9 +7,11 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.enrollment_db import (
+    EnrollmentNotFoundError,
     EnrollmentPersistenceError,
     EnrollmentRecordInput,
     persist_enrollment_to_db,
+    persist_enrollment_verification_to_db,
     student_exists_in_db,
     StudentAlreadyRegisteredError,
 )
@@ -391,6 +393,7 @@ def _persist_enrollment_metadata(
     mode: str,
     event_type: str,
     event_message: str,
+    update_existing: bool = False,
 ) -> None:
     validation = entry.get("validation", {})
     uploaded_images = entry.get("uploaded_images", {})
@@ -400,28 +403,31 @@ def _persist_enrollment_metadata(
         uploaded_images = empty_uploaded_images()
 
     try:
-        persist_enrollment_to_db(
-            EnrollmentRecordInput(
-                student_id=str(entry.get("student_id", "")),
-                full_name=str(entry.get("full_name", "")),
-                phone=str(entry.get("phone", "")),
-                university_email=str(entry.get("university_email", "")),
-                status=str(entry.get("status", "uploaded")),
-                verification_completed=bool(entry.get("verification_completed", False)),
-                total_required_shots=int(entry.get("total_required_shots", 0)),
-                total_accepted_shots=int(entry.get("total_accepted_shots", 0)),
-                validation_passed=bool(validation.get("validation_passed", False)),
-                uploaded_images={
-                    angle: [str(path) for path in uploaded_images.get(angle, [])]
-                    if isinstance(uploaded_images.get(angle, []), list)
-                    else []
-                    for angle in ALLOWED_ANGLES
-                },
-                event_type=event_type,
-                event_message=event_message,
-                mode=mode,
-            )
+        payload = EnrollmentRecordInput(
+            student_id=str(entry.get("student_id", "")),
+            full_name=str(entry.get("full_name", "")),
+            phone=str(entry.get("phone", "")),
+            university_email=str(entry.get("university_email", "")),
+            status=str(entry.get("status", "uploaded")),
+            verification_completed=bool(entry.get("verification_completed", False)),
+            total_required_shots=int(entry.get("total_required_shots", 0)),
+            total_accepted_shots=int(entry.get("total_accepted_shots", 0)),
+            validation_passed=bool(validation.get("validation_passed", False)),
+            uploaded_images={
+                angle: [str(path) for path in uploaded_images.get(angle, [])]
+                if isinstance(uploaded_images.get(angle, []), list)
+                else []
+                for angle in ALLOWED_ANGLES
+            },
+            event_type=event_type,
+            event_message=event_message,
+            mode=mode,
         )
+
+        if update_existing:
+            persist_enrollment_verification_to_db(payload)
+        else:
+            persist_enrollment_to_db(payload)
     except StudentAlreadyRegisteredError:
         raise
     except RuntimeError as exc:
@@ -454,11 +460,6 @@ async def _handle_multipart_enrollment(
 ) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object]]:
     form_data = await request.form()
     payload = _parse_multipart_metadata(form_data.get("metadata"))
-    try:
-        if student_exists_in_db(payload.student_id):
-            raise StudentAlreadyRegisteredError("You are already registered")
-    except EnrollmentPersistenceError:
-        pass
 
     files_by_angle = _extract_multipart_files(form_data)
     validation_summary = _default_validation_summary()
@@ -485,6 +486,7 @@ async def _handle_multipart_enrollment(
                 event_message=(
                     f"Final enrollment validation failed for student_id={payload.student_id}"
                 ),
+                update_existing=True,
             )
         except (OSError, EnrollmentPersistenceError):
             # Validation response should still be returned even if persistence fallback fails.
@@ -510,39 +512,25 @@ async def _handle_multipart_enrollment(
 @router.post("/enroll", response_model=EnrollmentResponse)
 async def enroll(request: Request) -> EnrollmentResponse:
     content_type = request.headers.get("content-type", "").lower()
+    if "application/json" not in content_type:
+        raise HTTPException(
+            status_code=415,
+            detail={"message": "Unsupported content type for /enroll. Use JSON."},
+        )
+
     mode = "basic"
     event_type = "basic_info_uploaded"
     event_message = "Basic enrollment info submitted."
-    if "application/json" in content_type:
-        payload, uploaded_images, validation_summary = await _handle_json_enrollment(
-            request
-        )
-        try:
-            if student_exists_in_db(payload.student_id):
-                return EnrollmentResponse(
-                    success=False,
-                    message="You are already registered",
-                )
-        except EnrollmentPersistenceError:
-            pass
-    elif "multipart/form-data" in content_type:
-        mode = "final"
-        event_type = "enrollment_validated"
-        event_message = "Final enrollment submitted with validated images."
-        try:
-            payload, uploaded_images, validation_summary = await _handle_multipart_enrollment(
-                request
-            )
-        except StudentAlreadyRegisteredError:
+    payload, uploaded_images, validation_summary = await _handle_json_enrollment(request)
+
+    try:
+        if student_exists_in_db(payload.student_id):
             return EnrollmentResponse(
                 success=False,
                 message="You are already registered",
             )
-    else:
-        raise HTTPException(
-            status_code=415,
-            detail={"message": "Unsupported content type for /enroll."},
-        )
+    except EnrollmentPersistenceError:
+        pass
 
     entry = _build_enrollment_entry(
         payload=payload,
@@ -572,4 +560,47 @@ async def enroll(request: Request) -> EnrollmentResponse:
     return EnrollmentResponse(
         success=True,
         message="Enrollment saved successfully",
+    )
+
+
+@router.post("/enroll/verification", response_model=EnrollmentResponse)
+async def enroll_verification(request: Request) -> EnrollmentResponse:
+    content_type = request.headers.get("content-type", "").lower()
+    if "multipart/form-data" not in content_type:
+        raise HTTPException(
+            status_code=415,
+            detail={"message": "Unsupported content type for /enroll/verification. Use multipart form data."},
+        )
+
+    payload, uploaded_images, validation_summary = await _handle_multipart_enrollment(
+        request
+    )
+    entry = _build_enrollment_entry(
+        payload=payload,
+        uploaded_images=uploaded_images,
+        validation_summary=validation_summary,
+    )
+
+    try:
+        _persist_enrollment_metadata(
+            entry,
+            mode="final",
+            event_type="enrollment_validated",
+            event_message="Final enrollment submitted with validated images.",
+            update_existing=True,
+        )
+    except EnrollmentNotFoundError:
+        return EnrollmentResponse(
+            success=False,
+            message="No pending enrollment found. Submit basic info first.",
+        )
+    except (OSError, EnrollmentPersistenceError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save enrollment metadata.",
+        ) from exc
+
+    return EnrollmentResponse(
+        success=True,
+        message="Verification images uploaded successfully",
     )

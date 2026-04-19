@@ -364,6 +364,60 @@ def persist_enrollment_to_db(payload: EnrollmentRecordInput) -> None:
             raise EnrollmentPersistenceError(str(exc)) from exc
 
 
+def persist_enrollment_verification_to_db(payload: EnrollmentRecordInput) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        try:
+            student = db.scalar(
+                select(Student).where(Student.student_id == payload.student_id)
+            )
+            if student is None:
+                raise EnrollmentNotFoundError("No existing enrollment found for this student")
+
+            enrollment = _latest_enrollment_for_student(db, payload.student_id)
+            if enrollment is None:
+                raise EnrollmentNotFoundError("No existing enrollment found for this student")
+
+            if enrollment.status in {"approved", "rejected", "reset"}:
+                raise EnrollmentPersistenceError(
+                    f"Enrollment cannot be updated in current status: {enrollment.status}"
+                )
+
+            student.full_name = payload.full_name
+            student.phone = payload.phone
+            student.university_email = payload.university_email
+
+            enrollment.status = payload.status
+            enrollment.verification_completed = payload.verification_completed
+            enrollment.total_required_shots = payload.total_required_shots
+            enrollment.total_accepted_shots = payload.total_accepted_shots
+            enrollment.validation_passed = payload.validation_passed
+            enrollment.rejection_reason = None
+
+            if payload.mode == "final":
+                _replace_enrollment_images(
+                    db,
+                    enrollment_id=enrollment.id,
+                    uploaded_images=payload.uploaded_images,
+                    validation_passed=payload.validation_passed,
+                )
+
+            _create_audit_log(
+                db,
+                event_type=payload.event_type,
+                student_pk=student.id,
+                enrollment_pk=enrollment.id,
+                message=payload.event_message,
+            )
+            db.commit()
+        except EnrollmentNotFoundError:
+            db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise EnrollmentPersistenceError(str(exc)) from exc
+
+
 def record_processing_completed_in_db(
     student_id: str,
     *,

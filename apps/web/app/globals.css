@@ -86,52 +86,63 @@
   --sidebar-ring: oklch(0.708 0 0);
   --landing-page-gradient:
     radial-gradient(
-      circle at 76% 40%,
-      rgba(59, 130, 246, 0.13),
-      transparent 44%
+      circle at 18% 8%,
+      rgba(147, 197, 253, 0.24),
+      transparent 36%
     ),
-    linear-gradient(to right, #e8edf5, #f4f8ff 56%, #f7fbff 100%);
-  --landing-radial-layer:
+    linear-gradient(125deg, #eef4ff 0%, #edf4fd 45%, #f7fbff 100%);
+  --landing-grid-line: rgba(71, 85, 105, 0.09);
+  --landing-vignette:
+    radial-gradient(circle at 50% 50%, transparent 42%, rgba(15, 23, 42, 0.12) 100%);
+  --landing-glow-top-left:
     radial-gradient(
-      circle at 83% 44%,
-      rgba(96, 165, 250, 0.2),
-      transparent 42%
+      circle at 3% -4%,
+      rgba(125, 211, 252, 0.48),
+      rgba(59, 130, 246, 0.16) 22%,
+      transparent 47%
     );
-  --landing-grid-line: rgba(51, 65, 85, 0.06);
-  --landing-shell-bg: rgba(247, 251, 255, 0.74);
-  --landing-shell-border: rgba(148, 163, 184, 0.32);
-  --landing-shell-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.84),
-    0 20px 44px -34px rgba(15, 23, 42, 0.26);
-  --landing-nav-bg: rgba(255, 255, 255, 0.62);
-  --landing-card-bg: rgba(251, 253, 255, 0.94);
-  --landing-card-border: rgba(148, 163, 184, 0.4);
+  --landing-glow-bottom-right:
+    radial-gradient(
+      circle at 99% 99%,
+      rgba(147, 197, 253, 0.48),
+      rgba(59, 130, 246, 0.12) 25%,
+      transparent 50%
+    );
+  --landing-card-bg: rgba(255, 255, 255, 0.86);
+  --landing-card-border: rgba(148, 163, 184, 0.36);
   --landing-card-shadow:
-    0 22px 48px -34px rgba(30, 64, 175, 0.2),
-    0 8px 20px -14px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    0 34px 70px -38px rgba(30, 64, 175, 0.34),
+    0 14px 34px -24px rgba(15, 23, 42, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
   --landing-text-primary: #0f172a;
   --landing-text-secondary: #334155;
   --landing-text-muted: #64748b;
-  --landing-accent: #2563eb;
-  --landing-accent-hover: #1d4ed8;
-  --landing-progress-inactive: rgba(148, 163, 184, 0.26);
+  --landing-accent: #3b82f6;
+  --landing-accent-hover: #60a5fa;
+  --landing-progress-inactive: rgba(148, 163, 184, 0.3);
   --landing-progress-active:
-    linear-gradient(90deg, #1d4ed8 0%, #3b82f6 65%, #60a5fa 100%);
-  --landing-input-bg: rgba(237, 243, 252, 0.86);
-  --landing-input-border: rgba(148, 163, 184, 0.52);
-  --landing-input-placeholder: rgba(100, 116, 139, 0.9);
-  --landing-focus-ring: rgba(37, 99, 235, 0.28);
+    linear-gradient(90deg, #1d4ed8 0%, #2563eb 55%, #60a5fa 100%);
+  --landing-input-bg: rgba(240, 246, 255, 0.9);
+  --landing-input-border: rgba(96, 165, 250, 0.62);
+  --landing-input-placeholder: rgba(100, 116, 139, 0.88);
+  --landing-focus-ring: rgba(56, 189, 248, 0.28);
   --landing-input-text: #0f172a;
   --landing-button-bg:
-    linear-gradient(90deg, #1d4ed8 0%, #2563eb 64%, #3b82f6 100%);
+    linear-gradient(90deg, #1760d9 0%, #2384ff 52%, #3296ff 100%);
   --landing-button-shadow:
-    0 16px 30px -20px rgba(37, 99, 235, 0.62),
-    inset 0 1px 0 rgba(191, 219, 254, 0.42);
-  --landing-shell-blur: 4px;
-  --landing-card-blur: 0px;
-  --landing-input-inset-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
-  --landing-card-spotlight: radial-gradient(circle at 55% 50%, rgba(59, 130, 246, 0.2), transparent 62%);
+    0 18px 34px -18px rgba(37, 99, 235, 0.56),
+    inset 0 1px 0 rgba(186, 230, 253, 0.36);
+  --landing-card-blur: 10px;
+  --landing-input-inset-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(37, 99, 235, 0.12);
+  --landing-card-spotlight:
+    radial-gradient(
+      circle at 52% 50%,
+      rgba(56, 189, 248, 0.26),
+      rgba(37, 99, 235, 0.18) 28%,
+      transparent 64%
+    );
 }
 
 .dark {
@@ -168,52 +179,70 @@
   --sidebar-ring: oklch(0.68 0.08 245);
   --landing-page-gradient:
     radial-gradient(
-      circle at 75% 40%,
-      rgba(59, 130, 246, 0.18),
-      transparent 40%
+      circle at 10% -10%,
+      rgba(56, 189, 248, 0.27),
+      transparent 35%
     ),
-    linear-gradient(to right, #020617, #0b1120);
-  --landing-radial-layer:
+    linear-gradient(124deg, #040a18 0%, #08142c 45%, #061128 100%);
+  --landing-grid-line: rgba(80, 124, 176, 0.15);
+  --landing-vignette:
+    radial-gradient(circle at 50% 50%, transparent 36%, rgba(2, 6, 23, 0.62) 100%);
+  --landing-glow-top-left:
     radial-gradient(
-      circle at 78% 46%,
-      rgba(96, 165, 250, 0.2),
-      transparent 46%
+      circle at 2% -7%,
+      rgba(125, 211, 252, 0.6),
+      rgba(59, 130, 246, 0.28) 24%,
+      transparent 50%
     );
-  --landing-grid-line: rgba(148, 163, 184, 0.08);
-  --landing-shell-bg: rgba(5, 10, 22, 0.42);
-  --landing-shell-border: rgba(148, 163, 184, 0.14);
-  --landing-shell-shadow:
-    inset 0 1px 0 rgba(148, 163, 184, 0.08),
-    0 24px 48px -36px rgba(2, 6, 23, 0.86);
-  --landing-nav-bg: rgba(7, 14, 30, 0.42);
-  --landing-card-bg: rgba(11, 18, 32, 0.7);
-  --landing-card-border: rgba(255, 255, 255, 0.1);
+  --landing-glow-bottom-right:
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(125, 211, 252, 0.42),
+      rgba(59, 130, 246, 0.2) 24%,
+      transparent 48%
+    );
+  --landing-card-bg:
+    linear-gradient(
+      140deg,
+      rgba(22, 43, 75, 0.8) 0%,
+      rgba(16, 34, 63, 0.7) 42%,
+      rgba(24, 36, 68, 0.75) 72%,
+      rgba(36, 35, 70, 0.78) 100%
+    );
+  --landing-card-border: rgba(191, 219, 254, 0.26);
   --landing-card-shadow:
-    0 20px 80px rgba(59, 130, 246, 0.15),
-    0 12px 40px -24px rgba(2, 6, 23, 0.88),
-    inset 0 1px 0 rgba(148, 163, 184, 0.08);
-  --landing-text-primary: #e2e8f0;
-  --landing-text-secondary: #cbd5e1;
-  --landing-text-muted: #94a3b8;
-  --landing-accent: #60a5fa;
-  --landing-accent-hover: #93c5fd;
-  --landing-progress-inactive: rgba(148, 163, 184, 0.22);
+    0 40px 86px -38px rgba(15, 23, 42, 0.86),
+    0 18px 38px -22px rgba(59, 130, 246, 0.22),
+    inset 0 1px 0 rgba(226, 232, 240, 0.2);
+  --landing-text-primary: #f8fafc;
+  --landing-text-secondary: #b8c7df;
+  --landing-text-muted: #90a3c4;
+  --landing-accent: #3b82f6;
+  --landing-accent-hover: #60a5fa;
+  --landing-progress-inactive: rgba(148, 163, 184, 0.3);
   --landing-progress-active:
     linear-gradient(90deg, #1d4ed8 0%, #2563eb 55%, #60a5fa 100%);
-  --landing-input-bg: rgba(6, 13, 27, 0.86);
-  --landing-input-border: rgba(148, 163, 184, 0.4);
-  --landing-input-placeholder: rgba(148, 163, 184, 0.82);
-  --landing-focus-ring: rgba(96, 165, 250, 0.35);
-  --landing-input-text: #e2e8f0;
+  --landing-input-bg: rgba(6, 22, 48, 0.66);
+  --landing-input-border: rgba(56, 189, 248, 0.56);
+  --landing-input-placeholder: rgba(148, 163, 184, 0.92);
+  --landing-focus-ring: rgba(56, 189, 248, 0.3);
+  --landing-input-text: #dbeafe;
   --landing-button-bg:
-    linear-gradient(90deg, #1e3a8a 0%, #2563eb 62%, #3b82f6 100%);
+    linear-gradient(90deg, #1760d9 0%, #2384ff 52%, #3296ff 100%);
   --landing-button-shadow:
-    0 18px 34px -18px rgba(37, 99, 235, 0.45),
-    inset 0 1px 0 rgba(147, 197, 253, 0.24);
-  --landing-shell-blur: 2px;
-  --landing-card-blur: 20px;
-  --landing-input-inset-shadow: inset 0 1px 2px rgba(2, 6, 23, 0.54);
-  --landing-card-spotlight: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.34), rgba(59, 130, 246, 0.06) 42%, transparent 68%);
+    0 18px 34px -18px rgba(37, 99, 235, 0.56),
+    inset 0 1px 0 rgba(186, 230, 253, 0.32);
+  --landing-card-blur: 24px;
+  --landing-input-inset-shadow:
+    inset 0 1px 2px rgba(2, 6, 23, 0.54),
+    0 0 0 1px rgba(37, 99, 235, 0.18);
+  --landing-card-spotlight:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(56, 189, 248, 0.3),
+      rgba(59, 130, 246, 0.18) 30%,
+      transparent 66%
+    );
 }
 
 @layer base {
@@ -246,32 +275,24 @@
     background-color: var(--background);
   }
 
-  .landing-radial {
-    background-image: var(--landing-radial-layer);
+  .landing-vignette {
+    background-image: var(--landing-vignette);
   }
 
   .landing-grid-overlay {
     background-image:
       linear-gradient(var(--landing-grid-line) 1px, transparent 1px),
       linear-gradient(90deg, var(--landing-grid-line) 1px, transparent 1px);
-    background-size: 52px 52px;
-    mask-image: linear-gradient(to right, black 0%, black 46%, transparent 74%);
+    background-size: 72px 72px;
+    opacity: 0.5;
   }
 
-  .landing-shell {
-    background: var(--landing-shell-bg);
-    border-color: var(--landing-shell-border);
-    box-shadow: var(--landing-shell-shadow);
-    backdrop-filter: blur(var(--landing-shell-blur));
-    transition:
-      box-shadow 220ms ease,
-      border-color 200ms ease,
-      background-color 200ms ease;
+  .landing-glow-top-left {
+    background-image: var(--landing-glow-top-left);
   }
 
-  .landing-topbar {
-    background: var(--landing-nav-bg);
-    border-color: var(--landing-shell-border);
+  .landing-glow-bottom-right {
+    background-image: var(--landing-glow-bottom-right);
   }
 
   .landing-card-surface {
@@ -289,18 +310,19 @@
     background-image: var(--landing-card-spotlight);
   }
 
+  .landing-step-labels-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .landing-card-surface:hover {
       transform: translateY(-1px);
       box-shadow:
-        0 30px 50px -36px rgba(15, 23, 42, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.92);
-    }
-
-    .dark .landing-card-surface:hover {
-      box-shadow:
-        0 28px 46px -34px rgba(2, 6, 23, 0.86),
-        inset 0 1px 0 rgba(148, 163, 184, 0.12);
+        0 44px 88px -40px rgba(15, 23, 42, 0.86),
+        0 18px 38px -22px rgba(59, 130, 246, 0.28),
+        inset 0 1px 0 rgba(226, 232, 240, 0.24);
     }
   }
 
@@ -318,10 +340,11 @@
 
   .landing-link {
     color: var(--landing-text-muted);
+    transition: color 160ms ease;
   }
 
   .landing-link:hover {
-    color: var(--landing-text-secondary);
+    color: var(--landing-text-primary);
   }
 
   .landing-progress-track {
@@ -347,15 +370,15 @@
   }
 
   .landing-form-input {
-    height: 2.8rem;
+    height: 3.3rem;
     border-radius: 0.8rem;
     border-color: var(--landing-input-border);
     background: var(--landing-input-bg);
     color: var(--landing-input-text);
-    padding-left: 0.9rem;
-    padding-right: 0.9rem;
-    font-size: 0.9rem;
-    line-height: 1.25rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    font-size: 1.02rem;
+    line-height: 1.4rem;
     transition:
       border-color 180ms ease,
       box-shadow 180ms ease,
@@ -370,7 +393,9 @@
   .landing-form-input:focus-visible,
   .landing-form-input:focus {
     border-color: var(--landing-accent);
-    box-shadow: 0 0 0 3px var(--landing-focus-ring);
+    box-shadow:
+      0 0 0 3px var(--landing-focus-ring),
+      0 0 24px rgba(56, 189, 248, 0.22);
   }
 
   .landing-form-input-readonly {
@@ -379,7 +404,7 @@
   }
 
   .landing-cta {
-    height: 2.8rem;
+    height: 3.05rem;
     border-radius: 0.8rem;
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -406,7 +431,7 @@
   }
 
   .landing-cta-outline {
-    height: 2.8rem;
+    height: 3rem;
     border-radius: 0.8rem;
     transition:
       border-color 180ms ease,
@@ -420,5 +445,29 @@
 
   .landing-cta-outline:active {
     transform: translateY(0);
+  }
+
+  @media (max-width: 1023px) {
+    .landing-grid-overlay {
+      background-size: 56px 56px;
+      opacity: 0.42;
+    }
+
+    .landing-step-labels-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: 0.4rem;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .landing-form-input {
+      height: 3.05rem;
+      font-size: 0.96rem;
+    }
+
+    .landing-cta {
+      height: 2.9rem;
+      font-size: 0.95rem;
+    }
   }
 }

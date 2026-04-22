@@ -16,21 +16,18 @@ export function StudentIdStep({
   onContinue,
 }: StudentIdStepProps) {
   return (
-    <div className="space-y-6 sm:space-y-7">
+    <div className="space-y-7 sm:space-y-8">
       <header className="space-y-2.5">
-        <h2 className="landing-text-primary text-xl font-semibold tracking-tight sm:text-[1.35rem]">
+        <h3 className="landing-text-primary text-[2rem] leading-[1.08] font-semibold tracking-[-0.026em] sm:text-[2.3rem]">
           Check Registration Status
-        </h2>
-        <p className="landing-text-secondary text-sm leading-6">
+        </h3>
+        <p className="landing-text-secondary text-[1.03rem] leading-[1.45]">
           Enter your student ID to continue with DIU Lens.
         </p>
       </header>
 
-      <div className="space-y-4 rounded-xl border border-slate-200/65 bg-white/45 p-3.5 dark:border-white/10 dark:bg-slate-900/36 sm:p-4">
-        <Label
-          htmlFor="student-id"
-          className="landing-form-label text-[0.82rem] font-semibold tracking-[0.02em]"
-        >
+      <div className="space-y-3">
+        <Label htmlFor="student-id" className="sr-only">
           Student ID
         </Label>
         <Input
@@ -50,11 +47,11 @@ export function StudentIdStep({
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="landing-button-bg landing-cta w-full gap-2 px-5 text-sm text-white"
+        className="landing-button-bg landing-cta w-full gap-2 px-5 text-[1.02rem] text-white"
       >
         Continue
         <ArrowRight
-          className="size-4 transition-transform duration-150 group-hover/button:translate-x-0.5"
+          className="size-5 transition-transform duration-150 group-hover/button:translate-x-0.5"
           aria-hidden="true"
         />
       </Button>

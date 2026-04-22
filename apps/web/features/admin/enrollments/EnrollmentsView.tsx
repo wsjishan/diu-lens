@@ -111,22 +111,28 @@ export function EnrollmentsView() {
   const runAction = async (
     key: string,
     action: () => Promise<{ success: boolean; message: string }>,
-    successTitle: string
-  ) => {
+    successTitle: string,
+    onSuccess?: () => void
+  ): Promise<boolean> => {
     setActionKey(key);
 
     try {
       const result = await action();
       if (!result.success) {
         showToast({ title: 'Action failed', message: result.message, variant: 'error' });
-        return;
+        return false;
+      }
+
+      if (onSuccess) {
+        onSuccess();
       }
 
       showToast({ title: successTitle, message: result.message, variant: 'success' });
       await loadEnrollments(false);
+      return true;
     } catch (errorValue) {
       if (handleAuthFailure(errorValue)) {
-        return;
+        return false;
       }
 
       showToast({
@@ -134,6 +140,7 @@ export function EnrollmentsView() {
         message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
         variant: 'error',
       });
+      return false;
     } finally {
       setActionKey(null);
     }
@@ -158,6 +165,21 @@ export function EnrollmentsView() {
       return;
     }
 
+    const targetStudentId = rejectDialog.studentId;
+    const isStillPending = enrollments.some((item) => item.student_id === targetStudentId);
+    if (!isStillPending) {
+      setRejectDialog(null);
+      setRejectReason('');
+      setRejectError(null);
+      showToast({
+        title: 'Already updated',
+        message: 'This enrollment is no longer pending. Refreshing list.',
+        variant: 'error',
+      });
+      await loadEnrollments(false);
+      return;
+    }
+
     const reason = rejectReason.trim();
 
     if (reason.length < 3) {
@@ -167,14 +189,19 @@ export function EnrollmentsView() {
 
     setRejectError(null);
 
-    await runAction(
-      `reject:${rejectDialog.studentId}`,
-      () => rejectEnrollment(token, rejectDialog.studentId, reason),
-      'Enrollment rejected'
+    const wasRejected = await runAction(
+      `reject:${targetStudentId}`,
+      () => rejectEnrollment(token, targetStudentId, reason),
+      'Enrollment rejected',
+      () => {
+        setEnrollments((current) => current.filter((item) => item.student_id !== targetStudentId));
+      }
     );
 
-    setRejectDialog(null);
-    setRejectReason('');
+    if (wasRejected) {
+      setRejectDialog(null);
+      setRejectReason('');
+    }
   };
 
   if (isLoading) {

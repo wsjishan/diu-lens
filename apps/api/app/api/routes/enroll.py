@@ -476,7 +476,7 @@ async def _handle_multipart_enrollment(
             payload=payload,
             uploaded_images=uploaded_images,
             validation_summary=failed_validation,
-            status_override="failed",
+            status_override="pending",
         )
         try:
             _persist_enrollment_metadata(

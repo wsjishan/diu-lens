@@ -183,9 +183,18 @@ def _delete_operational_data_by_student_id(db: Session, student_id: str) -> int:
 
     db.execute(delete(FaceEmbedding).where(FaceEmbedding.student_id == student_id))
     db.execute(delete(Enrollment).where(Enrollment.student_id == student_id))
-    deleted_students = db.execute(
-        delete(Student).where(Student.student_id == student_id)
-    ).rowcount
+
+    has_remaining_enrollment = db.scalar(
+        select(Enrollment.id)
+        .where(Enrollment.student_id == student_id)
+        .limit(1)
+    )
+    deleted_students = 0
+    if has_remaining_enrollment is None:
+        deleted_students = db.execute(
+            delete(Student).where(Student.student_id == student_id)
+        ).rowcount or 0
+
     return int(deleted_students or 0)
 
 

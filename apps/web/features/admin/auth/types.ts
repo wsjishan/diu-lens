@@ -6,7 +6,16 @@ export type AdminUser = {
   is_active: boolean;
 };
 
-export type EnrollmentStatus = 'pending' | 'approved' | 'rejected' | 'processed' | 'reset';
+export type EnrollmentStatus =
+  | 'pending'
+  | 'uploaded'
+  | 'validated'
+  | 'failed'
+  | 'processing'
+  | 'processed'
+  | 'approved'
+  | 'rejected'
+  | 'reset';
 
 export type EnrollmentRecord = {
   student_id: string;

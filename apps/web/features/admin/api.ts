@@ -91,6 +91,10 @@ function parseEnrollment(value: unknown): EnrollmentRecord | null {
   const statusRaw = row.status;
   const status =
     statusRaw === 'pending' ||
+    statusRaw === 'uploaded' ||
+    statusRaw === 'validated' ||
+    statusRaw === 'failed' ||
+    statusRaw === 'processing' ||
     statusRaw === 'approved' ||
     statusRaw === 'rejected' ||
     statusRaw === 'processed' ||

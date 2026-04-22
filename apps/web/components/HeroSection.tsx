@@ -1,93 +1,60 @@
-import type { RegistrationHighlight } from '@/features/registration/constants';
-
-type HeroSectionProps = {
-  highlights: RegistrationHighlight[];
-};
-
-export function HeroSection({ highlights }: HeroSectionProps) {
+export function HeroSection() {
   return (
-    <section className="space-y-6 text-left sm:space-y-7 lg:space-y-9 lg:pr-2">
-      <div className="ai-float inline-flex items-center gap-2 rounded-full border border-blue-200/75 bg-white/56 px-3 py-1.5 text-[0.65rem] font-semibold tracking-[0.16em] text-blue-700 uppercase shadow-[0_12px_24px_-20px_rgba(37,99,235,0.56)] dark:border-white/10 dark:bg-slate-900/50 dark:text-slate-300 dark:shadow-[0_10px_24px_rgba(0,0,0,0.24)]">
-        <span className="ai-pulse-ring inline-flex size-2 rounded-full bg-sky-400" />
-        AI Identity Layer Online
+    <section className="space-y-7 text-left lg:space-y-9">
+      <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/45 bg-blue-50/65 px-4 py-1.5 text-[0.66rem] font-semibold tracking-[0.16em] text-blue-900 uppercase shadow-[0_0_24px_rgba(30,64,175,0.12)] backdrop-blur-sm dark:border-blue-300/35 dark:bg-[#0c1c3c]/70 dark:text-slate-300 dark:shadow-[0_0_24px_rgba(30,64,175,0.2)]">
+        <span className="inline-flex size-2 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(56,189,248,0.8)] dark:bg-sky-400" />
+        AI identity layer online
       </div>
-      <div className="space-y-4 sm:space-y-6">
-        <h1 className="max-w-[16ch] text-3xl leading-[1.07] font-semibold tracking-[-0.03em] sm:max-w-[18ch] sm:text-4xl md:text-[2.45rem] lg:max-w-[13.5ch] lg:text-[3.2rem]">
-          <span className="block bg-linear-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent dark:from-slate-100 dark:via-slate-200 dark:to-slate-300">
-            Smart{' '}
-            <span className="bg-linear-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-              Identification
-            </span>
+
+      <div className="space-y-5 lg:space-y-6">
+        <h1 className="landing-text-primary max-w-[13ch] text-[3rem] leading-[0.98] font-semibold tracking-[-0.035em] sm:text-[3.8rem] lg:max-w-[10.4ch] lg:text-[5.2rem]">
+          Smart{' '}
+          <span className="bg-linear-to-r from-[#164eaf] via-[#2871d8] to-[#3c92ff] bg-clip-text text-transparent dark:from-[#ecf2ff] dark:via-[#98c6ff] dark:to-[#5ea7ff]">
+            Identification
           </span>
-          <span className="landing-text-primary mt-1 block">for DIU Campus</span>
+          <br />
+          for DIU Campus
         </h1>
+
         <p
           id="how-it-works"
-          className="landing-text-secondary max-w-lg text-[0.92rem] leading-6 sm:text-[0.98rem] sm:leading-7"
+          className="landing-text-secondary max-w-[35rem] text-[1.06rem] leading-[1.48] lg:text-[1.02rem]"
         >
-          Complete onboarding once, then move across campus services with secure
-          identity access and fewer verification interruptions.
+          Verify once and access DIU campus services without repeated
+          verification steps. Secure identity registration, AI-powered face
+          verification, Privacy-first data handling.
         </p>
       </div>
-      <div
-        id="for-students"
-        className="max-w-3xl space-y-4"
-      >
-        <p className="landing-text-muted text-[0.65rem] font-semibold tracking-[0.16em] uppercase">
-          Registration flow
-        </p>
-        <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
-          <li className="relative flex items-center gap-2.5 rounded-xl border border-blue-200/70 bg-white/65 px-3 py-2 shadow-[0_8px_20px_-20px_rgba(37,99,235,0.7)] dark:border-blue-300/18 dark:bg-slate-900/46">
-            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[0.63rem] font-semibold text-white shadow-[0_0_0_3px_rgba(37,99,235,0.2)] dark:bg-blue-400 dark:text-slate-950 dark:shadow-[0_0_0_3px_rgba(59,130,246,0.2)]">
-              1
-            </span>
-            <span className="landing-text-primary text-[0.8rem] font-semibold">
-              Student ID check
-            </span>
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 -right-2 hidden h-px w-4 -translate-y-1/2 bg-linear-to-r from-blue-400/55 to-transparent sm:block"
-            />
-          </li>
-          <li className="relative flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white/58 px-3 py-2 dark:border-white/12 dark:bg-slate-900/40">
-            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-blue-200/70 bg-blue-100/90 text-[0.63rem] font-semibold text-blue-700 dark:border-white/12 dark:bg-blue-500/18 dark:text-slate-200">
-              2
-            </span>
-            <span className="landing-text-secondary text-[0.8rem] font-medium">
-              Basic information
-            </span>
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 -right-2 hidden h-px w-4 -translate-y-1/2 bg-linear-to-r from-blue-400/45 to-transparent sm:block"
-            />
-          </li>
-          <li className="flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white/58 px-3 py-2 dark:border-white/12 dark:bg-slate-900/40">
-            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-blue-200/70 bg-blue-100/90 text-[0.63rem] font-semibold text-blue-700 dark:border-white/12 dark:bg-blue-500/18 dark:text-slate-200">
-              3
-            </span>
-            <span className="landing-text-secondary text-[0.8rem] font-medium">
-              Face verification
-            </span>
-          </li>
-        </ol>
-        <ul
-          id="features"
-          className="landing-text-muted mt-4 grid gap-1.5 text-[0.8rem]"
-          aria-label="Platform highlights"
-        >
-          {highlights.map((item) => (
-            <li
-              key={item.title}
-              className="inline-flex items-center gap-1.5"
-            >
-              <span
-                className="size-1 rounded-full bg-blue-600/90 dark:bg-blue-400"
-                aria-hidden="true"
-              />
-              <span>{item.title}</span>
+
+      <div id="for-students" className="pt-2">
+        <ol className="grid grid-cols-3 gap-4 lg:max-w-[35.5rem]">
+          {[
+            { id: 1, label: 'Student ID check', active: true },
+            { id: 2, label: 'Basic information', active: false },
+            { id: 3, label: 'Face verification', active: false },
+          ].map((item, index, arr) => (
+            <li key={item.id} className="relative flex flex-col items-start gap-3">
+              <div className="relative w-full">
+                {index < arr.length - 1 ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-[2.55rem] right-2 top-1/2 h-px -translate-y-1/2 bg-linear-to-r from-blue-300/60 to-slate-500/30 sm:left-[3rem] lg:left-[3.35rem]"
+                  />
+                ) : null}
+                <span
+                  className={item.active
+                    ? 'relative z-10 inline-flex size-8 items-center justify-center rounded-full bg-linear-to-b from-[#2f8dff] to-[#1a67e5] text-[0.95rem] font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.65)] ring-1 ring-blue-200/80 sm:size-10 sm:text-[1.06rem] lg:size-11 lg:text-[1.18rem]'
+                    : 'relative z-10 inline-flex size-8 items-center justify-center rounded-full border border-slate-300/80 bg-slate-100/80 text-[0.92rem] font-medium text-slate-600 dark:border-slate-400/45 dark:bg-[#192844]/65 dark:text-slate-300 sm:size-10 sm:text-[1rem] lg:size-11 lg:text-[1.1rem]'}
+                >
+                  {item.id}
+                </span>
+              </div>
+              <span className="landing-text-secondary text-[0.75rem] leading-tight sm:text-[0.9rem] lg:text-[1.09rem]">
+                {item.label}
+              </span>
             </li>
           ))}
-        </ul>
+        </ol>
       </div>
     </section>
   );

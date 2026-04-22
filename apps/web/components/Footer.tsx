@@ -2,31 +2,43 @@ import Link from 'next/link';
 
 export function Footer() {
   return (
-    <footer className="border-t border-slate-200/90 px-6 py-3 text-center dark:border-white/10 sm:text-left">
-      <div className="flex flex-col items-center justify-between gap-2 sm:flex-row sm:items-center">
-        <p className="text-[0.72rem] text-slate-500/75 dark:text-slate-400">
+    <footer className="landing-topbar border-t px-4 py-3.5 sm:px-6 lg:px-8">
+      <div className="flex flex-col items-center justify-between gap-2.5 sm:flex-row sm:items-center">
+        <p className="landing-text-muted text-center text-[0.72rem] sm:text-left">
           Copyright {new Date().getFullYear()} DIU Lens. All rights reserved.
         </p>
         <nav
           id="support"
           aria-label="Footer links"
-          className="flex items-center justify-center gap-3 sm:justify-start"
+          className="flex flex-wrap items-center justify-center gap-4 sm:justify-start"
         >
           <a
             href="#"
-            className="text-[0.72rem] font-medium text-slate-500/80 transition-colors hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300"
+            className="landing-link rounded-md px-1.5 py-0.5 text-[0.72rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/45 dark:focus-visible:ring-blue-400/55"
           >
             Privacy Policy
           </a>
+          <span
+            aria-hidden="true"
+            className="landing-text-muted hidden text-[0.65rem] sm:inline"
+          >
+            •
+          </span>
           <a
             href="#"
-            className="text-[0.72rem] font-medium text-slate-500/80 transition-colors hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300"
+            className="landing-link rounded-md px-1.5 py-0.5 text-[0.72rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/45 dark:focus-visible:ring-blue-400/55"
           >
             Support
           </a>
+          <span
+            aria-hidden="true"
+            className="landing-text-muted hidden text-[0.65rem] sm:inline"
+          >
+            •
+          </span>
           <Link
             href="/admin/login"
-            className="text-[0.72rem] font-medium text-slate-500/80 transition-colors hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300"
+            className="landing-link rounded-md px-1.5 py-0.5 text-[0.72rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/45 dark:focus-visible:ring-blue-400/55"
           >
             Admin
           </Link>

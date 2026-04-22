@@ -27,11 +27,11 @@ export function BasicInfoStep({
 }: BasicInfoStepProps) {
   return (
     <div className="flex h-full flex-col gap-4 sm:gap-5">
-      <header className="space-y-2">
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+      <header className="space-y-2.5">
+        <h2 className="landing-text-primary text-xl font-semibold tracking-tight sm:text-[1.35rem]">
           Basic Information
         </h2>
-        <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+        <p className="landing-text-secondary text-sm leading-6">
           Confirm your profile details before starting identity verification.
         </p>
         {errorMessage ? (
@@ -44,11 +44,11 @@ export function BasicInfoStep({
         ) : null}
       </header>
 
-      <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 rounded-xl border border-slate-200/65 bg-white/45 p-3.5 dark:border-white/10 dark:bg-slate-900/36 sm:gap-4 sm:p-4 md:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label
             htmlFor="basic-student-id"
-            className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
+            className="landing-form-label text-[0.82rem] font-semibold tracking-[0.02em]"
           >
             Student ID
           </Label>
@@ -56,14 +56,14 @@ export function BasicInfoStep({
             id="basic-student-id"
             value={values.studentId}
             readOnly
-            className="h-10 w-full rounded-lg border-slate-300/80 bg-slate-100/80 px-3.5 text-sm text-slate-700 transition-all duration-200 ease-out dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-300"
+            className="landing-form-input landing-form-input-readonly w-full"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label
             htmlFor="full-name"
-            className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
+            className="landing-form-label text-[0.82rem] font-semibold tracking-[0.02em]"
           >
             Full Name
           </Label>
@@ -72,7 +72,7 @@ export function BasicInfoStep({
             value={values.fullName}
             placeholder="Enter your full name"
             onChange={(event) => onFieldChange('fullName', event.target.value)}
-            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/85 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="landing-form-input w-full"
             required
           />
         </div>
@@ -80,7 +80,7 @@ export function BasicInfoStep({
         <div className="col-span-1 flex flex-col gap-1.5 md:col-span-2">
           <Label
             htmlFor="phone-number"
-            className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
+            className="landing-form-label text-[0.82rem] font-semibold tracking-[0.02em]"
           >
             Phone Number
           </Label>
@@ -92,7 +92,7 @@ export function BasicInfoStep({
             onChange={(event) =>
               onFieldChange('phoneNumber', event.target.value)
             }
-            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/85 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="landing-form-input w-full"
             required
           />
         </div>
@@ -100,7 +100,7 @@ export function BasicInfoStep({
         <div className="col-span-1 flex flex-col gap-1.5 md:col-span-2">
           <Label
             htmlFor="university-email"
-            className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
+            className="landing-form-label text-[0.82rem] font-semibold tracking-[0.02em]"
           >
             University Email
           </Label>
@@ -113,19 +113,19 @@ export function BasicInfoStep({
             onChange={(event) =>
               onFieldChange('universityEmail', event.target.value)
             }
-            className="h-10 w-full rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/85 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+            className="landing-form-input w-full"
             required
           />
         </div>
       </div>
 
-      <div className="mt-auto flex flex-col gap-2.5 border-t border-slate-200/80 pt-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+      <div className="mt-auto flex flex-col gap-4 border-t border-slate-200/80 pt-4 dark:border-white/10">
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
           disabled={isSubmitting}
-          className="h-10 rounded-lg px-4"
+          className="landing-cta-outline h-11 w-full rounded-xl border-slate-300/80 bg-white/72 px-4 text-slate-700 hover:bg-slate-100 dark:border-white/12 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-900/85"
         >
           <ArrowLeft className="size-4" />
           Back
@@ -139,10 +139,10 @@ export function BasicInfoStep({
             !values.phoneNumber.trim() ||
             !values.universityEmail.trim()
           }
-          className="h-10 gap-2 rounded-lg bg-linear-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] dark:bg-linear-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
+          className="landing-button-bg landing-cta h-11 w-full gap-2 px-5 text-white"
         >
           {isSubmitting ? 'Continuing...' : 'Continue'}
-          <ArrowRight className="size-4" />
+          <ArrowRight className="size-4 transition-transform duration-150 group-hover/button:translate-x-0.5" />
         </Button>
       </div>
     </div>

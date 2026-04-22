@@ -14,10 +14,10 @@ export function SuccessStep({ onDone }: SuccessStepProps) {
       </div>
 
       <header className="space-y-2">
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+        <h2 className="landing-text-primary text-xl font-semibold tracking-tight">
           Registration Complete
         </h2>
-        <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+        <p className="landing-text-secondary text-sm leading-6">
           Your onboarding details have been saved. Face verification integration
           will be connected in the next release.
         </p>
@@ -26,7 +26,7 @@ export function SuccessStep({ onDone }: SuccessStepProps) {
       <Button
         type="button"
         onClick={onDone}
-        className="h-10 rounded-lg bg-linear-to-r from-[#1e2a78] to-[#2f5bff] px-8 text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] sm:px-9 dark:bg-linear-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
+        className="landing-button-bg landing-cta h-11 w-full px-8 text-white sm:w-auto sm:px-9"
       >
         Done
       </Button>

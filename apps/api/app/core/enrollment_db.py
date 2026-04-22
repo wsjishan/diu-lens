@@ -32,6 +32,10 @@ class EnrollmentNotFoundError(EnrollmentPersistenceError):
     """Raised when no enrollment exists for the provided student_id."""
 
 
+class EnrollmentInvalidStateError(EnrollmentPersistenceError):
+    """Raised when an admin action is not allowed for current enrollment state."""
+
+
 @dataclass(frozen=True)
 class EnrollmentAdminActionResult:
     success: bool
@@ -160,6 +164,31 @@ def _create_audit_log(
     )
 
 
+def _is_active_blocking_status(status: str) -> bool:
+    return status not in {"rejected", "reset"}
+
+
+def _delete_operational_data_by_student_id(db: Session, student_id: str) -> int:
+    enrollment_ids = db.scalars(
+        select(Enrollment.id).where(Enrollment.student_id == student_id)
+    ).all()
+
+    if enrollment_ids:
+        db.execute(
+            delete(EnrollmentImage).where(EnrollmentImage.enrollment_id.in_(enrollment_ids))
+        )
+        db.execute(
+            delete(SelectedCrop).where(SelectedCrop.enrollment_id.in_(enrollment_ids))
+        )
+
+    db.execute(delete(FaceEmbedding).where(FaceEmbedding.student_id == student_id))
+    db.execute(delete(Enrollment).where(Enrollment.student_id == student_id))
+    deleted_students = db.execute(
+        delete(Student).where(Student.student_id == student_id)
+    ).rowcount
+    return int(deleted_students or 0)
+
+
 def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
     """Admin action: approve a student's enrollment."""
     student, enrollment = _get_student_and_enrollment(db, student_id)
@@ -184,19 +213,22 @@ def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
 
 def reject_enrollment_by_student_id(
     db: Session, student_id: str, reason: str | None = None
-) -> bool:
-    """Admin action: reject a student's enrollment."""
+) -> None:
+    """Admin action: reject a pending student's enrollment and clear operational data."""
     student, enrollment = _get_student_and_enrollment(db, student_id)
     if student is None or enrollment is None:
         raise EnrollmentNotFoundError("Enrollment not found for this student_id")
 
-    if enrollment.status == "rejected":
-        return False
+    if enrollment.status != "pending":
+        raise EnrollmentInvalidStateError(
+            f"Only pending enrollments can be rejected. Current status: {enrollment.status}"
+        )
 
-    enrollment.status = "rejected"
     reason_text = reason.strip() if reason else ""
     enrollment.rejection_reason = reason_text or None
-    message = f"Enrollment rejected for student_id={student_id}"
+    message = (
+        f"Enrollment rejected and cleared for re-registration for student_id={student_id}"
+    )
     if reason_text:
         message = f"{message}. reason={reason_text}"
 
@@ -208,42 +240,31 @@ def reject_enrollment_by_student_id(
         message=message,
     )
     db.flush()
-    return True
+    _delete_operational_data_by_student_id(db, student_id)
 
 
 def reset_enrollment_by_student_id(db: Session, student_id: str) -> None:
-    """Super-admin action: destructive reset so the student can enroll again."""
+    """Super-admin action: destructive reset for approved student re-registration."""
     student, enrollment = _get_student_and_enrollment(db, student_id)
-    if student is None:
+    if student is None or enrollment is None:
         raise EnrollmentNotFoundError("Enrollment not found for this student_id")
 
-    enrollment_ids = db.scalars(
-        select(Enrollment.id).where(Enrollment.student_id == student_id)
-    ).all()
-    latest_enrollment_id = enrollment.id if enrollment is not None else None
+    if enrollment.status != "approved":
+        raise EnrollmentInvalidStateError(
+            f"Only approved enrollments can be reset. Current status: {enrollment.status}"
+        )
 
     _create_audit_log(
         db,
         event_type="enrollment_reset",
         student_pk=student.id,
-        enrollment_pk=latest_enrollment_id,
+        enrollment_pk=enrollment.id,
         message=(
-            f"Enrollment reset for student_id={student_id}. "
-            f"deleted_enrollments={len(enrollment_ids)}"
+            f"Enrollment reset and cleared for re-registration for student_id={student_id}"
         ),
     )
     db.flush()
-
-    if enrollment_ids:
-        db.execute(
-            delete(EnrollmentImage).where(EnrollmentImage.enrollment_id.in_(enrollment_ids))
-        )
-        db.execute(
-            delete(SelectedCrop).where(SelectedCrop.enrollment_id.in_(enrollment_ids))
-        )
-    db.execute(delete(FaceEmbedding).where(FaceEmbedding.student_id == student_id))
-    db.execute(delete(Enrollment).where(Enrollment.student_id == student_id))
-    db.execute(delete(Student).where(Student.student_id == student_id))
+    _delete_operational_data_by_student_id(db, student_id)
 
 
 def approve_enrollment(student_id: str) -> EnrollmentAdminActionResult:
@@ -279,7 +300,7 @@ def reject_enrollment(
     session_factory = get_session_factory()
     with session_factory() as db:
         try:
-            updated = reject_enrollment_by_student_id(db, student_id, reason=reason)
+            reject_enrollment_by_student_id(db, student_id, reason=reason)
             db.commit()
         except EnrollmentNotFoundError:
             db.rollback()
@@ -287,18 +308,19 @@ def reject_enrollment(
                 success=False,
                 message="Enrollment not found for this student_id",
             )
+        except EnrollmentInvalidStateError as exc:
+            db.rollback()
+            return EnrollmentAdminActionResult(
+                success=False,
+                message=str(exc),
+            )
         except SQLAlchemyError as exc:
             db.rollback()
             raise EnrollmentPersistenceError("Failed to reject enrollment.") from exc
 
-    if updated:
-        return EnrollmentAdminActionResult(
-            success=True,
-            message="Enrollment rejected successfully",
-        )
     return EnrollmentAdminActionResult(
         success=True,
-        message="Enrollment is already rejected",
+        message="Enrollment rejected and cleared successfully",
     )
 
 
@@ -314,6 +336,12 @@ def reset_enrollment(student_id: str) -> EnrollmentAdminActionResult:
                 success=False,
                 message="Enrollment not found for this student_id",
             )
+        except EnrollmentInvalidStateError as exc:
+            db.rollback()
+            return EnrollmentAdminActionResult(
+                success=False,
+                message=str(exc),
+            )
         except SQLAlchemyError as exc:
             db.rollback()
             raise EnrollmentPersistenceError("Failed to reset enrollment.") from exc
@@ -328,13 +356,27 @@ def persist_enrollment_to_db(payload: EnrollmentRecordInput) -> None:
     session_factory = get_session_factory()
     with session_factory() as db:
         try:
-            existing_student = db.scalar(
-                select(Student.id).where(Student.student_id == payload.student_id)
+            existing_enrollment = db.scalar(
+                select(Enrollment)
+                .where(Enrollment.student_id == payload.student_id)
+                .order_by(Enrollment.id.desc())
+                .limit(1)
             )
-            if existing_student is not None:
+            if existing_enrollment is not None and _is_active_blocking_status(
+                existing_enrollment.status
+            ):
                 raise StudentAlreadyRegisteredError("You are already registered")
 
-            student = _create_student(db, payload)
+            student = db.scalar(
+                select(Student).where(Student.student_id == payload.student_id)
+            )
+            if student is None:
+                student = _create_student(db, payload)
+            else:
+                student.full_name = payload.full_name
+                student.phone = payload.phone
+                student.university_email = payload.university_email
+
             enrollment = _create_enrollment(db, payload)
 
             if payload.mode == "final":
@@ -456,20 +498,7 @@ def record_processing_completed_in_db(
 
 
 def delete_enrollment_data_by_student_id(db: Session, student_id: str) -> None:
-    student_db_id = db.scalar(select(Student.id).where(Student.student_id == student_id))
-    if student_db_id is None:
-        return
-
-    enrollment_ids = db.scalars(
-        select(Enrollment.id).where(Enrollment.student_id == student_id)
-    ).all()
-    if enrollment_ids:
-        db.execute(delete(EnrollmentImage).where(EnrollmentImage.enrollment_id.in_(enrollment_ids)))
-        db.execute(delete(SelectedCrop).where(SelectedCrop.enrollment_id.in_(enrollment_ids)))
-
-    db.execute(delete(Enrollment).where(Enrollment.student_id == student_id))
-    # Embeddings table is not introduced yet, so nothing to delete there.
-    # Audit logs are intentionally preserved.
+    _delete_operational_data_by_student_id(db, student_id)
 
 
 def get_enrollments_snapshot_from_db() -> dict[str, Any]:

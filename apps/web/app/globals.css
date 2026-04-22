@@ -84,6 +84,54 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --landing-page-gradient:
+    radial-gradient(
+      circle at 76% 40%,
+      rgba(59, 130, 246, 0.13),
+      transparent 44%
+    ),
+    linear-gradient(to right, #e8edf5, #f4f8ff 56%, #f7fbff 100%);
+  --landing-radial-layer:
+    radial-gradient(
+      circle at 83% 44%,
+      rgba(96, 165, 250, 0.2),
+      transparent 42%
+    );
+  --landing-grid-line: rgba(51, 65, 85, 0.06);
+  --landing-shell-bg: rgba(247, 251, 255, 0.74);
+  --landing-shell-border: rgba(148, 163, 184, 0.32);
+  --landing-shell-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 20px 44px -34px rgba(15, 23, 42, 0.26);
+  --landing-nav-bg: rgba(255, 255, 255, 0.62);
+  --landing-card-bg: rgba(251, 253, 255, 0.94);
+  --landing-card-border: rgba(148, 163, 184, 0.4);
+  --landing-card-shadow:
+    0 22px 48px -34px rgba(30, 64, 175, 0.2),
+    0 8px 20px -14px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --landing-text-primary: #0f172a;
+  --landing-text-secondary: #334155;
+  --landing-text-muted: #64748b;
+  --landing-accent: #2563eb;
+  --landing-accent-hover: #1d4ed8;
+  --landing-progress-inactive: rgba(148, 163, 184, 0.26);
+  --landing-progress-active:
+    linear-gradient(90deg, #1d4ed8 0%, #3b82f6 65%, #60a5fa 100%);
+  --landing-input-bg: rgba(237, 243, 252, 0.86);
+  --landing-input-border: rgba(148, 163, 184, 0.52);
+  --landing-input-placeholder: rgba(100, 116, 139, 0.9);
+  --landing-focus-ring: rgba(37, 99, 235, 0.28);
+  --landing-input-text: #0f172a;
+  --landing-button-bg:
+    linear-gradient(90deg, #1d4ed8 0%, #2563eb 64%, #3b82f6 100%);
+  --landing-button-shadow:
+    0 16px 30px -20px rgba(37, 99, 235, 0.62),
+    inset 0 1px 0 rgba(191, 219, 254, 0.42);
+  --landing-shell-blur: 4px;
+  --landing-card-blur: 0px;
+  --landing-input-inset-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+  --landing-card-spotlight: radial-gradient(circle at 55% 50%, rgba(59, 130, 246, 0.2), transparent 62%);
 }
 
 .dark {
@@ -118,6 +166,54 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 260);
   --sidebar-border: oklch(0.43 0.02 255 / 45%);
   --sidebar-ring: oklch(0.68 0.08 245);
+  --landing-page-gradient:
+    radial-gradient(
+      circle at 75% 40%,
+      rgba(59, 130, 246, 0.18),
+      transparent 40%
+    ),
+    linear-gradient(to right, #020617, #0b1120);
+  --landing-radial-layer:
+    radial-gradient(
+      circle at 78% 46%,
+      rgba(96, 165, 250, 0.2),
+      transparent 46%
+    );
+  --landing-grid-line: rgba(148, 163, 184, 0.08);
+  --landing-shell-bg: rgba(5, 10, 22, 0.42);
+  --landing-shell-border: rgba(148, 163, 184, 0.14);
+  --landing-shell-shadow:
+    inset 0 1px 0 rgba(148, 163, 184, 0.08),
+    0 24px 48px -36px rgba(2, 6, 23, 0.86);
+  --landing-nav-bg: rgba(7, 14, 30, 0.42);
+  --landing-card-bg: rgba(11, 18, 32, 0.7);
+  --landing-card-border: rgba(255, 255, 255, 0.1);
+  --landing-card-shadow:
+    0 20px 80px rgba(59, 130, 246, 0.15),
+    0 12px 40px -24px rgba(2, 6, 23, 0.88),
+    inset 0 1px 0 rgba(148, 163, 184, 0.08);
+  --landing-text-primary: #e2e8f0;
+  --landing-text-secondary: #cbd5e1;
+  --landing-text-muted: #94a3b8;
+  --landing-accent: #60a5fa;
+  --landing-accent-hover: #93c5fd;
+  --landing-progress-inactive: rgba(148, 163, 184, 0.22);
+  --landing-progress-active:
+    linear-gradient(90deg, #1d4ed8 0%, #2563eb 55%, #60a5fa 100%);
+  --landing-input-bg: rgba(6, 13, 27, 0.86);
+  --landing-input-border: rgba(148, 163, 184, 0.4);
+  --landing-input-placeholder: rgba(148, 163, 184, 0.82);
+  --landing-focus-ring: rgba(96, 165, 250, 0.35);
+  --landing-input-text: #e2e8f0;
+  --landing-button-bg:
+    linear-gradient(90deg, #1e3a8a 0%, #2563eb 62%, #3b82f6 100%);
+  --landing-button-shadow:
+    0 18px 34px -18px rgba(37, 99, 235, 0.45),
+    inset 0 1px 0 rgba(147, 197, 253, 0.24);
+  --landing-shell-blur: 2px;
+  --landing-card-blur: 20px;
+  --landing-input-inset-shadow: inset 0 1px 2px rgba(2, 6, 23, 0.54);
+  --landing-card-spotlight: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.34), rgba(59, 130, 246, 0.06) 42%, transparent 68%);
 }
 
 @layer base {
@@ -141,5 +237,188 @@
   h5,
   h6 {
     font-family: var(--font-heading);
+  }
+}
+
+@layer utilities {
+  .landing-page {
+    background-image: var(--landing-page-gradient);
+    background-color: var(--background);
+  }
+
+  .landing-radial {
+    background-image: var(--landing-radial-layer);
+  }
+
+  .landing-grid-overlay {
+    background-image:
+      linear-gradient(var(--landing-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--landing-grid-line) 1px, transparent 1px);
+    background-size: 52px 52px;
+    mask-image: linear-gradient(to right, black 0%, black 46%, transparent 74%);
+  }
+
+  .landing-shell {
+    background: var(--landing-shell-bg);
+    border-color: var(--landing-shell-border);
+    box-shadow: var(--landing-shell-shadow);
+    backdrop-filter: blur(var(--landing-shell-blur));
+    transition:
+      box-shadow 220ms ease,
+      border-color 200ms ease,
+      background-color 200ms ease;
+  }
+
+  .landing-topbar {
+    background: var(--landing-nav-bg);
+    border-color: var(--landing-shell-border);
+  }
+
+  .landing-card-surface {
+    background: var(--landing-card-bg);
+    border-color: var(--landing-card-border);
+    box-shadow: var(--landing-card-shadow);
+    backdrop-filter: blur(var(--landing-card-blur));
+    transition:
+      transform 180ms ease,
+      box-shadow 220ms ease,
+      border-color 200ms ease;
+  }
+
+  .landing-card-spotlight {
+    background-image: var(--landing-card-spotlight);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .landing-card-surface:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 30px 50px -36px rgba(15, 23, 42, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    }
+
+    .dark .landing-card-surface:hover {
+      box-shadow:
+        0 28px 46px -34px rgba(2, 6, 23, 0.86),
+        inset 0 1px 0 rgba(148, 163, 184, 0.12);
+    }
+  }
+
+  .landing-text-primary {
+    color: var(--landing-text-primary);
+  }
+
+  .landing-text-secondary {
+    color: var(--landing-text-secondary);
+  }
+
+  .landing-text-muted {
+    color: var(--landing-text-muted);
+  }
+
+  .landing-link {
+    color: var(--landing-text-muted);
+  }
+
+  .landing-link:hover {
+    color: var(--landing-text-secondary);
+  }
+
+  .landing-progress-track {
+    background: var(--landing-progress-inactive);
+  }
+
+  .landing-progress-active {
+    background: var(--landing-progress-active);
+    transition: width 280ms ease;
+  }
+
+  .landing-input-surface {
+    background: var(--landing-input-bg);
+  }
+
+  .landing-button-bg {
+    background: var(--landing-button-bg);
+    box-shadow: var(--landing-button-shadow);
+  }
+
+  .landing-form-label {
+    color: var(--landing-text-secondary);
+  }
+
+  .landing-form-input {
+    height: 2.8rem;
+    border-radius: 0.8rem;
+    border-color: var(--landing-input-border);
+    background: var(--landing-input-bg);
+    color: var(--landing-input-text);
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+    font-size: 0.9rem;
+    line-height: 1.25rem;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+    box-shadow: var(--landing-input-inset-shadow);
+  }
+
+  .landing-form-input::placeholder {
+    color: var(--landing-input-placeholder);
+  }
+
+  .landing-form-input:focus-visible,
+  .landing-form-input:focus {
+    border-color: var(--landing-accent);
+    box-shadow: 0 0 0 3px var(--landing-focus-ring);
+  }
+
+  .landing-form-input-readonly {
+    background: color-mix(in oklab, var(--landing-input-bg) 78%, transparent);
+    color: var(--landing-text-muted);
+  }
+
+  .landing-cta {
+    height: 2.8rem;
+    border-radius: 0.8rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    transition:
+      transform 160ms ease,
+      filter 160ms ease,
+      box-shadow 180ms ease,
+      background-position 180ms ease;
+  }
+
+  .landing-cta:hover {
+    filter: brightness(1.03);
+    transform: translateY(-1px);
+  }
+
+  .landing-cta:active {
+    transform: translateY(0);
+  }
+
+  .landing-cta:focus-visible {
+    box-shadow:
+      0 0 0 3px var(--landing-focus-ring),
+      var(--landing-button-shadow);
+  }
+
+  .landing-cta-outline {
+    height: 2.8rem;
+    border-radius: 0.8rem;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      transform 160ms ease;
+  }
+
+  .landing-cta-outline:hover {
+    transform: translateY(-1px);
+  }
+
+  .landing-cta-outline:active {
+    transform: translateY(0);
   }
 }

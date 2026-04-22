@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { FolderCheck, LogOut, ScanFace, UserCircle2 } from 'lucide-react';
+import { FolderCheck, LogOut, ScanFace, ShieldCheck, UserCircle2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/features/admin/auth/AdminAuthContext';
@@ -22,6 +22,11 @@ const navItems: NavItem[] = [
     icon: <FolderCheck className="size-4" />,
   },
   {
+    href: '/admin/approved',
+    label: 'Approved',
+    icon: <ShieldCheck className="size-4" />,
+  },
+  {
     href: '/admin/recognition',
     label: 'Recognition',
     icon: <ScanFace className="size-4" />,
@@ -30,6 +35,7 @@ const navItems: NavItem[] = [
 
 const titleMap: Record<string, string> = {
   '/admin/enrollments': 'Enrollment Moderation',
+  '/admin/approved': 'Approved Enrollment Management',
   '/admin/recognition': 'Recognition',
 };
 

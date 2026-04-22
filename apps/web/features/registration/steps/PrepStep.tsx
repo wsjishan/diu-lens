@@ -9,12 +9,12 @@ type PrepStepProps = {
 
 export function PrepStep({ onContinue }: PrepStepProps) {
   return (
-    <div className="space-y-4">
-      <header className="space-y-1.5">
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+    <div className="space-y-5">
+      <header className="space-y-2">
+        <h2 className="landing-text-primary text-xl font-semibold tracking-tight sm:text-[1.35rem]">
           Face Verification
         </h2>
-        <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+        <p className="landing-text-secondary text-sm leading-6">
           Before continuing, make sure your environment is ready for a quick and
           accurate face verification scan.
         </p>
@@ -44,7 +44,7 @@ export function PrepStep({ onContinue }: PrepStepProps) {
       <Button
         type="button"
         onClick={onContinue}
-        className="h-10 rounded-lg bg-gradient-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] dark:bg-gradient-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
+        className="landing-button-bg landing-cta w-full px-5 text-white sm:w-auto"
       >
         Start Verification
       </Button>

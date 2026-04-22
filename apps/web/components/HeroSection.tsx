@@ -6,71 +6,73 @@ type HeroSectionProps = {
 
 export function HeroSection({ highlights }: HeroSectionProps) {
   return (
-    <section className="space-y-5 lg:pr-3">
-      <div className="ai-float inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-white/75 px-3 py-1.5 text-[0.68rem] font-semibold tracking-[0.16em] text-blue-700 uppercase shadow-[0_10px_24px_-20px_rgba(37,99,235,0.7)] dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-300 dark:shadow-[0_10px_24px_rgba(0,0,0,0.28)]">
+    <section className="space-y-6 text-left sm:space-y-7 lg:space-y-9 lg:pr-2">
+      <div className="ai-float inline-flex items-center gap-2 rounded-full border border-blue-200/75 bg-white/56 px-3 py-1.5 text-[0.65rem] font-semibold tracking-[0.16em] text-blue-700 uppercase shadow-[0_12px_24px_-20px_rgba(37,99,235,0.56)] dark:border-white/10 dark:bg-slate-900/50 dark:text-slate-300 dark:shadow-[0_10px_24px_rgba(0,0,0,0.24)]">
         <span className="ai-pulse-ring inline-flex size-2 rounded-full bg-sky-400" />
         AI Identity Layer Online
       </div>
-      <div className="space-y-4">
-        <h1 className="max-w-[18ch] wrap-break-word text-3xl leading-tight font-bold tracking-[-0.02em] text-slate-900 dark:text-white sm:text-4xl lg:max-w-[15ch] lg:text-6xl">
-          <span className="bg-linear-to-r from-slate-900 to-blue-700 bg-clip-text text-transparent dark:from-slate-100 dark:to-blue-300">
+      <div className="space-y-4 sm:space-y-6">
+        <h1 className="max-w-[16ch] text-3xl leading-[1.07] font-semibold tracking-[-0.03em] sm:max-w-[18ch] sm:text-4xl md:text-[2.45rem] lg:max-w-[13.5ch] lg:text-[3.2rem]">
+          <span className="block bg-linear-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent dark:from-slate-100 dark:via-slate-200 dark:to-slate-300">
             Smart{' '}
-            <span className="bg-linear-to-r from-blue-500 to-indigo-400 bg-clip-text text-transparent dark:from-blue-300 dark:to-blue-200">
+            <span className="bg-linear-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
               Identification
             </span>
-          </span>{' '}
-          <span className="text-slate-900 dark:text-white">for DIU Campus</span>
+          </span>
+          <span className="landing-text-primary mt-1 block">for DIU Campus</span>
         </h1>
         <p
           id="how-it-works"
-          className="max-w-md text-sm leading-6 text-slate-700 dark:text-slate-300 sm:text-base"
+          className="landing-text-secondary max-w-lg text-[0.92rem] leading-6 sm:text-[0.98rem] sm:leading-7"
         >
-          Verify once and access DIU campus services without repeated
-          verification steps.
+          Complete onboarding once, then move across campus services with secure
+          identity access and fewer verification interruptions.
         </p>
       </div>
       <div
         id="for-students"
-        className="max-w-152 space-y-2"
+        className="max-w-3xl space-y-4"
       >
-        <p className="text-[0.65rem] font-semibold tracking-widest text-slate-500/85 uppercase dark:text-slate-400">
+        <p className="landing-text-muted text-[0.65rem] font-semibold tracking-[0.16em] uppercase">
           Registration flow
         </p>
-        <ol className="ai-flow-track flex flex-col gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid sm:grid-cols-[auto_auto] sm:items-center sm:gap-x-2.5 lg:flex lg:flex-wrap lg:flex-row lg:items-center lg:gap-x-2.5 lg:gap-y-2">
-          <li className="ai-flow-step inline-flex items-center gap-1.5">
-            <span className="ai-flow-node inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-blue-500/18 dark:text-slate-200 dark:ring-1 dark:ring-white/10">
+        <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
+          <li className="relative flex items-center gap-2.5 rounded-xl border border-blue-200/70 bg-white/65 px-3 py-2 shadow-[0_8px_20px_-20px_rgba(37,99,235,0.7)] dark:border-blue-300/18 dark:bg-slate-900/46">
+            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[0.63rem] font-semibold text-white shadow-[0_0_0_3px_rgba(37,99,235,0.2)] dark:bg-blue-400 dark:text-slate-950 dark:shadow-[0_0_0_3px_rgba(59,130,246,0.2)]">
               1
             </span>
-            <span className="ai-flow-label">Student ID check</span>
+            <span className="landing-text-primary text-[0.8rem] font-semibold">
+              Student ID check
+            </span>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 -right-2 hidden h-px w-4 -translate-y-1/2 bg-linear-to-r from-blue-400/55 to-transparent sm:block"
+            />
           </li>
-          <span
-            className="ai-flow-arrow hidden text-xs text-slate-300/80 dark:text-slate-600 sm:inline"
-            aria-hidden="true"
-          >
-            →
-          </span>
-          <li className="ai-flow-step inline-flex items-center gap-1.5">
-            <span className="ai-flow-node inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-blue-500/18 dark:text-slate-200 dark:ring-1 dark:ring-white/10">
+          <li className="relative flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white/58 px-3 py-2 dark:border-white/12 dark:bg-slate-900/40">
+            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-blue-200/70 bg-blue-100/90 text-[0.63rem] font-semibold text-blue-700 dark:border-white/12 dark:bg-blue-500/18 dark:text-slate-200">
               2
             </span>
-            <span className="ai-flow-label">Basic information</span>
+            <span className="landing-text-secondary text-[0.8rem] font-medium">
+              Basic information
+            </span>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 -right-2 hidden h-px w-4 -translate-y-1/2 bg-linear-to-r from-blue-400/45 to-transparent sm:block"
+            />
           </li>
-          <span
-            className="ai-flow-arrow hidden text-xs text-slate-300/80 dark:text-slate-600 lg:inline"
-            aria-hidden="true"
-          >
-            →
-          </span>
-          <li className="ai-flow-step inline-flex items-center gap-1.5 sm:col-span-2 lg:col-span-1">
-            <span className="ai-flow-node inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[0.63rem] font-medium text-blue-700 dark:bg-blue-500/18 dark:text-slate-200 dark:ring-1 dark:ring-white/10">
+          <li className="flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white/58 px-3 py-2 dark:border-white/12 dark:bg-slate-900/40">
+            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-blue-200/70 bg-blue-100/90 text-[0.63rem] font-semibold text-blue-700 dark:border-white/12 dark:bg-blue-500/18 dark:text-slate-200">
               3
             </span>
-            <span className="ai-flow-label">Face verification</span>
+            <span className="landing-text-secondary text-[0.8rem] font-medium">
+              Face verification
+            </span>
           </li>
         </ol>
         <ul
           id="features"
-          className="mt-5 grid gap-1.5 text-[0.8rem] text-slate-600/85 dark:text-slate-400"
+          className="landing-text-muted mt-4 grid gap-1.5 text-[0.8rem]"
           aria-label="Platform highlights"
         >
           {highlights.map((item) => (
@@ -82,9 +84,7 @@ export function HeroSection({ highlights }: HeroSectionProps) {
                 className="size-1 rounded-full bg-blue-600/90 dark:bg-blue-400"
                 aria-hidden="true"
               />
-              <span className="text-slate-600/85 dark:text-slate-400">
-                {item.title}
-              </span>
+              <span>{item.title}</span>
             </li>
           ))}
         </ul>

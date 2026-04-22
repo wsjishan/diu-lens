@@ -16,20 +16,20 @@ export function StudentIdStep({
   onContinue,
 }: StudentIdStepProps) {
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <header className="space-y-2">
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+    <div className="space-y-6 sm:space-y-7">
+      <header className="space-y-2.5">
+        <h2 className="landing-text-primary text-xl font-semibold tracking-tight sm:text-[1.35rem]">
           Check Registration Status
         </h2>
-        <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+        <p className="landing-text-secondary text-sm leading-6">
           Enter your student ID to continue with DIU Lens.
         </p>
       </header>
 
-      <div className="space-y-2.5">
+      <div className="space-y-4 rounded-xl border border-slate-200/65 bg-white/45 p-3.5 dark:border-white/10 dark:bg-slate-900/36 sm:p-4">
         <Label
           htmlFor="student-id"
-          className="text-[0.82rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-300"
+          className="landing-form-label text-[0.82rem] font-semibold tracking-[0.02em]"
         >
           Student ID
         </Label>
@@ -41,7 +41,7 @@ export function StudentIdStep({
           inputMode="numeric"
           value={studentId}
           onChange={(event) => onStudentIdChange(event.target.value)}
-          className="h-10 rounded-lg border-slate-300/90 bg-white/65 px-3.5 text-sm text-slate-900 placeholder:text-slate-500/90 transition-all duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-white/10 dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30"
+          className="landing-form-input"
           required
         />
       </div>
@@ -50,11 +50,11 @@ export function StudentIdStep({
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="h-10 w-full gap-2 rounded-lg bg-linear-to-r from-[#1e2a78] to-[#2f5bff] px-5 text-sm font-semibold tracking-tight text-white transition-all duration-200 ease-out hover:from-[#1a2568] hover:to-[#244ee0] sm:w-auto dark:bg-linear-to-r dark:from-[#1e3a8a] dark:to-[#2563eb]"
+        className="landing-button-bg landing-cta w-full gap-2 px-5 text-sm text-white"
       >
         Continue
         <ArrowRight
-          className="size-4"
+          className="size-4 transition-transform duration-150 group-hover/button:translate-x-0.5"
           aria-hidden="true"
         />
       </Button>

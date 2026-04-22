@@ -1,38 +1,50 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, ShieldCheck, ShieldUser } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ADMIN_ROLE_COOKIE } from '@/features/admin/role-shared';
-import { AdminRole } from '@/features/admin/types';
-
-function persistDemoRole(role: AdminRole) {
-  document.cookie = `${ADMIN_ROLE_COOKIE}=${role}; path=/; max-age=604800; samesite=lax`;
-}
+import { useAdminAuth } from '@/features/admin/auth/AdminAuthContext';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const { status, login, isLoggingIn } = useAdminAuth();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsLoading(true);
+  const getNextPath = () => {
+    if (typeof window === 'undefined') {
+      return '/admin/enrollments';
+    }
 
-    window.setTimeout(() => {
-      persistDemoRole('normal');
-      router.push('/admin/search');
-    }, 700);
+    const next = new URLSearchParams(window.location.search).get('next');
+    return next || '/admin/enrollments';
   };
 
-  const handleRoleLogin = (role: AdminRole) => {
-    setIsLoading(true);
-    persistDemoRole(role);
-    router.push(role === 'super' ? '/admin/dashboard' : '/admin/search');
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace(getNextPath());
+    }
+  }, [status, router]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+
+    const result = await login(email.trim(), password);
+
+    if (!result.success) {
+      setError(result.message || 'Invalid email or password.');
+      return;
+    }
+
+    router.replace(getNextPath());
   };
 
   return (
@@ -44,20 +56,22 @@ export default function AdminLoginPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-blue-300/80">DIU Lens</p>
           <CardTitle className="text-2xl text-foreground">Admin Login</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Demo-only access screen for the DIU Lens administration panel.
+            Sign in with an admin or super admin account to manage enrollments.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="admin-email">Email or Username</Label>
+              <Label htmlFor="admin-email">Email</Label>
               <Input
                 id="admin-email"
-                type="text"
+                type="email"
                 required
                 placeholder="admin@diu.edu.bd"
                 className="h-10 border-border bg-muted/40 text-foreground"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
               />
             </div>
 
@@ -70,50 +84,36 @@ export default function AdminLoginPage() {
                   required
                   placeholder="Enter your password"
                   className="h-10 border-border bg-muted/40 pr-10 text-foreground"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-2 my-auto inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={() => setShowPassword((prev) => !prev)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
 
-            <Button type="submit" className="h-10 w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+            {error ? (
+              <p className="rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+
+            <Button type="submit" className="h-10 w-full" disabled={isLoggingIn || status === 'loading'}>
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
-
-          <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-3">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground">Demo Quick Login</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-9 border-border bg-transparent text-foreground hover:bg-muted"
-                disabled={isLoading}
-                onClick={() => handleRoleLogin('normal')}
-              >
-                <ShieldUser className="size-4" />
-                Login as Normal Admin
-              </Button>
-              <Button
-                type="button"
-                className="h-9"
-                disabled={isLoading}
-                onClick={() => handleRoleLogin('super')}
-              >
-                <ShieldCheck className="size-4" />
-                Login as Super Admin
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </main>

@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ANGLE_THRESHOLDS,
+  GUIDANCE_STICK_MS,
   MAX_BRIGHTNESS,
   MAX_CENTER_OFFSET,
   MIN_BLUR_VARIANCE,
   MIN_BRIGHTNESS,
   MIN_FACE_AREA_RATIO,
   POST_CAPTURE_COOLDOWN_MS,
+  STABILITY_GRACE_MS,
   STABILITY_WINDOW_MS,
   captureStorageVersion,
   guidedAngles,
@@ -51,10 +53,14 @@ type FaceLandmarker = {
 const detectionIntervalMs = 100;
 const CANVAS_SIZE = 72;
 const debugIntervalMs = 1200;
-const minStableFramesRequired = 3;
+const minStableFramesRequired = 4;
 const RIGHT_DEBUG_PREFIX = '[right-debug]';
 const CAPTURE_ERROR_PREFIX = '[capture-error]';
 const PREVIEW_IS_MIRRORED = true;
+const NEAR_CENTER_TOLERANCE = 0.05;
+const HARD_CENTER_TOLERANCE = 0.1;
+const NEAR_BLUR_RATIO = 0.82;
+const HARD_BLUR_RATIO = 0.65;
 
 let faceLandmarkerPromise: Promise<FaceLandmarker> | null = null;
 
@@ -555,6 +561,8 @@ export function useFaceCapture({
   const persistenceEnabledRef = useRef(true);
   const latestShotsRef = useRef<CapturedShotsByAngle>(emptyCapturedShots());
   const stableWindowStartRef = useRef<number | null>(null);
+  const lastAllValidAtRef = useRef<number | null>(null);
+  const stickyGuidanceUntilRef = useRef<number>(0);
 
   const [modelReady, setModelReady] = useState(false);
   const [modelErrorMessage, setModelErrorMessage] = useState<string | null>(null);
@@ -811,6 +819,8 @@ export function useFaceCapture({
       ) {
         console.log('[detect] result:', false);
         stableWindowStartRef.current = null;
+        stableFramesRef.current = 0;
+        lastAllValidAtRef.current = null;
         scheduleNext();
         return;
       }
@@ -820,6 +830,8 @@ export function useFaceCapture({
         console.log('[detect] result:', false);
         stableWindowStartRef.current = null;
         stableFramesRef.current = 0;
+        lastAllValidAtRef.current = null;
+        stickyGuidanceUntilRef.current = 0;
         setFeedback((prev) => ({
           ...prev,
           guidanceState: 'cooldown',
@@ -839,6 +851,8 @@ export function useFaceCapture({
 
         if (!result) {
           stableWindowStartRef.current = null;
+          stableFramesRef.current = 0;
+          lastAllValidAtRef.current = null;
           scheduleNext();
           return;
         }
@@ -866,7 +880,10 @@ export function useFaceCapture({
 
         if (faceCount === 0) {
           blocker = 'no_face';
+          stableWindowStartRef.current = null;
           stableFramesRef.current = 0;
+          lastAllValidAtRef.current = null;
+          stickyGuidanceUntilRef.current = 0;
           setFeedback({
             guidanceState: 'no_face',
             instruction: perAngleInstruction[currentAngleRef.current],
@@ -883,7 +900,10 @@ export function useFaceCapture({
           if (activeAngle === 'right') {
             console.log(`${RIGHT_DEBUG_PREFIX} blocker=multiple_faces`);
           }
+          stableWindowStartRef.current = null;
           stableFramesRef.current = 0;
+          lastAllValidAtRef.current = null;
+          stickyGuidanceUntilRef.current = 0;
           setFeedback({
             guidanceState: 'multiple_faces',
             instruction: perAngleInstruction[currentAngleRef.current],
@@ -921,7 +941,10 @@ export function useFaceCapture({
           blurVariance = quality.blurVariance;
         } catch (error) {
           blocker = 'result_processing_error';
+          stableWindowStartRef.current = null;
           stableFramesRef.current = 0;
+          lastAllValidAtRef.current = null;
+          stickyGuidanceUntilRef.current = 0;
           logCaptureError('result_processing', error, {
             targetAngle: activeAngle,
             blocker,
@@ -949,7 +972,10 @@ export function useFaceCapture({
           };
         } catch (error) {
           blocker = 'angle_classification_error';
+          stableWindowStartRef.current = null;
           stableFramesRef.current = 0;
+          lastAllValidAtRef.current = null;
+          stickyGuidanceUntilRef.current = 0;
           logCaptureError('angle_classification', error, {
             targetAngle: activeAngle,
             blocker,
@@ -966,7 +992,7 @@ export function useFaceCapture({
           return;
         }
 
-        // Keep brightness as a quality signal, but do not block MVP capture progression.
+        // Keep brightness as a quality signal, but do not block capture progression.
         const allValid =
           readiness.faceDetected &&
           readiness.singleFace &&
@@ -975,37 +1001,54 @@ export function useFaceCapture({
           readiness.angleMatch &&
           readiness.sharpEnough;
         const nearAngleMatch = isNearlyAngleMatch(activeAngle, yaw, pitch);
+        const isCenterNearEnough = centerOffset <= MAX_CENTER_OFFSET + NEAR_CENTER_TOLERANCE;
+        const isCenterFarOff = centerOffset > MAX_CENTER_OFFSET + HARD_CENTER_TOLERANCE;
+        const isBlurNearEnough = blurVariance >= MIN_BLUR_VARIANCE * NEAR_BLUR_RATIO;
+        const isBlurTooLow = blurVariance < MIN_BLUR_VARIANCE * HARD_BLUR_RATIO;
+        const isNearReady =
+          readiness.faceLargeEnough &&
+          isCenterNearEnough &&
+          (readiness.angleMatch || nearAngleMatch) &&
+          isBlurNearEnough;
+
+        const stableDurationMs =
+          stableWindowStartRef.current === null ? 0 : now - stableWindowStartRef.current;
 
         let guidanceState: FaceCaptureState['feedback']['guidanceState'] = 'hold_steady';
         let liveMessage = 'Hold steady';
 
-        // Priority: no face -> multiple -> too small -> off-center -> blurry -> wrong angle -> hold
         if (!readiness.faceLargeEnough) {
           blocker = 'face_too_small';
           guidanceState = 'face_too_small';
           liveMessage = 'Move closer';
-        } else if (!readiness.centered) {
-          blocker = 'off_center';
-          guidanceState = 'off_center';
-          liveMessage = 'Center your face';
-        } else if (!readiness.sharpEnough) {
-          blocker = 'blurry';
-          guidanceState = 'blurry';
-          liveMessage = 'Hold steady';
-        } else if (!readiness.angleMatch && nearAngleMatch) {
-          blocker = 'near_angle';
-          guidanceState = 'hold_steady';
-          liveMessage = 'Hold steady';
-        } else if (!readiness.angleMatch) {
+        } else if (!readiness.angleMatch && !nearAngleMatch) {
           blocker = 'wrong_angle';
           guidanceState = 'wrong_angle';
           liveMessage = getAngleGuidance(activeAngle, yaw, pitch);
-        } else {
+        } else if (!readiness.centered && isCenterFarOff) {
+          blocker = 'off_center';
+          guidanceState = 'off_center';
+          liveMessage = 'Center your face';
+        } else if (!readiness.sharpEnough && isBlurTooLow) {
+          blocker = 'blurry';
+          guidanceState = 'blurry';
+          liveMessage = 'Hold steady';
+        } else if (!allValid && isNearReady) {
+          blocker = 'near_ready';
+          guidanceState = 'hold_steady';
+          liveMessage = 'Hold steady';
+        } else if (allValid) {
           blocker = 'ready';
+          guidanceState = 'ready';
+        } else {
+          blocker = 'hold';
+          guidanceState = 'hold_steady';
+          liveMessage = 'Hold steady';
         }
 
-        if (allValid) {
-          guidanceState = 'ready';
+        if (!allValid && now < stickyGuidanceUntilRef.current) {
+          guidanceState = 'hold_steady';
+          liveMessage = 'Hold steady';
         }
 
         if (activeAngle === 'right' && now - lastDebugLogRef.current > debugIntervalMs) {
@@ -1033,6 +1076,15 @@ export function useFaceCapture({
           console.log('[capture] angle:', activeAngle);
           console.log('[capture] stableFrames:', stableFramesRef.current);
           console.log('[capture] stableDurationMs:', Number(stableDurationMs.toFixed(0)));
+          console.log('[capture] tuning', {
+            targetAngle: activeAngle,
+            blocker,
+            stableFrames: stableFramesRef.current,
+            stableDurationMs: Number(stableDurationMs.toFixed(0)),
+            yaw: Number(yaw.toFixed(1)),
+            pitch: Number(pitch.toFixed(1)),
+            triggerAtMs: null,
+          });
           console.log('[capture] detection summary', {
             angle: activeAngle,
             state: guidanceState,
@@ -1048,25 +1100,38 @@ export function useFaceCapture({
         }
 
         if (!allValid) {
-          stableWindowStartRef.current = null;
-          stableFramesRef.current = 0;
+          const withinGrace =
+            isNearReady &&
+            lastAllValidAtRef.current !== null &&
+            now - lastAllValidAtRef.current <= STABILITY_GRACE_MS;
+
+          if (!withinGrace) {
+            stableWindowStartRef.current = null;
+            stableFramesRef.current = 0;
+          }
+
+          stickyGuidanceUntilRef.current =
+            guidanceState === 'hold_steady' ? now + GUIDANCE_STICK_MS : 0;
           setFeedback({
             guidanceState,
             instruction: perAngleInstruction[activeAngle],
             liveMessage,
-            holdProgress: 0,
+            holdProgress: withinGrace
+              ? clamp(stableFramesRef.current / requiredStableFrames, 0, 1)
+              : 0,
             readiness,
           });
           scheduleNext();
           return;
         }
 
+        lastAllValidAtRef.current = now;
         if (stableWindowStartRef.current === null) {
           stableWindowStartRef.current = now;
         }
         stableFramesRef.current += 1;
         const holdProgress = clamp(stableFramesRef.current / requiredStableFrames, 0, 1);
-        const stableDurationMs = now - stableWindowStartRef.current;
+        const stableDurationMsNow = now - stableWindowStartRef.current;
 
         setFeedback({
           guidanceState: holdProgress >= 1 ? 'ready' : 'hold_steady',
@@ -1076,7 +1141,12 @@ export function useFaceCapture({
           readiness,
         });
 
-        if (stableFramesRef.current <= minStableFramesRequired || autoCaptureLockRef.current) {
+        const hasMetStability =
+          stableFramesRef.current >= requiredStableFrames &&
+          stableDurationMsNow >= STABILITY_WINDOW_MS &&
+          stableFramesRef.current > minStableFramesRequired;
+
+        if (!hasMetStability || autoCaptureLockRef.current) {
           scheduleNext();
           return;
         }
@@ -1088,7 +1158,16 @@ export function useFaceCapture({
           yaw: Number(yaw.toFixed(1)),
           pitch: Number(pitch.toFixed(1)),
           stableFrames: stableFramesRef.current,
-          stableDurationMs: Number(stableDurationMs.toFixed(0)),
+          stableDurationMs: Number(stableDurationMsNow.toFixed(0)),
+          triggerAtMs: Number(now.toFixed(0)),
+        });
+        console.log('[capture] tuning', {
+          targetAngle: activeAngle,
+          blocker: 'trigger_capture',
+          stableFrames: stableFramesRef.current,
+          stableDurationMs: Number(stableDurationMsNow.toFixed(0)),
+          yaw: Number(yaw.toFixed(1)),
+          pitch: Number(pitch.toFixed(1)),
           triggerAtMs: Number(now.toFixed(0)),
         });
 
@@ -1107,6 +1186,8 @@ export function useFaceCapture({
               }));
               stableWindowStartRef.current = null;
               stableFramesRef.current = 0;
+              lastAllValidAtRef.current = null;
+              stickyGuidanceUntilRef.current = 0;
               return;
             }
 
@@ -1125,6 +1206,8 @@ export function useFaceCapture({
               }));
               stableWindowStartRef.current = null;
               stableFramesRef.current = 0;
+              lastAllValidAtRef.current = null;
+              stickyGuidanceUntilRef.current = 0;
               return;
             }
 
@@ -1165,6 +1248,8 @@ export function useFaceCapture({
             const nextAngle = findFirstMissingAngle(nextShots);
             stableFramesRef.current = 0;
             stableWindowStartRef.current = null;
+            lastAllValidAtRef.current = null;
+            stickyGuidanceUntilRef.current = 0;
             cooldownUntilRef.current = performance.now() + POST_CAPTURE_COOLDOWN_MS;
 
             if (nextAngle) {
@@ -1183,6 +1268,8 @@ export function useFaceCapture({
             }));
             stableWindowStartRef.current = null;
             stableFramesRef.current = 0;
+            lastAllValidAtRef.current = null;
+            stickyGuidanceUntilRef.current = 0;
           } finally {
             autoCaptureLockRef.current = false;
             setIsAutoCapturing(false);
@@ -1193,6 +1280,8 @@ export function useFaceCapture({
       } catch (error) {
         stableFramesRef.current = 0;
         stableWindowStartRef.current = null;
+        lastAllValidAtRef.current = null;
+        stickyGuidanceUntilRef.current = 0;
         logCaptureError('detection_loop', error, {
           targetAngle: activeAngle,
           blocker,
@@ -1223,6 +1312,8 @@ export function useFaceCapture({
       autoCaptureLockRef.current = false;
       stableFramesRef.current = 0;
       stableWindowStartRef.current = null;
+      lastAllValidAtRef.current = null;
+      stickyGuidanceUntilRef.current = 0;
     };
   }, [
     captureSnapshot,
@@ -1244,6 +1335,9 @@ export function useFaceCapture({
     });
 
     stableFramesRef.current = 0;
+    stableWindowStartRef.current = null;
+    lastAllValidAtRef.current = null;
+    stickyGuidanceUntilRef.current = 0;
     cooldownUntilRef.current = 0;
     setActiveAngle(angle);
     setFeedback((prev) => ({
@@ -1257,6 +1351,9 @@ export function useFaceCapture({
   const focusAngle = useCallback((angle: VerificationAngle) => {
     setActiveAngle(angle);
     stableFramesRef.current = 0;
+    stableWindowStartRef.current = null;
+    lastAllValidAtRef.current = null;
+    stickyGuidanceUntilRef.current = 0;
   }, []);
 
   const clearSession = useCallback(() => {

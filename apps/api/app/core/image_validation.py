@@ -10,14 +10,15 @@ EyesVisibleStatus = Literal["passed", "failed", "not_yet_implemented"]
 
 @dataclass(frozen=True)
 class ImageValidationConfig:
-    min_blur_variance: float = 80.0
+    min_blur_variance: float = 34.0
     min_brightness: float = 40.0
     max_brightness: float = 220.0
     min_width: int = 224
     min_height: int = 224
     min_face_size: int = 40
-    max_center_offset_ratio_x: float = 0.25
-    max_center_offset_ratio_y: float = 0.25
+    max_center_offset_front: float = 0.36
+    max_center_offset_non_front: float = 0.44
+    min_face_area_ratio: float = 0.045
 
 
 _CONFIG = ImageValidationConfig()
@@ -36,9 +37,69 @@ def _default_report(file_name: str, angle: str) -> dict[str, Any]:
         "dimensions_ok": False,
         "face_detected": False,
         "face_centered": False,
+        "center_offset": None,
+        "max_center_offset": None,
+        "face_size_ratio": None,
+        "blocker": "unknown",
         "eyes_visible": "not_yet_implemented",
         "failure_reasons": [],
     }
+
+
+def _max_center_offset_for_angle(config: ImageValidationConfig, angle: str) -> float:
+    return (
+        config.max_center_offset_front
+        if angle == "front"
+        else config.max_center_offset_non_front
+    )
+
+
+def _reason_code(reason: str) -> str:
+    return reason.split("(", 1)[0].strip()
+
+
+def validate_uploaded_image_integrity(
+    image_bytes: bytes,
+    file_name: str,
+    angle: str,
+    config: ImageValidationConfig = _CONFIG,
+) -> dict[str, Any]:
+    report = _default_report(file_name=file_name, angle=angle)
+    failure_reasons: list[str] = []
+
+    if not image_bytes:
+        failure_reasons.append("missing_image_data")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if image is None:
+        failure_reasons.append("invalid_image_data")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+
+    height, width = image.shape[:2]
+    dimensions_ok = width >= config.min_width and height >= config.min_height
+    report["dimensions_ok"] = dimensions_ok
+    if not dimensions_ok:
+        failure_reasons.append(
+            f"image_too_small(min:{config.min_width}x{config.min_height},got:{width}x{height})"
+        )
+
+    # Final-stage gate is intentionally lightweight: we only verify integrity/presence.
+    # Quality constraints (lighting/face/angle/blur/centering) are enforced during live capture.
+    report["blur_ok"] = True
+    report["brightness_ok"] = True
+    report["face_detected"] = True
+    report["face_centered"] = True
+
+    report["passed"] = len(failure_reasons) == 0
+    report["failure_reasons"] = failure_reasons
+    report["blocker"] = _reason_code(failure_reasons[0]) if failure_reasons else "ready"
+    return report
 
 
 def validate_uploaded_image(
@@ -107,19 +168,31 @@ def validate_uploaded_image(
         image_center_x = width / 2.0
         image_center_y = height / 2.0
 
-        offset_x = abs(face_center_x - image_center_x) / max(width, 1)
-        offset_y = abs(face_center_y - image_center_y) / max(height, 1)
-        face_centered = (
-            offset_x <= config.max_center_offset_ratio_x
-            and offset_y <= config.max_center_offset_ratio_y
+        face_center_norm_x = face_center_x / max(width, 1)
+        face_center_norm_y = face_center_y / max(height, 1)
+        center_offset = float(
+            np.hypot(face_center_norm_x - 0.5, face_center_norm_y - 0.5)
         )
+        max_center_offset = _max_center_offset_for_angle(config, angle)
+        face_size_ratio = (float(w) * float(h)) / max(float(width * height), 1.0)
+
+        report["center_offset"] = center_offset
+        report["max_center_offset"] = max_center_offset
+        report["face_size_ratio"] = face_size_ratio
+
+        face_centered = center_offset <= max_center_offset
         report["face_centered"] = face_centered
         if not face_centered:
             failure_reasons.append(
                 "face_off_center"
-                f"(offset_x:{offset_x:.3f},offset_y:{offset_y:.3f},"
-                f"max_x:{config.max_center_offset_ratio_x:.3f},"
-                f"max_y:{config.max_center_offset_ratio_y:.3f})"
+                f"(center_offset:{center_offset:.3f},max:{max_center_offset:.3f})"
+            )
+
+        face_large_enough = face_size_ratio >= config.min_face_area_ratio
+        if not face_large_enough:
+            failure_reasons.append(
+                "face_too_small"
+                f"(ratio:{face_size_ratio:.3f},min:{config.min_face_area_ratio:.3f})"
             )
 
     # Eyes-visible check is intentionally explicit for this phase.
@@ -131,9 +204,14 @@ def validate_uploaded_image(
         and report["brightness_ok"]
         and report["face_detected"]
         and report["face_centered"]
+        and (
+            report["face_size_ratio"] is None
+            or float(report["face_size_ratio"]) >= config.min_face_area_ratio
+        )
     )
     report["passed"] = passed
     report["failure_reasons"] = failure_reasons
+    report["blocker"] = _reason_code(failure_reasons[0]) if failure_reasons else "ready"
 
     return report
 

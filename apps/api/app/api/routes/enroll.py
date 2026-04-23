@@ -16,7 +16,10 @@ from app.core.enrollment_db import (
     student_exists_in_db,
     StudentAlreadyRegisteredError,
 )
-from app.core.image_validation import build_validation_summary, validate_uploaded_image
+from app.core.image_validation import (
+    build_validation_summary,
+    validate_uploaded_image_integrity,
+)
 from app.core.storage import (
     ALLOWED_ANGLES,
     ALLOWED_IMAGE_CONTENT_TYPES,
@@ -220,11 +223,23 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
                 raise _bad_request(f"File too large for angle: {angle}")
 
             file_name = upload.filename or "unknown"
-            image_report = validate_uploaded_image(
+            image_report = validate_uploaded_image_integrity(
                 image_bytes=sample,
                 file_name=file_name,
                 angle=angle,
             )
+            logger.info(
+                "[review] angle=%s dimensionsOk=%s valid=%s",
+                angle,
+                image_report.get("dimensions_ok"),
+                image_report.get("passed"),
+            )
+            if not bool(image_report.get("passed")):
+                logger.info(
+                    "[review] blocker=%s angle=%s",
+                    image_report.get("blocker", "unknown"),
+                    angle,
+                )
             image_reports.append(image_report)
 
     summary = build_validation_summary(image_reports)
@@ -243,7 +258,7 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
             status_code=400,
             detail={
                 "status": "failed",
-                "message": "Image quality validation failed for uploaded enrollment images.",
+                "message": "Image integrity validation failed for uploaded enrollment images.",
                 "validation": summary,
             },
         )

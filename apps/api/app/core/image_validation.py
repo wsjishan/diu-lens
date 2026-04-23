@@ -10,15 +10,15 @@ EyesVisibleStatus = Literal["passed", "failed", "not_yet_implemented"]
 
 @dataclass(frozen=True)
 class ImageValidationConfig:
-    min_blur_variance: float = 34.0
-    min_brightness: float = 40.0
-    max_brightness: float = 220.0
+    min_blur_variance: float = 45.0
+    min_brightness: float = 70.0
+    max_brightness: float = 200.0
     min_width: int = 224
     min_height: int = 224
     min_face_size: int = 40
-    max_center_offset_front: float = 0.36
-    max_center_offset_non_front: float = 0.44
-    min_face_area_ratio: float = 0.045
+    max_center_offset_front: float = 0.28
+    max_center_offset_non_front: float = 0.28
+    min_face_area_ratio: float = 0.09
 
 
 _CONFIG = ImageValidationConfig()
@@ -37,6 +37,8 @@ def _default_report(file_name: str, angle: str) -> dict[str, Any]:
         "dimensions_ok": False,
         "face_detected": False,
         "face_centered": False,
+        "multiple_faces_detected": False,
+        "face_count": 0,
         "center_offset": None,
         "max_center_offset": None,
         "face_size_ratio": None,
@@ -95,6 +97,83 @@ def validate_uploaded_image_integrity(
     report["brightness_ok"] = True
     report["face_detected"] = True
     report["face_centered"] = True
+
+    report["passed"] = len(failure_reasons) == 0
+    report["failure_reasons"] = failure_reasons
+    report["blocker"] = _reason_code(failure_reasons[0]) if failure_reasons else "ready"
+    return report
+
+
+def validate_uploaded_image_sanity(
+    image_bytes: bytes,
+    file_name: str,
+    angle: str,
+    config: ImageValidationConfig = _CONFIG,
+) -> dict[str, Any]:
+    report = _default_report(file_name=file_name, angle=angle)
+    failure_reasons: list[str] = []
+
+    if not image_bytes:
+        failure_reasons.append("missing_image_data")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if image is None:
+        failure_reasons.append("invalid_image_data")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+
+    height, width = image.shape[:2]
+    dimensions_ok = width >= config.min_width and height >= config.min_height
+    report["dimensions_ok"] = dimensions_ok
+    if not dimensions_ok:
+        failure_reasons.append(
+            f"image_too_small(min:{config.min_width}x{config.min_height},got:{width}x{height})"
+        )
+
+    # Sanity validator keeps backend at the same or looser strictness than live capture.
+    # Blur/brightness/centering/pose are enforced in live capture only.
+    report["blur_ok"] = True
+    report["brightness_ok"] = True
+    report["face_centered"] = True
+
+    if _FACE_CASCADE.empty():
+        failure_reasons.append("face_detector_unavailable")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = _FACE_CASCADE.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(config.min_face_size, config.min_face_size),
+    )
+
+    face_count = len(faces)
+    report["face_count"] = face_count
+    report["face_detected"] = face_count > 0
+    if face_count == 0:
+        failure_reasons.append("face_not_detected")
+    elif face_count > 1:
+        face_areas = sorted(
+            [int(w) * int(h) for (_, _, w, h) in faces], reverse=True
+        )
+        largest_area = face_areas[0] if face_areas else 0
+        second_largest_area = face_areas[1] if len(face_areas) > 1 else 0
+        has_clear_second_face = (
+            largest_area > 0 and second_largest_area >= int(largest_area * 0.35)
+        )
+        if has_clear_second_face:
+            report["multiple_faces_detected"] = True
+            failure_reasons.append(
+                f"multiple_faces_detected(count:{face_count})"
+            )
 
     report["passed"] = len(failure_reasons) == 0
     report["failure_reasons"] = failure_reasons

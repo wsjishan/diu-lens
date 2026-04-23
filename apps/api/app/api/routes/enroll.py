@@ -18,7 +18,7 @@ from app.core.enrollment_db import (
 )
 from app.core.image_validation import (
     build_validation_summary,
-    validate_uploaded_image_integrity,
+    validate_uploaded_image_sanity,
 )
 from app.core.storage import (
     ALLOWED_ANGLES,
@@ -223,7 +223,7 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
                 raise _bad_request(f"File too large for angle: {angle}")
 
             file_name = upload.filename or "unknown"
-            image_report = validate_uploaded_image_integrity(
+            image_report = validate_uploaded_image_sanity(
                 image_bytes=sample,
                 file_name=file_name,
                 angle=angle,
@@ -251,14 +251,14 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
     )
     if not summary["validation_passed"]:
         logger.warning(
-            "[verification] image quality validation failed details=%s",
+            "[verification] image sanity validation failed details=%s",
             summary.get("image_reports", []),
         )
         raise HTTPException(
             status_code=400,
             detail={
                 "status": "failed",
-                "message": "Image integrity validation failed for uploaded enrollment images.",
+                "message": "Image sanity validation failed for uploaded enrollment images.",
                 "validation": summary,
             },
         )

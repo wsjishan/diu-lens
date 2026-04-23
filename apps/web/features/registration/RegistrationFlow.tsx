@@ -27,122 +27,32 @@ const transition = {
   ease: [0.2, 0.7, 0.2, 1] as [number, number, number, number],
 };
 
-function toAngleLabel(angle: string) {
-  const normalized = angle.trim().toLowerCase();
-  if (normalized === 'front') {
-    return 'Front';
-  }
-  if (normalized === 'left') {
-    return 'Left';
-  }
-  if (normalized === 'right') {
-    return 'Right';
-  }
-  if (normalized === 'up') {
-    return 'Up';
-  }
-  if (normalized === 'down') {
-    return 'Down';
-  }
-  return angle;
-}
-
-function toFriendlyReason(reason: string) {
-  const normalized = reason.trim().toLowerCase();
-  if (normalized.startsWith('face_off_center')) {
-    return 'face too far off-center';
-  }
-  if (normalized.startsWith('face_not_detected')) {
-    return 'face not detected';
-  }
-  if (normalized.startsWith('face_too_small')) {
-    return 'face too small';
-  }
-  if (normalized.startsWith('image_blurry')) {
-    return 'image too blurry';
-  }
-  if (normalized.startsWith('invalid_brightness')) {
-    return 'lighting is not acceptable';
-  }
-  if (normalized.startsWith('missing_image_data')) {
-    return 'capture is missing';
-  }
-  if (normalized.startsWith('invalid_image_data')) {
-    return 'capture is unreadable';
-  }
-  if (normalized.startsWith('image_too_small')) {
-    return 'capture is too small';
-  }
-  return 'quality check failed';
-}
-
-function parseAngleFailures(message: string) {
-  const match = message.match(/image quality checks failed \((.*)\)/i);
-  if (!match?.[1]) {
-    return [];
-  }
-
-  const parts = match[1]
-    .split(';')
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  const failures: Array<{ angle: string; reason: string }> = [];
-  for (const part of parts) {
-    const separatorIndex = part.indexOf(':');
-    if (separatorIndex <= 0) {
-      continue;
-    }
-    const angle = part.slice(0, separatorIndex).trim();
-    const reason = part.slice(separatorIndex + 1).trim();
-    if (!angle || !reason) {
-      continue;
-    }
-    failures.push({ angle, reason });
-  }
-
-  return failures;
-}
-
 function toFriendlyVerificationMessage(message: string | null | undefined) {
   if (!message) {
     return GENERIC_REGISTRATION_COMPLETION_ERROR;
   }
 
-  const targetedFailures = parseAngleFailures(message);
-  if (targetedFailures.length > 0) {
-    const unique = new Set<string>();
-    const messages: string[] = [];
-    for (const failure of targetedFailures) {
-      const key = `${failure.angle}:${failure.reason}`;
-      if (unique.has(key)) {
-        continue;
-      }
-      unique.add(key);
-      messages.push(
-        `Retake ${toAngleLabel(failure.angle)}: ${toFriendlyReason(failure.reason)}.`
-      );
-    }
-    if (messages.length > 0) {
-      return messages.join(' ');
-    }
-  }
-
   const normalized = message.toLowerCase();
-  if (normalized.includes('face_not_detected')) {
-    return 'Face could not be detected in one or more captures. Retake with your full face centered.';
+  if (normalized.includes('missing_image_data')) {
+    return 'One or more captured files are missing. Please retake the affected angle.';
   }
-  if (normalized.includes('image_blurry')) {
-    return 'One or more captures are blurry. Hold steady and retake.';
+  if (normalized.includes('invalid_image_data')) {
+    return 'One or more captured files are unreadable. Please retake the affected angle.';
   }
-  if (normalized.includes('invalid_brightness')) {
-    return 'Lighting quality is not acceptable. Improve lighting and retake.';
+  if (normalized.includes('image_too_small')) {
+    return 'One or more captured files are too small to process. Please retake the affected angle.';
   }
-  if (normalized.includes('face_off_center')) {
-    return 'One or more captures are off-center. Align your face and retake.';
+  if (normalized.includes('image sanity validation failed')) {
+    return 'Could not process one or more capture files. Please retake the affected angle.';
   }
-  if (normalized.includes('image quality checks failed')) {
-    return 'Some captures did not pass quality checks. Please retake the guided shots.';
+  if (normalized.includes('image sanity checks failed')) {
+    return 'Could not process one or more capture files. Please retake the affected angle.';
+  }
+  if (normalized.includes('image integrity validation failed')) {
+    return 'Could not process one or more capture files. Please retake the affected angle.';
+  }
+  if (normalized.includes('image integrity checks failed')) {
+    return 'Could not process one or more capture files. Please retake the affected angle.';
   }
 
   return message;

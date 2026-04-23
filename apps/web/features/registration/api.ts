@@ -132,7 +132,7 @@ function toValidationReasonMessage(value: unknown): string | null {
     return null;
   }
 
-  return `Image quality checks failed (${Array.from(reasons).join('; ')})`;
+  return `Image sanity checks failed (${Array.from(reasons).join('; ')})`;
 }
 
 function toFastApiValidationMessage(value: unknown): string | null {

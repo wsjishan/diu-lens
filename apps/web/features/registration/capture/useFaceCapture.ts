@@ -992,14 +992,14 @@ export function useFaceCapture({
           return;
         }
 
-        // Keep brightness as a quality signal, but do not block capture progression.
         const allValid =
           readiness.faceDetected &&
           readiness.singleFace &&
           readiness.faceLargeEnough &&
           readiness.centered &&
           readiness.angleMatch &&
-          readiness.sharpEnough;
+          readiness.sharpEnough &&
+          readiness.brightnessOk;
         const nearAngleMatch = isNearlyAngleMatch(activeAngle, yaw, pitch);
         const isCenterNearEnough = centerOffset <= MAX_CENTER_OFFSET + NEAR_CENTER_TOLERANCE;
         const isCenterFarOff = centerOffset > MAX_CENTER_OFFSET + HARD_CENTER_TOLERANCE;
@@ -1009,7 +1009,8 @@ export function useFaceCapture({
           readiness.faceLargeEnough &&
           isCenterNearEnough &&
           (readiness.angleMatch || nearAngleMatch) &&
-          isBlurNearEnough;
+          isBlurNearEnough &&
+          readiness.brightnessOk;
 
         const stableDurationMs =
           stableWindowStartRef.current === null ? 0 : now - stableWindowStartRef.current;
@@ -1033,6 +1034,10 @@ export function useFaceCapture({
           blocker = 'blurry';
           guidanceState = 'blurry';
           liveMessage = 'Hold steady';
+        } else if (!readiness.brightnessOk) {
+          blocker = brightness < MIN_BRIGHTNESS ? 'lighting_low' : 'lighting_high';
+          guidanceState = brightness < MIN_BRIGHTNESS ? 'lighting_low' : 'lighting_high';
+          liveMessage = brightness < MIN_BRIGHTNESS ? 'Improve lighting' : 'Reduce bright light';
         } else if (!allValid && isNearReady) {
           blocker = 'near_ready';
           guidanceState = 'hold_steady';

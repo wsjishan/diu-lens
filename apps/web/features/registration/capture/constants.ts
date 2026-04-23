@@ -29,21 +29,21 @@ export const POST_CAPTURE_COOLDOWN_MS = 600;
 export const STABILITY_GRACE_MS = 280;
 export const GUIDANCE_STICK_MS = 320;
 
-export const MIN_FACE_AREA_RATIO = 0.055;
-export const MAX_CENTER_OFFSET = 0.36;
-export const MIN_BLUR_VARIANCE = 34;
-export const MIN_BRIGHTNESS = 55;
-export const MAX_BRIGHTNESS = 225;
+export const MIN_FACE_AREA_RATIO = 0.09;
+export const MAX_CENTER_OFFSET = 0.28;
+export const MIN_BLUR_VARIANCE = 45;
+export const MIN_BRIGHTNESS = 70;
+export const MAX_BRIGHTNESS = 200;
 
 export const ANGLE_THRESHOLDS = {
-  frontYawAbs: 14,
-  frontPitchAbs: 14,
-  leftYaw: 4,
-  rightYaw: -4,
-  upPitch: -4,
-  downPitch: 4,
-  sidePitchAbs: 22,
-  verticalYawAbs: 22,
+  frontYawAbs: 12,
+  frontPitchAbs: 12,
+  leftYaw: 14,
+  rightYaw: -14,
+  upPitch: -10,
+  downPitch: 10,
+  sidePitchAbs: 18,
+  verticalYawAbs: 16,
 } as const;
 
 export const captureStorageVersion = 1;

@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -25,12 +26,18 @@ _CONFIG = ImageValidationConfig()
 _FACE_CASCADE = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
+logger = logging.getLogger(__name__)
+_STRICT_FACE_DETECTION_ANGLES: set[str] = {"front"}
 
 
 def _default_report(file_name: str, angle: str) -> dict[str, Any]:
     return {
         "file_name": file_name,
         "angle": angle,
+        "image_size_bytes": 0,
+        "readable": False,
+        "decoded_shape": None,
+        "dimensions": None,
         "passed": False,
         "blur_ok": False,
         "brightness_ok": False,
@@ -45,7 +52,83 @@ def _default_report(file_name: str, angle: str) -> dict[str, Any]:
         "blocker": "unknown",
         "eyes_visible": "not_yet_implemented",
         "failure_reasons": [],
+        "blocking_reasons": [],
+        "non_blocking_reasons": [],
+        "is_blocking_failure": False,
+        "final_decision": "reject",
     }
+
+
+def _append_reason(
+    report: dict[str, Any],
+    *,
+    reason: str,
+    blocking: bool,
+) -> None:
+    target_key = "blocking_reasons" if blocking else "non_blocking_reasons"
+    target_reasons = report.get(target_key)
+    if not isinstance(target_reasons, list):
+        target_reasons = []
+    target_reasons.append(reason)
+    report[target_key] = target_reasons
+
+
+def _dimensions_from_shape(decoded_shape: object) -> str:
+    if not isinstance(decoded_shape, list) or len(decoded_shape) < 2:
+        return "unknown"
+    try:
+        height = int(decoded_shape[0])
+        width = int(decoded_shape[1])
+    except (TypeError, ValueError):
+        return "unknown"
+    return f"{width}x{height}"
+
+
+def _finalize_guided_sanity_report(report: dict[str, Any]) -> dict[str, Any]:
+    blocking_reasons_raw = report.get("blocking_reasons", [])
+    non_blocking_reasons_raw = report.get("non_blocking_reasons", [])
+    blocking_reasons = (
+        [str(reason) for reason in blocking_reasons_raw]
+        if isinstance(blocking_reasons_raw, list)
+        else []
+    )
+    non_blocking_reasons = (
+        [str(reason) for reason in non_blocking_reasons_raw]
+        if isinstance(non_blocking_reasons_raw, list)
+        else []
+    )
+    has_blocking_failure = len(blocking_reasons) > 0
+
+    report["blocking_reasons"] = blocking_reasons
+    report["non_blocking_reasons"] = non_blocking_reasons
+    # Keep backward compatibility for API consumers already reading failure_reasons.
+    report["failure_reasons"] = blocking_reasons
+    report["is_blocking_failure"] = has_blocking_failure
+    report["passed"] = not has_blocking_failure
+    report["final_decision"] = "reject" if has_blocking_failure else "accept"
+
+    if has_blocking_failure:
+        report["blocker"] = _reason_code(blocking_reasons[0])
+    elif non_blocking_reasons:
+        report["blocker"] = _reason_code(non_blocking_reasons[0])
+    else:
+        report["blocker"] = "ready"
+
+    log_fn = logger.warning if has_blocking_failure else logger.info
+    log_fn(
+        "[guided-sanity] angle=%s file=%s readable=%s dimensions=%s face_detected=%s blocking=%s "
+        "blocking_reasons=%s non_blocking_reasons=%s final_decision=%s",
+        report.get("angle", "unknown"),
+        report.get("file_name", "unknown"),
+        bool(report.get("readable", False)),
+        report.get("dimensions", _dimensions_from_shape(report.get("decoded_shape"))),
+        bool(report.get("face_detected", False)),
+        has_blocking_failure,
+        blocking_reasons,
+        non_blocking_reasons,
+        report.get("final_decision", "reject"),
+    )
+    return report
 
 
 def _max_center_offset_for_angle(config: ImageValidationConfig, angle: str) -> float:
@@ -111,28 +194,33 @@ def validate_uploaded_image_sanity(
     config: ImageValidationConfig = _CONFIG,
 ) -> dict[str, Any]:
     report = _default_report(file_name=file_name, angle=angle)
-    failure_reasons: list[str] = []
+    report["image_size_bytes"] = len(image_bytes)
+    strict_face_detection = angle in _STRICT_FACE_DETECTION_ANGLES
 
     if not image_bytes:
-        failure_reasons.append("missing_image_data")
-        report["failure_reasons"] = failure_reasons
-        report["blocker"] = _reason_code(failure_reasons[0])
-        return report
+        _append_reason(report, reason="missing_image_data", blocking=True)
+        return _finalize_guided_sanity_report(report)
 
     image_array = np.frombuffer(image_bytes, dtype=np.uint8)
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     if image is None:
-        failure_reasons.append("invalid_image_data")
-        report["failure_reasons"] = failure_reasons
-        report["blocker"] = _reason_code(failure_reasons[0])
-        return report
+        _append_reason(report, reason="invalid_image_data", blocking=True)
+        return _finalize_guided_sanity_report(report)
+
+    report["readable"] = True
+    report["decoded_shape"] = [int(v) for v in image.shape]
 
     height, width = image.shape[:2]
+    report["dimensions"] = f"{width}x{height}"
     dimensions_ok = width >= config.min_width and height >= config.min_height
     report["dimensions_ok"] = dimensions_ok
     if not dimensions_ok:
-        failure_reasons.append(
-            f"image_too_small(min:{config.min_width}x{config.min_height},got:{width}x{height})"
+        _append_reason(
+            report,
+            reason=(
+                f"image_too_small(min:{config.min_width}x{config.min_height},got:{width}x{height})"
+            ),
+            blocking=True,
         )
 
     # Sanity validator keeps backend at the same or looser strictness than live capture.
@@ -142,10 +230,12 @@ def validate_uploaded_image_sanity(
     report["face_centered"] = True
 
     if _FACE_CASCADE.empty():
-        failure_reasons.append("face_detector_unavailable")
-        report["failure_reasons"] = failure_reasons
-        report["blocker"] = _reason_code(failure_reasons[0])
-        return report
+        _append_reason(
+            report,
+            reason="face_detector_unavailable",
+            blocking=strict_face_detection,
+        )
+        return _finalize_guided_sanity_report(report)
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     faces = _FACE_CASCADE.detectMultiScale(
@@ -159,7 +249,11 @@ def validate_uploaded_image_sanity(
     report["face_count"] = face_count
     report["face_detected"] = face_count > 0
     if face_count == 0:
-        failure_reasons.append("face_not_detected")
+        _append_reason(
+            report,
+            reason="face_not_detected",
+            blocking=strict_face_detection,
+        )
     elif face_count > 1:
         face_areas = sorted(
             [int(w) * int(h) for (_, _, w, h) in faces], reverse=True
@@ -171,14 +265,13 @@ def validate_uploaded_image_sanity(
         )
         if has_clear_second_face:
             report["multiple_faces_detected"] = True
-            failure_reasons.append(
-                f"multiple_faces_detected(count:{face_count})"
+            _append_reason(
+                report,
+                reason=f"multiple_faces_detected(count:{face_count})",
+                blocking=True,
             )
 
-    report["passed"] = len(failure_reasons) == 0
-    report["failure_reasons"] = failure_reasons
-    report["blocker"] = _reason_code(failure_reasons[0]) if failure_reasons else "ready"
-    return report
+    return _finalize_guided_sanity_report(report)
 
 
 def validate_uploaded_image(

@@ -43,16 +43,16 @@ function toFriendlyVerificationMessage(message: string | null | undefined) {
     return 'One or more captured files are too small to process. Please retake the affected angle.';
   }
   if (normalized.includes('image sanity validation failed')) {
-    return 'Could not process one or more capture files. Please retake the affected angle.';
+    return message;
   }
   if (normalized.includes('image sanity checks failed')) {
-    return 'Could not process one or more capture files. Please retake the affected angle.';
+    return message;
   }
   if (normalized.includes('image integrity validation failed')) {
-    return 'Could not process one or more capture files. Please retake the affected angle.';
+    return message;
   }
   if (normalized.includes('image integrity checks failed')) {
-    return 'Could not process one or more capture files. Please retake the affected angle.';
+    return message;
   }
 
   return message;

@@ -207,6 +207,12 @@ def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
     if enrollment.status == "approved":
         return False
 
+    if enrollment.status not in {"validated", "processed"}:
+        raise EnrollmentInvalidStateError(
+            "Only validated enrollments can be approved. "
+            f"Current status: {enrollment.status}"
+        )
+
     enrollment.status = "approved"
     enrollment.rejection_reason = None
     _create_audit_log(
@@ -223,14 +229,15 @@ def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
 def reject_enrollment_by_student_id(
     db: Session, student_id: str, reason: str | None = None
 ) -> None:
-    """Admin action: reject a pending student's enrollment and clear operational data."""
+    """Admin action: reject a validated student's enrollment and clear operational data."""
     student, enrollment = _get_student_and_enrollment(db, student_id)
     if student is None or enrollment is None:
         raise EnrollmentNotFoundError("Enrollment not found for this student_id")
 
-    if enrollment.status != "pending":
+    if enrollment.status != "validated":
         raise EnrollmentInvalidStateError(
-            f"Only pending enrollments can be rejected. Current status: {enrollment.status}"
+            "Only validated enrollments can be rejected. "
+            f"Current status: {enrollment.status}"
         )
 
     reason_text = reason.strip() if reason else ""
@@ -258,9 +265,10 @@ def reset_enrollment_by_student_id(db: Session, student_id: str) -> None:
     if student is None or enrollment is None:
         raise EnrollmentNotFoundError("Enrollment not found for this student_id")
 
-    if enrollment.status != "approved":
+    if enrollment.status not in {"approved", "processed"}:
         raise EnrollmentInvalidStateError(
-            f"Only approved enrollments can be reset. Current status: {enrollment.status}"
+            "Only approved enrollments can be reset. "
+            f"Current status: {enrollment.status}"
         )
 
     _create_audit_log(
@@ -485,8 +493,6 @@ def record_processing_completed_in_db(
                 enrollment = _latest_enrollment_for_student(db, student.student_id)
                 if enrollment is not None:
                     enrollment_id = enrollment.id
-                    if processing_passed:
-                        enrollment.status = "processed"
                     db.flush()
 
             _create_audit_log(

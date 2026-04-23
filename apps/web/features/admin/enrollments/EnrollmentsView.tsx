@@ -83,7 +83,7 @@ export function EnrollmentsView() {
 
       try {
         const rows = await fetchEnrollments(token);
-        setEnrollments(rows.filter((item) => item.status === 'pending'));
+        setEnrollments(rows.filter((item) => item.status === 'validated'));
       } catch (errorValue) {
         if (handleAuthFailure(errorValue)) {
           return;
@@ -106,7 +106,7 @@ export function EnrollmentsView() {
     void loadEnrollments(true);
   }, [token, loadEnrollments]);
 
-  const pendingCount = useMemo(() => enrollments.length, [enrollments]);
+  const validatedCount = useMemo(() => enrollments.length, [enrollments]);
 
   const runAction = async (
     key: string,
@@ -166,14 +166,14 @@ export function EnrollmentsView() {
     }
 
     const targetStudentId = rejectDialog.studentId;
-    const isStillPending = enrollments.some((item) => item.student_id === targetStudentId);
-    if (!isStillPending) {
+    const isStillReviewable = enrollments.some((item) => item.student_id === targetStudentId);
+    if (!isStillReviewable) {
       setRejectDialog(null);
       setRejectReason('');
       setRejectError(null);
       showToast({
         title: 'Already updated',
-        message: 'This enrollment is no longer pending. Refreshing list.',
+        message: 'This enrollment is no longer in the review queue. Refreshing list.',
         variant: 'error',
       });
       await loadEnrollments(false);
@@ -220,7 +220,7 @@ export function EnrollmentsView() {
   return (
     <div className="grid gap-6">
       <section className="grid gap-4 md:grid-cols-1">
-        <MetricCard title="Pending Enrollments" value={pendingCount} tone="pending" />
+        <MetricCard title="Validated Enrollments" value={validatedCount} tone="pending" />
       </section>
 
       <Card className="border-border bg-card text-foreground">
@@ -228,7 +228,7 @@ export function EnrollmentsView() {
           <div>
             <CardTitle className="text-foreground">Enrollment Queue</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Review pending requests and either approve or reject.
+              Review validated submissions and either approve or reject.
             </CardDescription>
           </div>
           <Button
@@ -261,7 +261,7 @@ export function EnrollmentsView() {
 
           {!error && enrollments.length === 0 ? (
             <div className="rounded-xl border border-border bg-muted/35 p-8 text-center text-sm text-muted-foreground">
-              No pending enrollments found.
+              No validated enrollments found.
             </div>
           ) : null}
 

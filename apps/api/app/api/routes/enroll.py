@@ -204,6 +204,52 @@ def _validate_file_counts(files_by_angle: dict[str, list[UploadFile]]) -> None:
             )
 
 
+def _extract_sanity_failure_details(
+    image_reports: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    details: list[dict[str, object]] = []
+
+    for report in image_reports:
+        if bool(report.get("passed", False)):
+            continue
+
+        failure_reasons_raw = report.get("failure_reasons", [])
+        failure_reasons = (
+            [str(reason) for reason in failure_reasons_raw]
+            if isinstance(failure_reasons_raw, list)
+            else []
+        )
+        reason = failure_reasons[0] if failure_reasons else str(report.get("blocker", "unknown"))
+
+        details.append(
+            {
+                "angle": str(report.get("angle", "unknown")),
+                "file_name": str(report.get("file_name", "unknown")),
+                "reason": reason,
+                "error_code": reason.split("(", 1)[0].strip() or "unknown",
+                "image_size_bytes": int(report.get("image_size_bytes", 0) or 0),
+                "decoded_shape": report.get("decoded_shape"),
+            }
+        )
+
+    return details
+
+
+def _dimensions_from_report(report: dict[str, object]) -> str:
+    dimensions = report.get("dimensions")
+    if isinstance(dimensions, str) and dimensions.strip():
+        return dimensions
+    decoded_shape = report.get("decoded_shape")
+    if isinstance(decoded_shape, list) and len(decoded_shape) >= 2:
+        try:
+            height = int(decoded_shape[0])
+            width = int(decoded_shape[1])
+            return f"{width}x{height}"
+        except (TypeError, ValueError):
+            return "unknown"
+    return "unknown"
+
+
 async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[str, object]:
     image_reports: list[dict[str, object]] = []
 
@@ -228,37 +274,57 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
                 file_name=file_name,
                 angle=angle,
             )
+            blocking_reasons = image_report.get("blocking_reasons", [])
+            non_blocking_reasons = image_report.get("non_blocking_reasons", [])
+            if not isinstance(blocking_reasons, list):
+                blocking_reasons = []
+            if not isinstance(non_blocking_reasons, list):
+                non_blocking_reasons = []
+            is_blocking = bool(image_report.get("is_blocking_failure", False))
             logger.info(
-                "[review] angle=%s dimensionsOk=%s valid=%s",
+                "[guided-sanity] route_review angle=%s file=%s readable=%s dimensions=%s "
+                "face_detected=%s blocking=%s blocking_reasons=%s non_blocking_reasons=%s "
+                "final_decision=%s bytes=%s",
                 angle,
-                image_report.get("dimensions_ok"),
-                image_report.get("passed"),
+                file_name,
+                bool(image_report.get("readable", False)),
+                _dimensions_from_report(image_report),
+                bool(image_report.get("face_detected", False)),
+                is_blocking,
+                blocking_reasons,
+                non_blocking_reasons,
+                image_report.get("final_decision", "reject"),
+                len(sample),
             )
-            if not bool(image_report.get("passed")):
-                logger.info(
-                    "[review] blocker=%s angle=%s",
-                    image_report.get("blocker", "unknown"),
+            if is_blocking:
+                logger.warning(
+                    "[guided-sanity] route_blocked angle=%s file=%s reason=%s",
                     angle,
+                    file_name,
+                    image_report.get("blocker", "unknown"),
                 )
             image_reports.append(image_report)
 
     summary = build_validation_summary(image_reports)
     logger.info(
-        "[verification] image validation summary total=%s passed=%s failed=%s",
+        "[guided-sanity] summary total=%s passed=%s failed=%s",
         summary.get("total_images_checked"),
         summary.get("total_images_passed"),
         summary.get("failed_images_count"),
     )
     if not summary["validation_passed"]:
+        failure_details = _extract_sanity_failure_details(image_reports)
         logger.warning(
-            "[verification] image sanity validation failed details=%s",
-            summary.get("image_reports", []),
+            "[guided-sanity] validation_failed details=%s",
+            failure_details,
         )
         raise HTTPException(
             status_code=400,
             detail={
+                "error": "sanity_failed",
                 "status": "failed",
                 "message": "Image sanity validation failed for uploaded enrollment images.",
+                "details": failure_details,
                 "validation": summary,
             },
         )
@@ -274,7 +340,7 @@ async def _close_upload_files(files_by_angle: dict[str, list[UploadFile]]) -> No
 
 def _default_validation_summary() -> dict[str, object]:
     return {
-        "validation_passed": True,
+        "validation_passed": False,
         "total_images_checked": 0,
         "total_images_passed": 0,
         "failed_images_count": 0,
@@ -342,6 +408,9 @@ def _normalize_validation_summary(
                     "file_name": str(report.get("file_name", "unknown")),
                     "angle": str(report.get("angle", "unknown")),
                     "passed": bool(report.get("passed", False)),
+                    "blocker": str(report.get("blocker", "unknown")),
+                    "image_size_bytes": int(report.get("image_size_bytes", 0) or 0),
+                    "decoded_shape": report.get("decoded_shape"),
                     "blur_ok": bool(report.get("blur_ok", False)),
                     "brightness_ok": bool(report.get("brightness_ok", False)),
                     "dimensions_ok": bool(report.get("dimensions_ok", False)),
@@ -467,7 +536,13 @@ def _extract_failed_validation_summary(exc: HTTPException) -> dict[str, object]:
         validation = detail.get("validation")
         if isinstance(validation, dict):
             return validation
-    return _default_validation_summary()
+    return {
+        "validation_passed": False,
+        "total_images_checked": 0,
+        "total_images_passed": 0,
+        "failed_images_count": 1,
+        "image_reports": [],
+    }
 
 
 async def _handle_json_enrollment(
@@ -499,8 +574,16 @@ async def _handle_multipart_enrollment(
     except HTTPException as exc:
         await _close_upload_files(files_by_angle)
         failed_validation = _extract_failed_validation_summary(exc)
+        failed_payload = payload.model_copy(
+            update={
+                "verification_completed": False,
+                "total_required_shots": 0,
+                "total_accepted_shots": 0,
+                "angles": [],
+            }
+        )
         failed_entry = _build_enrollment_entry(
-            payload=payload,
+            payload=failed_payload,
             uploaded_images=uploaded_images,
             validation_summary=failed_validation,
             status_override="pending",
@@ -600,9 +683,16 @@ async def enroll_verification(request: Request) -> EnrollmentResponse:
             detail={"message": "Unsupported content type for /enroll/verification. Use multipart form data."},
         )
 
-    payload, uploaded_images, validation_summary = await _handle_multipart_enrollment(
-        request
-    )
+    try:
+        payload, uploaded_images, validation_summary = await _handle_multipart_enrollment(
+            request
+        )
+    except HTTPException as exc:
+        logger.warning(
+            "[verification] request failed detail=%s",
+            exc.detail,
+        )
+        raise
     entry = _build_enrollment_entry(
         payload=payload,
         uploaded_images=uploaded_images,

@@ -1,9 +1,21 @@
-import type { VerificationCapturesByAngle } from '@/features/registration/verification/types';
+import type {
+  VerificationAngle,
+  VerificationCapturesByAngle,
+} from '@/features/registration/verification/types';
 
 const GENERIC_ENROLLMENT_ERROR =
   'Unable to continue right now. Please try again.';
 const GENERIC_REGISTRATION_COMPLETION_ERROR =
   'Unable to complete registration right now. Please try again.';
+const MIN_CAPTURE_FILE_SIZE_BYTES = 10 * 1024;
+const ALLOWED_CAPTURE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png']);
+const REQUIRED_VERIFICATION_ANGLES: VerificationAngle[] = [
+  'front',
+  'left',
+  'right',
+  'up',
+  'down',
+];
 
 export type EnrollmentPayload = {
   student_id: string;
@@ -95,6 +107,33 @@ function toValidationReasonMessage(value: unknown): string | null {
   }
 
   const detailRecord = detail as Record<string, unknown>;
+  if (
+    detailRecord.error === 'sanity_failed' &&
+    Array.isArray(detailRecord.details)
+  ) {
+    const failedReasons = detailRecord.details
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return null;
+        }
+        const failed = entry as Record<string, unknown>;
+        const angle =
+          typeof failed.angle === 'string' && failed.angle.trim()
+            ? failed.angle.trim()
+            : 'unknown';
+        const reason =
+          typeof failed.reason === 'string' && failed.reason.trim()
+            ? failed.reason.trim()
+            : 'unknown';
+        return `${angle}: ${reason}`;
+      })
+      .filter((entry): entry is string => Boolean(entry));
+
+    if (failedReasons.length > 0) {
+      return `Image sanity checks failed (${failedReasons.join('; ')})`;
+    }
+  }
+
   const validation = detailRecord.validation;
   if (!validation || typeof validation !== 'object') {
     return null;
@@ -114,7 +153,8 @@ function toValidationReasonMessage(value: unknown): string | null {
     }
 
     const reportRecord = report as Record<string, unknown>;
-    const angle = typeof reportRecord.angle === 'string' ? reportRecord.angle : 'unknown';
+    const angle =
+      typeof reportRecord.angle === 'string' ? reportRecord.angle : 'unknown';
     const failureReasons = reportRecord.failure_reasons;
 
     if (!Array.isArray(failureReasons)) {
@@ -219,19 +259,61 @@ async function submitEnrollmentCompletionRequest(
 
     let appendedFiles = 0;
 
-    for (const [angle, captures] of Object.entries(capturesByAngle)) {
+    for (const angle of REQUIRED_VERIFICATION_ANGLES) {
+      const captures = capturesByAngle[angle];
       if (!Array.isArray(captures)) {
-        continue;
+        return {
+          success: false,
+          message: `Missing captured verification files for angle: ${angle}. Please retake this shot.`,
+        };
+      }
+
+      if (captures.length !== 1) {
+        return {
+          success: false,
+          message: `Expected exactly 1 captured file for angle: ${angle}. Please retake this shot.`,
+        };
       }
 
       for (const [index, capture] of captures.entries()) {
+        if (!(capture instanceof Blob)) {
+          return {
+            success: false,
+            message: `Captured file is invalid for angle: ${angle}. Please retake this shot.`,
+          };
+        }
+
+        if (capture.size <= 0) {
+          return {
+            success: false,
+            message: `Captured file is empty for angle: ${angle}. Please retake this shot.`,
+          };
+        }
+
+        if (capture.size < MIN_CAPTURE_FILE_SIZE_BYTES) {
+          return {
+            success: false,
+            message: `Captured file is too small for angle: ${angle}. Please retake this shot.`,
+          };
+        }
+
+        const normalizedType = capture.type.toLowerCase();
+        if (!ALLOWED_CAPTURE_CONTENT_TYPES.has(normalizedType)) {
+          return {
+            success: false,
+            message: `Captured file type is invalid for angle: ${angle}. Please retake this shot.`,
+          };
+        }
+
+        console.log(angle, capture.size, capture.type);
         console.log('[verification] attaching capture', {
           angle,
           index,
           size: capture.size,
           type: capture.type,
         });
-        formData.append(angle, capture, `${angle}_${index + 1}.jpg`);
+        const extension = normalizedType === 'image/png' ? 'png' : 'jpg';
+        formData.append(angle, capture, `${angle}_${index + 1}.${extension}`);
         appendedFiles += 1;
       }
     }
@@ -239,7 +321,8 @@ async function submitEnrollmentCompletionRequest(
     if (appendedFiles === 0) {
       return {
         success: false,
-        message: 'No captured verification images found. Please retake the guided shots.',
+        message:
+          'No captured verification images found. Please retake the guided shots.',
       };
     }
     console.log('[verification] files attached', { appendedFiles });
@@ -249,7 +332,11 @@ async function submitEnrollmentCompletionRequest(
       body: formData,
     });
 
-    return await parseEnrollmentResponse(response, errorMessage, 'verification');
+    return await parseEnrollmentResponse(
+      response,
+      errorMessage,
+      'verification'
+    );
   } catch (error) {
     console.error('[verification] request failed', error);
     throw error;

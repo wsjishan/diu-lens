@@ -13,6 +13,7 @@ const mediaConstraints: MediaStreamConstraints = {
     height: { ideal: 720 },
   },
 };
+const MIN_CAPTURE_DIMENSION_PX = 100;
 
 function stopMediaTracks(stream: MediaStream | null) {
   if (!stream) {
@@ -164,9 +165,13 @@ export function useCamera(): CameraHookResult {
     if (
       !videoElement ||
       !streamRef.current ||
-      videoElement.videoWidth === 0 ||
-      videoElement.videoHeight === 0
+      videoElement.videoWidth <= MIN_CAPTURE_DIMENSION_PX ||
+      videoElement.videoHeight <= MIN_CAPTURE_DIMENSION_PX
     ) {
+      console.warn('[capture] snapshot skipped due to invalid frame size', {
+        width: videoElement?.videoWidth ?? 0,
+        height: videoElement?.videoHeight ?? 0,
+      });
       return null;
     }
 
@@ -181,8 +186,28 @@ export function useCamera(): CameraHookResult {
 
     context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
+    if (
+      canvas.width <= MIN_CAPTURE_DIMENSION_PX ||
+      canvas.height <= MIN_CAPTURE_DIMENSION_PX
+    ) {
+      console.warn('[capture] snapshot skipped due to invalid canvas size', {
+        width: canvas.width,
+        height: canvas.height,
+      });
+      return null;
+    }
+
     return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.92);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            console.error('[capture] canvas.toBlob returned null');
+          }
+          resolve(blob);
+        },
+        'image/jpeg',
+        0.9
+      );
     });
   }, []);
 

@@ -26,12 +26,12 @@ export function BasicInfoStep({
   errorMessage,
 }: BasicInfoStepProps) {
   return (
-    <div className="flex h-full flex-col gap-4 sm:gap-5">
-      <header className="space-y-2.5">
-        <h2 className="landing-text-primary text-xl font-semibold tracking-tight sm:text-[1.35rem]">
+    <div className="flex h-full flex-col gap-4 max-[639px]:gap-3 sm:gap-5">
+      <header className="space-y-2.5 max-[639px]:space-y-1.5">
+        <h2 className="landing-text-primary text-xl font-semibold tracking-tight max-[639px]:text-[1.02rem] max-[639px]:font-medium sm:text-[1.35rem]">
           Basic Information
         </h2>
-        <p className="landing-text-secondary text-sm leading-6">
+        <p className="landing-text-secondary text-sm leading-6 max-[639px]:max-w-[30ch] max-[639px]:text-[0.72rem] max-[639px]:leading-[1.35]">
           Confirm your profile details before starting identity verification.
         </p>
         {errorMessage ? (
@@ -44,7 +44,7 @@ export function BasicInfoStep({
         ) : null}
       </header>
 
-      <div className="grid grid-cols-1 gap-3.5 rounded-xl border border-slate-200/65 bg-white/45 p-3.5 dark:border-white/10 dark:bg-slate-900/36 sm:gap-4 sm:p-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 rounded-xl border border-slate-200/65 bg-white/45 p-3.5 max-[639px]:gap-2.5 max-[639px]:rounded-[0.75rem] max-[639px]:p-2.5 dark:border-white/10 dark:bg-slate-900/36 sm:gap-4 sm:p-4 md:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label
             htmlFor="basic-student-id"
@@ -119,13 +119,13 @@ export function BasicInfoStep({
         </div>
       </div>
 
-      <div className="mt-auto flex flex-col gap-4 border-t border-slate-200/80 pt-4 dark:border-white/10">
+      <div className="mt-auto flex flex-col gap-4 border-t border-slate-200/80 pt-4 max-[639px]:gap-2.5 max-[639px]:pt-3 dark:border-white/10">
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
           disabled={isSubmitting}
-          className="landing-cta-outline h-11 w-full rounded-xl border-slate-300/80 bg-white/72 px-4 text-slate-700 hover:bg-slate-100 dark:border-white/12 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-900/85"
+          className="landing-cta-outline h-11 w-full rounded-xl border-slate-300/80 bg-white/72 px-4 text-slate-700 hover:bg-slate-100 max-[639px]:h-[2.78rem] max-[639px]:rounded-[0.7rem] dark:border-white/12 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-900/85"
         >
           <ArrowLeft className="size-4" />
           Back
@@ -139,7 +139,7 @@ export function BasicInfoStep({
             !values.phoneNumber.trim() ||
             !values.universityEmail.trim()
           }
-          className="landing-button-bg landing-cta h-11 w-full gap-2 px-5 text-white"
+          className="landing-button-bg landing-cta h-11 w-full gap-2 px-5 text-white max-[639px]:h-[2.9rem] max-[639px]:rounded-[0.7rem]"
         >
           {isSubmitting ? 'Continuing...' : 'Continue'}
           <ArrowRight className="size-4 transition-transform duration-150 group-hover/button:translate-x-0.5" />

@@ -489,4 +489,39 @@
       height: 2.84rem;
     }
   }
+
+  @media (max-width: 639px) {
+    .landing-grid-overlay {
+      opacity: 0.24;
+    }
+
+    .landing-glow-top-left {
+      filter: saturate(0.85);
+    }
+
+    .landing-glow-bottom-right {
+      filter: saturate(0.82);
+    }
+
+    .landing-card-surface {
+      box-shadow:
+        0 14px 28px -22px rgba(30, 64, 175, 0.28),
+        0 6px 14px -12px rgba(15, 23, 42, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.94);
+    }
+
+    .landing-form-input {
+      height: 2.9rem;
+      font-size: 0.89rem;
+    }
+
+    .landing-cta {
+      height: 2.9rem;
+      font-size: 0.88rem;
+    }
+
+    .landing-cta-outline {
+      height: 2.85rem;
+    }
+  }
 }

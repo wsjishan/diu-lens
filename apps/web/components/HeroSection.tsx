@@ -1,3 +1,9 @@
+const heroSteps = [
+  { id: 1, label: 'Student ID check', active: true },
+  { id: 2, label: 'Basic information', active: false },
+  { id: 3, label: 'Face verification', active: false },
+] as const;
+
 export function HeroSection() {
   return (
     <section className="space-y-4 text-left lg:space-y-[1.65rem]">
@@ -28,11 +34,7 @@ export function HeroSection() {
 
       <div id="for-students" className="pt-0.5">
         <ol className="flex flex-col gap-2.5 sm:grid sm:grid-cols-3 sm:gap-3 lg:max-w-[31.25rem]">
-          {[
-            { id: 1, label: 'Student ID check', active: true },
-            { id: 2, label: 'Basic information', active: false },
-            { id: 3, label: 'Face verification', active: false },
-          ].map((item, index, arr) => (
+          {heroSteps.map((item, index, arr) => (
             <li key={item.id} className="relative flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2 sm:text-left">
               <div className="relative w-auto sm:w-full">
                 {index < arr.length - 1 ? (
@@ -62,6 +64,61 @@ export function HeroSection() {
           ))}
         </ol>
       </div>
+    </section>
+  );
+}
+
+export function MobileHeroIntro() {
+  return (
+    <section className="space-y-3.5">
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/40 bg-blue-50/60 px-2.5 py-1 text-[0.5rem] font-semibold tracking-[0.11em] text-blue-900 uppercase shadow-[0_0_14px_rgba(30,64,175,0.08)] dark:border-blue-300/28 dark:bg-[#0c1c3c]/58 dark:text-slate-300">
+        <span className="inline-flex size-1.5 rounded-full bg-sky-500 dark:bg-sky-400" />
+        AI identity layer online
+      </div>
+
+      <div className="space-y-2">
+        <h1 className="landing-text-primary max-w-[14ch] text-[1.68rem] leading-[1.02] font-semibold tracking-[-0.022em]">
+          Smart{' '}
+          <span className="bg-linear-to-r from-[#164eaf] via-[#2871d8] to-[#3c92ff] bg-clip-text text-transparent dark:from-[#ecf2ff] dark:via-[#98c6ff] dark:to-[#5ea7ff]">
+            Identification
+          </span>{' '}
+          for DIU Campus
+        </h1>
+
+        <p
+          id="how-it-works"
+          className="landing-text-secondary max-w-[30ch] text-[0.76rem] leading-[1.4]"
+        >
+          Verify once and access DIU campus services without repeated
+          verification steps. Secure identity registration, AI-powered face
+          verification, Privacy-first data handling.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export function MobileOnboardingStepper() {
+  return (
+    <section id="for-students" aria-label="Registration flow steps" className="px-0.5">
+      <ol className="space-y-2">
+        {heroSteps.map((item, index, arr) => (
+          <li key={item.id} className="relative flex items-center gap-2">
+            {index < arr.length - 1 ? (
+              <span
+                aria-hidden="true"
+                className="absolute left-[0.375rem] top-[1rem] h-[1.1rem] w-px bg-linear-to-b from-blue-300/42 to-slate-400/24"
+              />
+            ) : null}
+            <span
+              className={item.active
+                ? 'relative z-10 inline-flex size-3 items-center justify-center rounded-full bg-[#1a67e5] ring-2 ring-blue-200/58 dark:ring-blue-200/26'
+                : 'relative z-10 inline-flex size-3 items-center justify-center rounded-full border border-slate-300/72 bg-slate-100/68 dark:border-slate-500/38 dark:bg-[#1a2742]/58'}
+            />
+            <span className="landing-text-secondary text-[0.72rem] leading-none">{item.label}</span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

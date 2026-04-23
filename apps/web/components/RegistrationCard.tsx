@@ -18,8 +18,8 @@ export function RegistrationCard({ onStepIndexChange }: RegistrationCardProps) {
       className={cn(
         'mx-auto flex w-full transition-all duration-400 ease-out lg:mx-0',
         isVerificationStep
-          ? 'max-w-5xl lg:max-w-5xl'
-          : 'max-w-[22.75rem] sm:max-w-[27rem] md:max-w-[31rem] lg:max-w-[31rem]'
+          ? 'max-w-5xl max-[639px]:max-w-none lg:max-w-5xl'
+          : 'max-w-[22.75rem] max-[639px]:max-w-none sm:max-w-[27rem] md:max-w-[31rem] lg:max-w-[31rem]'
       )}
     >
       <RegistrationFlow

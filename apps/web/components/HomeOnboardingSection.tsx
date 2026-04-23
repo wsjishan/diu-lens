@@ -14,13 +14,13 @@ export function HomeOnboardingSection() {
     <section className="relative w-full">
       <div
         aria-hidden="true"
-        className="landing-card-spotlight pointer-events-none absolute right-[-10%] top-1/2 hidden h-[32rem] w-[42rem] -translate-y-1/2 rounded-full blur-3xl lg:block"
+        className="landing-card-spotlight pointer-events-none absolute right-[-8%] top-1/2 hidden h-[26.5rem] w-[34rem] -translate-y-1/2 rounded-full blur-3xl lg:block"
       />
 
-      <div className="grid w-full grid-cols-1 gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] md:items-center md:gap-14 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)] lg:gap-24">
+      <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] md:items-center md:gap-10 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:gap-[4rem]">
         <div
           className={cn(
-            'max-w-[44rem] transition-all duration-400 ease-out lg:pr-2',
+            'mx-auto w-full max-w-[22.75rem] transition-all duration-400 ease-out sm:max-w-[29rem] md:mx-0 md:max-w-[38.5rem] lg:pr-2',
             activeStep > 0 && !isVerificationStep
               ? 'lg:opacity-70 lg:blur-[1px]'
               : 'lg:opacity-100'
@@ -29,7 +29,7 @@ export function HomeOnboardingSection() {
           <HeroSection />
         </div>
 
-        <div className="relative flex w-full justify-center md:justify-end lg:pr-2">
+        <div className="relative mx-auto flex w-full max-w-[22.75rem] justify-center sm:max-w-[27rem] md:mx-0 md:max-w-none md:justify-end lg:pr-1">
           <RegistrationCard onStepIndexChange={setActiveStep} />
         </div>
       </div>

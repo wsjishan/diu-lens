@@ -16,17 +16,17 @@ export function StudentIdStep({
   onContinue,
 }: StudentIdStepProps) {
   return (
-    <div className="space-y-7 sm:space-y-8">
-      <header className="space-y-2.5">
-        <h3 className="landing-text-primary text-[2rem] leading-[1.08] font-semibold tracking-[-0.026em] sm:text-[2.3rem]">
+    <div className="space-y-4 sm:space-y-5">
+      <header className="space-y-2">
+        <h3 className="landing-text-primary text-[1.3rem] leading-[1.1] font-semibold tracking-[-0.016em] sm:text-[1.68rem]">
           Check Registration Status
         </h3>
-        <p className="landing-text-secondary text-[1.03rem] leading-[1.45]">
+        <p className="landing-text-secondary text-[0.8rem] leading-[1.45] sm:text-[0.86rem]">
           Enter your student ID to continue with DIU Lens.
         </p>
       </header>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <Label htmlFor="student-id" className="sr-only">
           Student ID
         </Label>
@@ -47,7 +47,7 @@ export function StudentIdStep({
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="landing-button-bg landing-cta w-full gap-2 px-5 text-[1.02rem] text-white"
+        className="landing-button-bg landing-cta w-full gap-2 px-5 text-[0.9rem] text-white"
       >
         Continue
         <ArrowRight

@@ -4,20 +4,20 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 export function Header() {
   return (
-    <header className="flex items-center justify-between py-1">
-      <div className="flex items-center gap-3.5">
-        <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/18 text-blue-300 shadow-[0_0_34px_rgba(59,130,246,0.35)] ring-1 ring-blue-300/40 sm:size-9 lg:size-10">
-          <Eye className="size-4 sm:size-[1.1rem] lg:size-5" aria-hidden="true" />
+    <header className="flex items-center justify-between py-1.5 sm:py-1">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <span className="inline-flex size-[1.9rem] items-center justify-center rounded-full border border-slate-300/78 bg-white/88 text-blue-700 shadow-[0_8px_18px_-12px_rgba(30,64,175,0.34)] dark:border-blue-200/28 dark:bg-[#102646]/84 dark:text-blue-100 dark:shadow-[0_8px_18px_-12px_rgba(37,99,235,0.28)] sm:size-9 lg:size-[2.375rem]">
+          <Eye className="size-[0.95rem] sm:size-[1.05rem] lg:size-[1.12rem]" aria-hidden="true" />
         </span>
-        <p className="landing-text-primary text-[1.55rem] leading-none font-semibold tracking-[-0.02em] sm:text-[1.75rem] lg:text-[2.05rem]">
+        <p className="landing-text-primary text-[1.06rem] leading-none font-semibold tracking-[-0.016em] sm:text-[1.44rem] lg:text-[1.8rem]">
           DIU Lens
         </p>
       </div>
 
-      <div className="flex items-center gap-3 sm:gap-4 lg:gap-5">
+      <div className="flex items-center gap-2 sm:gap-3.5 lg:gap-[1.125rem]">
         <Link
           href="/faq"
-          className="landing-link text-[0.9rem] font-medium sm:text-[1rem] lg:text-[1.28rem]"
+          className="landing-link text-[0.74rem] font-medium sm:text-[0.9rem] lg:text-[1.02rem]"
         >
           FAQ
         </Link>

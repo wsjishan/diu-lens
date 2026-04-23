@@ -25,19 +25,19 @@ export function RegistrationShell({
   return (
     <Card
       className={cn(
-        'landing-card-surface flex w-full flex-col rounded-[1.65rem] border px-6 py-7 sm:px-8 sm:py-8',
+        'landing-card-surface flex w-full flex-col rounded-[1.15rem] border px-4 py-[1.125rem] sm:rounded-[1.3rem] sm:px-[1.375rem] sm:py-[1.4rem]',
         className
       )}
     >
-      <CardContent className="space-y-7 p-0">
-        <header className="space-y-4">
-          <h2 className="landing-text-primary text-center text-[2.55rem] leading-none font-semibold tracking-[-0.02em]">
+      <CardContent className="space-y-3 p-0 sm:space-y-[1.1rem]">
+        <header className="space-y-2 sm:space-y-2.5">
+          <h2 className="landing-text-primary text-center text-[1.5rem] leading-none font-semibold tracking-[-0.015em] sm:text-[1.72rem]">
             Onboarding
           </h2>
 
-          <div className="space-y-2.5">
-            <p className="landing-text-secondary text-[1.04rem]">Step {activeIndex + 1} of 4</p>
-            <div className="landing-progress-track h-2 w-full overflow-hidden rounded-full">
+          <div className="space-y-1.5">
+            <p className="landing-text-secondary text-[0.74rem] sm:text-[0.8rem]">Step {activeIndex + 1} of 4</p>
+            <div className="landing-progress-track h-[0.3125rem] w-full overflow-hidden rounded-full">
               <span
                 className="landing-progress-active block h-full rounded-full"
                 style={{ width: `${progressPercent}%` }}
@@ -49,7 +49,7 @@ export function RegistrationShell({
                 <span
                   key={step.id}
                   className={cn(
-                    'text-[0.98rem] whitespace-nowrap',
+                    'text-[0.68rem] whitespace-nowrap sm:text-[0.72rem]',
                     index <= activeIndex ? 'landing-text-secondary' : 'landing-text-muted'
                   )}
                 >
@@ -60,7 +60,7 @@ export function RegistrationShell({
           </div>
         </header>
 
-        <div className="space-y-6">{children}</div>
+        <div className="space-y-3.5 sm:space-y-4">{children}</div>
       </CardContent>
     </Card>
   );

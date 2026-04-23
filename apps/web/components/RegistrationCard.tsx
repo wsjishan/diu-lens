@@ -19,7 +19,7 @@ export function RegistrationCard({ onStepIndexChange }: RegistrationCardProps) {
         'mx-auto flex w-full transition-all duration-400 ease-out lg:mx-0',
         isVerificationStep
           ? 'max-w-5xl lg:max-w-5xl'
-          : 'max-w-[36.5rem] lg:max-w-[36.5rem]'
+          : 'max-w-[22.75rem] sm:max-w-[27rem] md:max-w-[31rem] lg:max-w-[31rem]'
       )}
     >
       <RegistrationFlow

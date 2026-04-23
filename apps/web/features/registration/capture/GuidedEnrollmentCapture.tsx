@@ -91,6 +91,7 @@ export function GuidedEnrollmentCapture({
     }
 
     const originalConsoleError = console.error;
+    const originalConsoleWarn = console.warn;
 
     console.error = (...args: unknown[]) => {
       const message = args
@@ -109,9 +110,12 @@ export function GuidedEnrollmentCapture({
         .join(' ');
 
       if (
+        message.includes('[capture-error]') ||
+        message.includes('[capture-overlay-suppressed]') ||
         message.includes('Created TensorFlow Lite XNNPACK delegate for CPU') ||
         message.includes('XNNPACK delegate')
       ) {
+        originalConsoleWarn(...args);
         return;
       }
 

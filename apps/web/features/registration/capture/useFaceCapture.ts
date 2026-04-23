@@ -181,7 +181,7 @@ function logCaptureError(
     blocker: string;
     [key: string]: unknown;
   },
-  severity: 'error' | 'warn' = 'error'
+  severity: 'error' | 'warn' = 'warn'
 ) {
   const details = describeError(error);
   const logger = severity === 'warn' ? console.warn : console.error;

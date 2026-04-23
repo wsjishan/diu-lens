@@ -104,9 +104,10 @@ settings = Settings(
         "ACCESS_TOKEN_EXPIRE_MINUTES",
         "Set a positive integer like 60.",
     ),
+    # TEMPORARY/PROVISIONAL: tighter threshold until clean calibration data exists.
     face_match_distance_threshold=_get_positive_float(
         "FACE_MATCH_DISTANCE_THRESHOLD",
-        0.45,
+        0.07,
     ),
     face_match_top_k=_get_positive_int("FACE_MATCH_TOP_K", 5),
     face_match_candidate_pool_limit=_get_positive_int(

@@ -40,7 +40,8 @@ APP_ENV=development
 Optional face matching settings:
 
 ```bash
-FACE_MATCH_DISTANCE_THRESHOLD=0.45
+# TEMPORARY/PROVISIONAL until clean calibration set is rebuilt
+FACE_MATCH_DISTANCE_THRESHOLD=0.07
 FACE_MATCH_TOP_K=5
 FACE_MATCH_CANDIDATE_POOL_LIMIT=200
 ```

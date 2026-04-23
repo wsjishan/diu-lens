@@ -11,6 +11,6 @@ export const verificationAngles: VerificationAngle[] = [
   'down',
 ];
 
-export const requiredShotsPerAngle = 3;
+export const requiredShotsPerAngle = 1;
 export const totalRequiredShots =
   verificationAngles.length * requiredShotsPerAngle;

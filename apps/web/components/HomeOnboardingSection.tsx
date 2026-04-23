@@ -21,21 +21,21 @@ export function HomeOnboardingSection() {
         className="landing-card-spotlight pointer-events-none absolute right-[-8%] top-1/2 hidden h-[26.5rem] w-[34rem] -translate-y-1/2 rounded-full blur-3xl lg:block"
       />
 
-      <div className="mx-auto flex w-full max-w-[22.75rem] flex-col pt-1.5 sm:hidden">
+      <div className="mx-auto flex w-full max-w-[22.75rem] flex-col pt-1.5 pb-5 sm:hidden">
         <div
           className={cn(
             'w-full transition-all duration-400 ease-out',
-            activeStep > 0 && !isVerificationStep ? 'opacity-90' : 'opacity-100'
+            activeStep > 0 && !isVerificationStep ? 'opacity-88' : 'opacity-100'
           )}
         >
           <MobileHeroIntro />
         </div>
 
-        <div className="mt-3 w-full">
+        <div className="mt-1.5 w-full">
           <RegistrationCard onStepIndexChange={setActiveStep} />
         </div>
 
-        <div className="mt-5 w-full">
+        <div className="mt-4 w-full px-0.5">
           <MobileOnboardingStepper />
         </div>
       </div>

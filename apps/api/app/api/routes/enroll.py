@@ -25,8 +25,8 @@ from app.core.storage import (
 )
 
 
-REQUIRED_IMAGES_PER_ANGLE = 3
-REQUIRED_TOTAL_SHOTS = 15
+REQUIRED_IMAGES_PER_ANGLE = 1
+REQUIRED_TOTAL_SHOTS = 5
 EYES_VISIBLE_VALUES: tuple[str, ...] = ("passed", "failed", "not_yet_implemented")
 ENROLLMENT_STATUSES: tuple[str, ...] = (
     "pending",

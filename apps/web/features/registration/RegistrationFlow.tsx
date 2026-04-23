@@ -214,6 +214,7 @@ export function RegistrationFlow({
     if (activeStep === 2) {
       return (
         <VerificationFlow
+          studentId={values.studentId}
           onComplete={handleVerificationComplete}
           isSubmittingCompletion={isCompletingRegistration}
           completionErrorMessage={verificationError}

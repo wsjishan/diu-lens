@@ -16,18 +16,21 @@ export function StudentIdStep({
   onContinue,
 }: StudentIdStepProps) {
   return (
-    <div className="space-y-4 max-[639px]:space-y-3 sm:space-y-5">
-      <header className="space-y-2 max-[639px]:space-y-1.5">
-        <h3 className="landing-text-primary text-[1.3rem] leading-[1.1] font-semibold tracking-[-0.016em] max-[639px]:text-[0.98rem] max-[639px]:font-medium sm:text-[1.68rem]">
+    <div className="space-y-4 max-[639px]:space-y-2.5 sm:space-y-5">
+      <header className="space-y-2 max-[639px]:space-y-1">
+        <h3 className="landing-text-primary text-[1.3rem] leading-[1.1] font-semibold tracking-[-0.016em] max-[639px]:text-[0.84rem] max-[639px]:leading-[1.2] max-[639px]:font-medium sm:text-[1.68rem]">
           Check Registration Status
         </h3>
-        <p className="landing-text-secondary max-w-[29ch] text-[0.8rem] leading-[1.45] max-[639px]:text-[0.72rem] max-[639px]:leading-[1.35] sm:text-[0.86rem]">
+        <p className="landing-text-secondary max-w-[29ch] text-[0.8rem] leading-[1.45] max-[639px]:max-w-[27ch] max-[639px]:text-[0.66rem] max-[639px]:leading-[1.32] sm:text-[0.86rem]">
           Enter your student ID to continue with DIU Lens.
         </p>
       </header>
 
-      <div className="space-y-2">
-        <Label htmlFor="student-id" className="sr-only">
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="student-id"
+          className="sr-only"
+        >
           Student ID
         </Label>
         <Input
@@ -47,11 +50,11 @@ export function StudentIdStep({
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="landing-button-bg landing-cta w-full gap-2 px-5 text-[0.9rem] text-white max-[639px]:h-[2.9rem]"
+        className="landing-button-bg landing-cta w-full gap-1.5 px-5 text-[0.9rem] text-white max-[639px]:h-[2.62rem] max-[639px]:text-[0.8rem]"
       >
         Continue
         <ArrowRight
-          className="size-5 transition-transform duration-150 group-hover/button:translate-x-0.5"
+          className="size-4 transition-transform duration-150 group-hover/button:translate-x-0.5"
           aria-hidden="true"
         />
       </Button>

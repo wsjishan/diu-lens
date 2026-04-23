@@ -90,6 +90,37 @@ export function GuidedEnrollmentCapture({
       return;
     }
 
+    const originalConsoleError = console.error;
+
+    console.error = (...args: unknown[]) => {
+      const message = args
+        .map((arg) => {
+          if (typeof arg === 'string') {
+            return arg;
+          }
+          if (arg instanceof Error) {
+            return arg.message;
+          }
+          if (arg && typeof arg === 'object' && 'message' in arg) {
+            return String((arg as { message?: unknown }).message ?? '');
+          }
+          return String(arg);
+        })
+        .join(' ');
+
+      if (
+        message.includes('Created TensorFlow Lite XNNPACK delegate for CPU') ||
+        message.includes('XNNPACK delegate')
+      ) {
+        return;
+      }
+
+      originalConsoleError(...args);
+    };
+
+    const previousOnError = window.onerror;
+    const previousOnUnhandledRejection = window.onunhandledrejection;
+
     const describeError = (error: unknown) => {
       if (error instanceof Error) {
         return {
@@ -105,7 +136,7 @@ export function GuidedEnrollmentCapture({
 
     const logCaptureError = (source: string, error: unknown) => {
       const details = describeError(error);
-      console.error('[capture-error]', {
+      console.error('[capture-overlay-suppressed]', {
         source,
         message: details.message,
         stack: details.stack,
@@ -114,20 +145,45 @@ export function GuidedEnrollmentCapture({
       });
     };
 
-    const onWindowError = (event: ErrorEvent) => {
-      logCaptureError('window.error', event.error ?? event.message);
+    window.onerror = (message, source, lineno, colno, error) => {
+      logCaptureError('window.onerror', error ?? message);
+      if (typeof previousOnError === 'function') {
+        try {
+          previousOnError.call(window, message, source, lineno, colno, error);
+        } catch (handlerError) {
+          console.error('[capture-overlay-suppressed]', {
+            source: 'window.onerror.previous_handler_failed',
+            message: String(handlerError),
+            currentTargetAngle: currentAngleRef.current,
+            currentBlocker: currentBlockerRef.current,
+          });
+        }
+      }
+      return true;
     };
 
-    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
-      logCaptureError('window.unhandledrejection', event.reason);
+    window.onunhandledrejection = (event) => {
+      logCaptureError('window.onunhandledrejection', event.reason);
+      event.preventDefault();
+      if (typeof previousOnUnhandledRejection === 'function') {
+        try {
+          previousOnUnhandledRejection.call(window, event);
+        } catch (handlerError) {
+          console.error('[capture-overlay-suppressed]', {
+            source: 'window.onunhandledrejection.previous_handler_failed',
+            message: String(handlerError),
+            currentTargetAngle: currentAngleRef.current,
+            currentBlocker: currentBlockerRef.current,
+          });
+        }
+      }
+      return true;
     };
-
-    window.addEventListener('error', onWindowError);
-    window.addEventListener('unhandledrejection', onUnhandledRejection);
 
     return () => {
-      window.removeEventListener('error', onWindowError);
-      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+      console.error = originalConsoleError;
+      window.onerror = previousOnError;
+      window.onunhandledrejection = previousOnUnhandledRejection;
     };
   }, []);
 

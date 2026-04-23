@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, Camera, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +38,8 @@ export function GuidedEnrollmentCapture({
 }: GuidedEnrollmentCaptureProps) {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
+  const currentAngleRef = useRef<string>('front');
+  const currentBlockerRef = useRef<string>('no_face');
 
   const {
     videoRef,
@@ -73,10 +75,61 @@ export function GuidedEnrollmentCapture({
   });
 
   useEffect(() => {
+    currentAngleRef.current = state.currentAngle;
+    currentBlockerRef.current = state.feedback.guidanceState;
+  }, [state.currentAngle, state.feedback.guidanceState]);
+
+  useEffect(() => {
     if (permissionState === 'idle') {
       void requestAccess();
     }
   }, [permissionState, requestAccess]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const describeError = (error: unknown) => {
+      if (error instanceof Error) {
+        return {
+          message: error.message,
+          stack: error.stack ?? null,
+        };
+      }
+      return {
+        message: typeof error === 'string' ? error : String(error),
+        stack: null,
+      };
+    };
+
+    const logCaptureError = (source: string, error: unknown) => {
+      const details = describeError(error);
+      console.error('[capture-error]', {
+        source,
+        message: details.message,
+        stack: details.stack,
+        currentTargetAngle: currentAngleRef.current,
+        currentBlocker: currentBlockerRef.current,
+      });
+    };
+
+    const onWindowError = (event: ErrorEvent) => {
+      logCaptureError('window.error', event.error ?? event.message);
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logCaptureError('window.unhandledrejection', event.reason);
+    };
+
+    window.addEventListener('error', onWindowError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', onWindowError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -90,6 +143,10 @@ export function GuidedEnrollmentCapture({
     }
 
     setLocalErrorMessage(null);
+    console.log('[verification] final submit triggered', {
+      studentId,
+      capturedCount: state.capturedCount,
+    });
 
     try {
       const summary: VerificationCompletionSummary = {
@@ -107,9 +164,18 @@ export function GuidedEnrollmentCapture({
       await onComplete(summary);
       clearSession();
     } catch {
+      console.error('[verification] final submit failed at capture step');
       setLocalErrorMessage('Unable to submit verification. Please try again.');
     }
-  }, [capturesByAngle, clearSession, isSubmittingCompletion, onComplete, state.canSubmit]);
+  }, [
+    capturesByAngle,
+    clearSession,
+    isSubmittingCompletion,
+    onComplete,
+    state.canSubmit,
+    state.capturedCount,
+    studentId,
+  ]);
 
   const permissionBlocked = permissionState !== 'granted';
 
@@ -118,7 +184,7 @@ export function GuidedEnrollmentCapture({
       return 'Uploading verification images...';
     }
 
-    if (completionErrorMessage) {
+    if (completionErrorMessage && state.canSubmit) {
       return completionErrorMessage;
     }
 
@@ -145,6 +211,7 @@ export function GuidedEnrollmentCapture({
     localErrorMessage,
     permissionBlocked,
     state.feedback.liveMessage,
+    state.canSubmit,
     state.modelErrorMessage,
   ]);
 

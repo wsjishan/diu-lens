@@ -27,6 +27,31 @@ const transition = {
   ease: [0.2, 0.7, 0.2, 1] as [number, number, number, number],
 };
 
+function toFriendlyVerificationMessage(message: string | null | undefined) {
+  if (!message) {
+    return GENERIC_REGISTRATION_COMPLETION_ERROR;
+  }
+
+  const normalized = message.toLowerCase();
+  if (normalized.includes('face_not_detected')) {
+    return 'Face could not be detected in one or more captures. Retake with your full face centered.';
+  }
+  if (normalized.includes('image_blurry')) {
+    return 'One or more captures are blurry. Hold steady and retake.';
+  }
+  if (normalized.includes('invalid_brightness')) {
+    return 'Lighting quality is not acceptable. Improve lighting and retake.';
+  }
+  if (normalized.includes('face_off_center')) {
+    return 'One or more captures are off-center. Align your face and retake.';
+  }
+  if (normalized.includes('image quality checks failed')) {
+    return 'Some captures did not pass quality checks. Please retake the guided shots.';
+  }
+
+  return message;
+}
+
 function formatStudentId(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 9);
 
@@ -125,6 +150,9 @@ export function RegistrationFlow({
 
       setVerificationError(null);
       setIsCompletingRegistration(true);
+      console.log('[verification] completion submit start', {
+        student_id: values.studentId,
+      });
 
       try {
         const result = await submitEnrollmentCompletion(
@@ -146,15 +174,15 @@ export function RegistrationFlow({
         );
 
         if (!result.success) {
-          setVerificationError(
-            result.message || GENERIC_REGISTRATION_COMPLETION_ERROR
-          );
+          console.warn('[verification] completion submit rejected', result);
+          setVerificationError(toFriendlyVerificationMessage(result.message));
           return;
         }
 
+        console.log('[verification] completion submit succeeded', result);
         setActiveStep(3);
       } catch (error) {
-        console.error('[registration] completion submit failed', error);
+        console.error('[verification] completion submit failed', error);
         setVerificationError(
           toErrorMessage(error, GENERIC_REGISTRATION_COMPLETION_ERROR)
         );

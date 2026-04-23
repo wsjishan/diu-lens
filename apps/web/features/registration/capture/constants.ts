@@ -24,22 +24,24 @@ export const perAngleHint: Record<VerificationAngle, string> = {
   down: 'Lower your chin just a little.',
 };
 
-export const STABILITY_WINDOW_MS = 700;
-export const POST_CAPTURE_COOLDOWN_MS = 650;
+export const STABILITY_WINDOW_MS = 450;
+export const POST_CAPTURE_COOLDOWN_MS = 600;
 
-export const MIN_FACE_AREA_RATIO = 0.12;
-export const MAX_CENTER_OFFSET = 0.24;
-export const MIN_BLUR_VARIANCE = 85;
-export const MIN_BRIGHTNESS = 75;
-export const MAX_BRIGHTNESS = 190;
+export const MIN_FACE_AREA_RATIO = 0.08;
+export const MAX_CENTER_OFFSET = 0.28;
+export const MIN_BLUR_VARIANCE = 55;
+export const MIN_BRIGHTNESS = 55;
+export const MAX_BRIGHTNESS = 225;
 
 export const ANGLE_THRESHOLDS = {
-  frontYawAbs: 10,
-  frontPitchAbs: 10,
-  leftYaw: -12,
-  rightYaw: 12,
-  upPitch: -10,
-  downPitch: 10,
+  frontYawAbs: 14,
+  frontPitchAbs: 14,
+  leftYaw: 7,
+  rightYaw: -5,
+  upPitch: -7,
+  downPitch: 7,
+  sidePitchAbs: 18,
+  verticalYawAbs: 18,
 } as const;
 
 export const captureStorageVersion = 1;

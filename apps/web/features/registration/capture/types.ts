@@ -29,6 +29,18 @@ export type CaptureReadiness = {
 };
 
 export type CaptureFeedback = {
+  guidanceState:
+    | 'no_face'
+    | 'multiple_faces'
+    | 'face_too_small'
+    | 'off_center'
+    | 'blurry'
+    | 'lighting_low'
+    | 'lighting_high'
+    | 'wrong_angle'
+    | 'hold_steady'
+    | 'ready'
+    | 'cooldown';
   instruction: string;
   liveMessage: string;
   holdProgress: number;

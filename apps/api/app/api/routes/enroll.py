@@ -1,4 +1,5 @@
 import json
+import logging
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Literal, cast
@@ -79,6 +80,7 @@ class EnrollmentResponse(BaseModel):
 
 
 router = APIRouter(tags=["enrollment"])
+logger = logging.getLogger(__name__)
 
 
 def _bad_request(message: str) -> HTTPException:
@@ -226,7 +228,17 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
             image_reports.append(image_report)
 
     summary = build_validation_summary(image_reports)
+    logger.info(
+        "[verification] image validation summary total=%s passed=%s failed=%s",
+        summary.get("total_images_checked"),
+        summary.get("total_images_passed"),
+        summary.get("failed_images_count"),
+    )
     if not summary["validation_passed"]:
+        logger.warning(
+            "[verification] image quality validation failed details=%s",
+            summary.get("image_reports", []),
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -565,6 +577,7 @@ async def enroll(request: Request) -> EnrollmentResponse:
 
 @router.post("/enroll/verification", response_model=EnrollmentResponse)
 async def enroll_verification(request: Request) -> EnrollmentResponse:
+    logger.info("[verification] enroll/verification request received")
     content_type = request.headers.get("content-type", "").lower()
     if "multipart/form-data" not in content_type:
         raise HTTPException(
@@ -590,16 +603,25 @@ async def enroll_verification(request: Request) -> EnrollmentResponse:
             update_existing=True,
         )
     except EnrollmentNotFoundError:
+        logger.warning(
+            "[verification] no pending enrollment found for student_id=%s",
+            payload.student_id,
+        )
         return EnrollmentResponse(
             success=False,
             message="No pending enrollment found. Submit basic info first.",
         )
     except (OSError, EnrollmentPersistenceError) as exc:
+        logger.exception(
+            "[verification] failed to persist enrollment verification for student_id=%s",
+            payload.student_id,
+        )
         raise HTTPException(
             status_code=500,
             detail="Failed to save enrollment metadata.",
         ) from exc
 
+    logger.info("[verification] verification completed for student_id=%s", payload.student_id)
     return EnrollmentResponse(
         success=True,
         message="Verification images uploaded successfully",

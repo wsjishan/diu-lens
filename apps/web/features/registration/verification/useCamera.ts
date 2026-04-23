@@ -51,6 +51,7 @@ export function useCamera(): CameraHookResult {
     stopMediaTracks(streamRef.current);
     streamRef.current = null;
     setStream(null);
+    console.log('[capture] camera stream stopped');
   }, []);
 
   useEffect(() => {
@@ -94,9 +95,11 @@ export function useCamera(): CameraHookResult {
   }, [stream, videoAttachVersion]);
 
   const requestAccess = useCallback(async () => {
+    console.log('[capture] camera access requested');
     if (!navigator?.mediaDevices?.getUserMedia) {
       setStatus('unsupported');
       setErrorMessage('Camera API is not supported by this browser.');
+      console.warn('[capture] camera api unsupported');
       return false;
     }
 
@@ -115,6 +118,7 @@ export function useCamera(): CameraHookResult {
       setStream(nextStream);
 
       setStatus('granted');
+      console.log('[capture] camera access granted');
       return true;
     } catch (error) {
       stopStream();
@@ -139,6 +143,10 @@ export function useCamera(): CameraHookResult {
         messageByError[errorName] ??
           'Unable to start camera. Check camera permissions and try again.'
       );
+      console.error('[capture] camera access failed', {
+        errorName,
+        error,
+      });
       return false;
     }
   }, [stopStream]);
@@ -182,6 +190,7 @@ export function useCamera(): CameraHookResult {
     return () => {
       stopMediaTracks(streamRef.current);
       streamRef.current = null;
+      console.log('[capture] camera hook cleanup complete');
     };
   }, []);
 

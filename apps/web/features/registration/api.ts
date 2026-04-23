@@ -54,6 +54,117 @@ function isEnrollmentResponse(value: unknown): value is EnrollmentResponse {
   );
 }
 
+function toMessageFromUnknown(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.message === 'string' && record.message.trim()) {
+    return record.message.trim();
+  }
+
+  if (typeof record.detail === 'string' && record.detail.trim()) {
+    return record.detail.trim();
+  }
+
+  if (record.detail && typeof record.detail === 'object') {
+    const detail = record.detail as Record<string, unknown>;
+    if (typeof detail.message === 'string' && detail.message.trim()) {
+      return detail.message.trim();
+    }
+  }
+
+  return null;
+}
+
+function toValidationReasonMessage(value: unknown): string | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const detail = record.detail;
+  if (!detail || typeof detail !== 'object') {
+    return null;
+  }
+
+  const detailRecord = detail as Record<string, unknown>;
+  const validation = detailRecord.validation;
+  if (!validation || typeof validation !== 'object') {
+    return null;
+  }
+
+  const validationRecord = validation as Record<string, unknown>;
+  const reports = validationRecord.image_reports;
+  if (!Array.isArray(reports)) {
+    return null;
+  }
+
+  const reasons = new Set<string>();
+
+  for (const report of reports) {
+    if (!report || typeof report !== 'object') {
+      continue;
+    }
+
+    const reportRecord = report as Record<string, unknown>;
+    const angle = typeof reportRecord.angle === 'string' ? reportRecord.angle : 'unknown';
+    const failureReasons = reportRecord.failure_reasons;
+
+    if (!Array.isArray(failureReasons)) {
+      continue;
+    }
+
+    for (const reason of failureReasons) {
+      if (typeof reason === 'string' && reason.trim()) {
+        reasons.add(`${angle}: ${reason.trim()}`);
+      }
+    }
+  }
+
+  if (reasons.size === 0) {
+    return null;
+  }
+
+  return `Image quality checks failed (${Array.from(reasons).join('; ')})`;
+}
+
+function toFastApiValidationMessage(value: unknown): string | null {
+  let source: unknown = value;
+  if (!Array.isArray(source) && source && typeof source === 'object') {
+    const record = source as Record<string, unknown>;
+    source = record.detail;
+  }
+  if (!Array.isArray(source)) {
+    return null;
+  }
+
+  const messages = source
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const record = entry as Record<string, unknown>;
+      if (typeof record.msg === 'string' && record.msg.trim()) {
+        return record.msg.trim();
+      }
+      return null;
+    })
+    .filter((message): message is string => Boolean(message));
+
+  if (messages.length === 0) {
+    return null;
+  }
+
+  return messages.join('; ');
+}
+
 export async function submitEnrollment(payload: EnrollmentPayload) {
   return submitEnrollmentRequest(payload, GENERIC_ENROLLMENT_ERROR);
 }
@@ -97,7 +208,11 @@ async function submitEnrollmentCompletionRequest(
   errorMessage: string
 ) {
   try {
-    console.log('[enroll completion] request payload', payload);
+    console.log('[verification] request start', {
+      student_id: payload.student_id,
+      total_required_shots: payload.total_required_shots,
+      total_accepted_shots: payload.total_accepted_shots,
+    });
 
     const formData = new FormData();
     formData.append('metadata', JSON.stringify(payload));
@@ -110,52 +225,86 @@ async function submitEnrollmentCompletionRequest(
       }
 
       for (const [index, capture] of captures.entries()) {
+        console.log('[verification] attaching capture', {
+          angle,
+          index,
+          size: capture.size,
+          type: capture.type,
+        });
         formData.append(angle, capture, `${angle}_${index + 1}.jpg`);
         appendedFiles += 1;
       }
     }
 
     if (appendedFiles === 0) {
-      throw new Error(errorMessage);
+      return {
+        success: false,
+        message: 'No captured verification images found. Please retake the guided shots.',
+      };
     }
+    console.log('[verification] files attached', { appendedFiles });
 
     const response = await fetch(`${getApiBaseUrl()}/enroll/verification`, {
       method: 'POST',
       body: formData,
     });
 
-    return await parseEnrollmentResponse(response, errorMessage);
+    return await parseEnrollmentResponse(response, errorMessage, 'verification');
   } catch (error) {
-    console.error('[enroll completion] request failed', error);
+    console.error('[verification] request failed', error);
     throw error;
   }
 }
 
 async function parseEnrollmentResponse(
   response: Response,
-  errorMessage: string
+  errorMessage: string,
+  logPrefix = 'enroll'
 ): Promise<EnrollmentSubmissionResult> {
-  console.log('[enroll] response.status', response.status);
+  const rawText = await response.text();
+  console.log(`[${logPrefix}] raw response`, {
+    status: response.status,
+    ok: response.ok,
+    body: rawText,
+  });
 
   let parsedData: unknown = null;
-
-  try {
-    parsedData = await response.json();
-    console.log('[enroll] parsed response JSON', parsedData);
-  } catch {
-    console.log('[enroll] parsed response JSON', null);
-    throw new Error(errorMessage);
+  if (rawText.trim()) {
+    try {
+      parsedData = JSON.parse(rawText);
+    } catch {
+      parsedData = rawText;
+    }
   }
 
-  if (!isEnrollmentResponse(parsedData)) {
-    throw new Error(errorMessage);
+  if (isEnrollmentResponse(parsedData)) {
+    if (response.status >= 500) {
+      throw new Error(parsedData.message || errorMessage);
+    }
+    return parsedData;
   }
+
+  const derivedMessage =
+    toValidationReasonMessage(parsedData) ||
+    toFastApiValidationMessage(parsedData) ||
+    toMessageFromUnknown(parsedData) ||
+    (response.ok ? 'Request completed.' : errorMessage);
 
   if (response.status >= 500) {
-    throw new Error(parsedData.message || errorMessage);
+    throw new Error(derivedMessage);
   }
 
-  return parsedData;
+  if (!response.ok) {
+    return {
+      success: false,
+      message: derivedMessage,
+    };
+  }
+
+  return {
+    success: true,
+    message: derivedMessage,
+  };
 }
 
 export { GENERIC_ENROLLMENT_ERROR, GENERIC_REGISTRATION_COMPLETION_ERROR };

@@ -150,12 +150,25 @@ export function RegistrationFlow({
 
   const handleVerificationComplete = useCallback(
     async (summary: VerificationCompletionSummary) => {
+      const completionStartMs = performance.now();
+      const logTiming = (stage: string, details: Record<string, unknown> = {}) => {
+        const nowMs = performance.now();
+        console.log('[verification-timing]', stage, {
+          nowMs: Number(nowMs.toFixed(2)),
+          elapsedMs: Number((nowMs - completionStartMs).toFixed(2)),
+          ...details,
+        });
+      };
       if (isCompletingRegistration) {
+        logTiming('verification submit ignored due to in-flight completion');
         return;
       }
 
       setVerificationError(null);
       setIsCompletingRegistration(true);
+      logTiming('verification completion submit started', {
+        student_id: values.studentId,
+      });
       console.log('[verification] completion submit start', {
         student_id: values.studentId,
       });
@@ -187,13 +200,16 @@ export function RegistrationFlow({
 
         console.log('[verification] completion submit succeeded', result);
         setActiveStep(3);
+        logTiming('ui completion state updated', { activeStep: 3 });
       } catch (error) {
         console.error('[verification] completion submit failed', error);
         setVerificationError(
           toErrorMessage(error, GENERIC_REGISTRATION_COMPLETION_ERROR)
         );
+        logTiming('verification completion failed');
       } finally {
         setIsCompletingRegistration(false);
+        logTiming('verification completion finalize');
       }
     },
     [

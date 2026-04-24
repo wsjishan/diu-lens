@@ -2,6 +2,7 @@ import json
 import logging
 from collections import Counter
 from datetime import datetime, timezone
+from time import perf_counter
 from typing import Literal, cast
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
@@ -252,6 +253,7 @@ def _dimensions_from_report(report: dict[str, object]) -> str:
 
 async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[str, object]:
     image_reports: list[dict[str, object]] = []
+    total_uploaded_bytes = 0
 
     for angle in ALLOWED_ANGLES:
         for upload in files_by_angle.get(angle, []):
@@ -267,6 +269,7 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
 
             if len(sample) > MAX_UPLOAD_IMAGE_SIZE_BYTES:
                 raise _bad_request(f"File too large for angle: {angle}")
+            total_uploaded_bytes += len(sample)
 
             file_name = upload.filename or "unknown"
             image_report = validate_uploaded_image_integrity(
@@ -312,6 +315,7 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
         summary.get("total_images_passed"),
         summary.get("failed_images_count"),
     )
+    summary["total_uploaded_bytes"] = total_uploaded_bytes
     if not summary["validation_passed"]:
         failure_details = _extract_sanity_failure_details(image_reports)
         logger.warning(
@@ -545,6 +549,28 @@ def _extract_failed_validation_summary(exc: HTTPException) -> dict[str, object]:
     }
 
 
+def _total_uploaded_bytes_from_validation_summary(
+    validation_summary: dict[str, object],
+) -> int:
+    explicit_total = validation_summary.get("total_uploaded_bytes")
+    if explicit_total is not None:
+        try:
+            return int(explicit_total)
+        except (TypeError, ValueError):
+            pass
+
+    image_reports = validation_summary.get("image_reports")
+    if not isinstance(image_reports, list):
+        return 0
+
+    total_bytes = 0
+    for report in image_reports:
+        if not isinstance(report, dict):
+            continue
+        total_bytes += int(report.get("image_size_bytes", 0) or 0)
+    return total_bytes
+
+
 async def _handle_json_enrollment(
     request: Request,
 ) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object]]:
@@ -559,18 +585,37 @@ async def _handle_json_enrollment(
 
 async def _handle_multipart_enrollment(
     request: Request,
-) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object]]:
+) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object], dict[str, float]]:
+    multipart_started_at = perf_counter()
     form_data = await request.form()
+    after_form_parse_at = perf_counter()
     payload = _parse_multipart_metadata(form_data.get("metadata"))
+    after_metadata_parse_at = perf_counter()
 
     files_by_angle = _extract_multipart_files(form_data)
+    after_file_access_at = perf_counter()
+    logger.info(
+        "[verification-timing] metadata parsed ms=%s",
+        round((after_metadata_parse_at - after_form_parse_at) * 1000, 2),
+    )
+    logger.info(
+        "[verification-timing] form parsing / file access complete ms=%s",
+        round((after_file_access_at - multipart_started_at) * 1000, 2),
+    )
     validation_summary = _default_validation_summary()
     uploaded_images = empty_uploaded_images()
+    after_validation_at = after_file_access_at
+    after_file_save_at = after_file_access_at
 
     try:
         _validate_final_multipart_metadata(payload)
         _validate_file_counts(files_by_angle)
         validation_summary = await _validate_files(files_by_angle)
+        after_validation_at = perf_counter()
+        logger.info(
+            "[verification-timing] integrity validation complete ms=%s",
+            round((after_validation_at - after_file_access_at) * 1000, 2),
+        )
     except HTTPException as exc:
         await _close_upload_files(files_by_angle)
         failed_validation = _extract_failed_validation_summary(exc)
@@ -608,6 +653,11 @@ async def _handle_multipart_enrollment(
             payload.student_id,
             files_by_angle,
         )
+        after_file_save_at = perf_counter()
+        logger.info(
+            "[verification-timing] file save complete ms=%s",
+            round((after_file_save_at - after_validation_at) * 1000, 2),
+        )
     except ValueError as exc:
         raise _bad_request(str(exc)) from exc
     except OSError as exc:
@@ -616,7 +666,26 @@ async def _handle_multipart_enrollment(
             detail="Failed to save uploaded verification images.",
         ) from exc
 
-    return payload, uploaded_images, validation_summary
+    return (
+        payload,
+        uploaded_images,
+        validation_summary,
+        {
+            "form_parse_file_access_ms": round(
+                (after_file_access_at - multipart_started_at) * 1000, 2
+            ),
+            "metadata_parse_ms": round(
+                (after_metadata_parse_at - after_form_parse_at) * 1000, 2
+            ),
+            "integrity_validation_ms": round(
+                (after_validation_at - after_file_access_at) * 1000, 2
+            ),
+            "save_files_ms": round((after_file_save_at - after_validation_at) * 1000, 2),
+            "multipart_total_ms": round(
+                (after_file_save_at - multipart_started_at) * 1000, 2
+            ),
+        },
+    )
 
 
 @router.post("/enroll", response_model=EnrollmentResponse)
@@ -675,59 +744,100 @@ async def enroll(request: Request) -> EnrollmentResponse:
 
 @router.post("/enroll/verification", response_model=EnrollmentResponse)
 async def enroll_verification(request: Request) -> EnrollmentResponse:
-    logger.info("[verification] enroll/verification request received")
-    content_type = request.headers.get("content-type", "").lower()
-    if "multipart/form-data" not in content_type:
-        raise HTTPException(
-            status_code=415,
-            detail={"message": "Unsupported content type for /enroll/verification. Use multipart form data."},
+    request_started_at = perf_counter()
+    total_uploaded_bytes = 0
+    logger.info("[verification-timing] route entered")
+    logger.info("[verification] request start path=/enroll/verification")
+    try:
+        content_type = request.headers.get("content-type", "").lower()
+        if "multipart/form-data" not in content_type:
+            raise HTTPException(
+                status_code=415,
+                detail={"message": "Unsupported content type for /enroll/verification. Use multipart form data."},
+            )
+
+        try:
+            (
+                payload,
+                uploaded_images,
+                validation_summary,
+                multipart_timing,
+            ) = await _handle_multipart_enrollment(
+                request
+            )
+            total_uploaded_bytes = _total_uploaded_bytes_from_validation_summary(
+                validation_summary
+            )
+            logger.info(
+                "[verification] uploaded bytes=%s student_id=%s",
+                total_uploaded_bytes,
+                payload.student_id,
+            )
+            logger.info(
+                "[verification-timing] multipart breakdown form_parse_file_access_ms=%s metadata_parse_ms=%s integrity_validation_ms=%s save_files_ms=%s multipart_total_ms=%s",
+                multipart_timing.get("form_parse_file_access_ms", 0.0),
+                multipart_timing.get("metadata_parse_ms", 0.0),
+                multipart_timing.get("integrity_validation_ms", 0.0),
+                multipart_timing.get("save_files_ms", 0.0),
+                multipart_timing.get("multipart_total_ms", 0.0),
+            )
+        except HTTPException as exc:
+            failed_validation = _extract_failed_validation_summary(exc)
+            total_uploaded_bytes = _total_uploaded_bytes_from_validation_summary(
+                failed_validation
+            )
+            logger.info("[verification] uploaded bytes=%s", total_uploaded_bytes)
+            logger.warning(
+                "[verification] request failed detail=%s",
+                exc.detail,
+            )
+            raise
+
+        entry = _build_enrollment_entry(
+            payload=payload,
+            uploaded_images=uploaded_images,
+            validation_summary=validation_summary,
         )
 
-    try:
-        payload, uploaded_images, validation_summary = await _handle_multipart_enrollment(
-            request
-        )
-    except HTTPException as exc:
-        logger.warning(
-            "[verification] request failed detail=%s",
-            exc.detail,
-        )
-        raise
-    entry = _build_enrollment_entry(
-        payload=payload,
-        uploaded_images=uploaded_images,
-        validation_summary=validation_summary,
-    )
+        try:
+            _persist_enrollment_metadata(
+                entry,
+                mode="final",
+                event_type="enrollment_validated",
+                event_message="Final enrollment submitted with validated images.",
+                update_existing=True,
+            )
+        except EnrollmentNotFoundError:
+            logger.warning(
+                "[verification] no pending enrollment found for student_id=%s",
+                payload.student_id,
+            )
+            return EnrollmentResponse(
+                success=False,
+                message="No pending enrollment found. Submit basic info first.",
+            )
+        except (OSError, EnrollmentPersistenceError) as exc:
+            logger.exception(
+                "[verification] failed to persist enrollment verification for student_id=%s",
+                payload.student_id,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save enrollment metadata.",
+            ) from exc
+        logger.info("[verification-timing] DB persistence complete")
 
-    try:
-        _persist_enrollment_metadata(
-            entry,
-            mode="final",
-            event_type="enrollment_validated",
-            event_message="Final enrollment submitted with validated images.",
-            update_existing=True,
-        )
-    except EnrollmentNotFoundError:
-        logger.warning(
-            "[verification] no pending enrollment found for student_id=%s",
-            payload.student_id,
-        )
+        logger.info("[verification] verification completed for student_id=%s", payload.student_id)
+        logger.info("[verification-timing] response returned")
         return EnrollmentResponse(
-            success=False,
-            message="No pending enrollment found. Submit basic info first.",
+            success=True,
+            message="Verification images uploaded successfully",
         )
-    except (OSError, EnrollmentPersistenceError) as exc:
-        logger.exception(
-            "[verification] failed to persist enrollment verification for student_id=%s",
-            payload.student_id,
+    finally:
+        elapsed_ms = round((perf_counter() - request_started_at) * 1000, 2)
+        logger.info("[verification-timing] total route ms=%s", elapsed_ms)
+        logger.info(
+            "[verification] route elapsed_ms=%s total_uploaded_bytes=%s",
+            elapsed_ms,
+            total_uploaded_bytes,
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to save enrollment metadata.",
-        ) from exc
-
-    logger.info("[verification] verification completed for student_id=%s", payload.student_id)
-    return EnrollmentResponse(
-        success=True,
-        message="Verification images uploaded successfully",
-    )

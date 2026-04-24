@@ -198,6 +198,11 @@ export function GuidedEnrollmentCapture({
   }, [stopStream]);
 
   const handleSubmit = useCallback(async () => {
+    console.log('[verification-timing] submit button clicked', {
+      nowMs: Number(performance.now().toFixed(2)),
+      canSubmit: state.canSubmit,
+      isSubmittingCompletion,
+    });
     if (isSubmittingCompletion || !state.canSubmit) {
       return;
     }

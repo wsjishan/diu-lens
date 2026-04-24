@@ -14,6 +14,8 @@ const mediaConstraints: MediaStreamConstraints = {
   },
 };
 const MIN_CAPTURE_DIMENSION_PX = 100;
+const MAX_UPLOAD_WIDTH_PX = 640;
+const CAPTURE_JPEG_QUALITY = 0.75;
 
 function stopMediaTracks(stream: MediaStream | null) {
   if (!stream) {
@@ -175,30 +177,54 @@ export function useCamera(): CameraHookResult {
       return null;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = videoElement.videoWidth;
-    canvas.height = videoElement.videoHeight;
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = videoElement.videoWidth;
+    sourceCanvas.height = videoElement.videoHeight;
 
-    const context = canvas.getContext('2d');
-    if (!context) {
+    const sourceContext = sourceCanvas.getContext('2d');
+    if (!sourceContext) {
       return null;
     }
 
-    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    sourceContext.drawImage(
+      videoElement,
+      0,
+      0,
+      sourceCanvas.width,
+      sourceCanvas.height
+    );
+
+    const shouldResize = sourceCanvas.width > MAX_UPLOAD_WIDTH_PX;
+    const targetWidth = shouldResize ? MAX_UPLOAD_WIDTH_PX : sourceCanvas.width;
+    const targetHeight = Math.max(
+      1,
+      Math.round((sourceCanvas.height * targetWidth) / sourceCanvas.width)
+    );
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = targetWidth;
+    exportCanvas.height = targetHeight;
+
+    const exportContext = exportCanvas.getContext('2d');
+    if (!exportContext) {
+      return null;
+    }
+
+    exportContext.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
 
     if (
-      canvas.width <= MIN_CAPTURE_DIMENSION_PX ||
-      canvas.height <= MIN_CAPTURE_DIMENSION_PX
+      exportCanvas.width <= MIN_CAPTURE_DIMENSION_PX ||
+      exportCanvas.height <= MIN_CAPTURE_DIMENSION_PX
     ) {
       console.warn('[capture] snapshot skipped due to invalid canvas size', {
-        width: canvas.width,
-        height: canvas.height,
+        width: exportCanvas.width,
+        height: exportCanvas.height,
       });
       return null;
     }
 
     return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(
+      exportCanvas.toBlob(
         (blob) => {
           if (!blob) {
             console.error('[capture] canvas.toBlob returned null');
@@ -206,7 +232,7 @@ export function useCamera(): CameraHookResult {
           resolve(blob);
         },
         'image/jpeg',
-        0.9
+        CAPTURE_JPEG_QUALITY
       );
     });
   }, []);

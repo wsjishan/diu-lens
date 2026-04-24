@@ -248,16 +248,28 @@ async function submitEnrollmentCompletionRequest(
   errorMessage: string
 ) {
   try {
+    const requestStartMs = performance.now();
+    const logTiming = (stage: string, details: Record<string, unknown> = {}) => {
+      const nowMs = performance.now();
+      console.log('[verification-timing]', stage, {
+        nowMs: Number(nowMs.toFixed(2)),
+        elapsedMs: Number((nowMs - requestStartMs).toFixed(2)),
+        ...details,
+      });
+    };
+
     console.log('[verification] request start', {
       student_id: payload.student_id,
       total_required_shots: payload.total_required_shots,
       total_accepted_shots: payload.total_accepted_shots,
     });
 
+    logTiming('FormData creation started');
     const formData = new FormData();
     formData.append('metadata', JSON.stringify(payload));
 
     let appendedFiles = 0;
+    let totalUploadBytes = 0;
 
     for (const angle of REQUIRED_VERIFICATION_ANGLES) {
       const captures = capturesByAngle[angle];
@@ -306,6 +318,8 @@ async function submitEnrollmentCompletionRequest(
         }
 
         console.log(angle, capture.size, capture.type);
+        const sizeKb = Math.round(capture.size / 1024);
+        console.log('[verification-upload]', angle, sizeKb, 'KB');
         console.log('[verification] attaching capture', {
           angle,
           index,
@@ -315,6 +329,14 @@ async function submitEnrollmentCompletionRequest(
         const extension = normalizedType === 'image/png' ? 'png' : 'jpg';
         formData.append(angle, capture, `${angle}_${index + 1}.${extension}`);
         appendedFiles += 1;
+        totalUploadBytes += capture.size;
+        logTiming('each file appended', {
+          angle,
+          index,
+          sizeKb,
+          fileType: capture.type,
+          appendedFiles,
+        });
       }
     }
 
@@ -326,17 +348,35 @@ async function submitEnrollmentCompletionRequest(
       };
     }
     console.log('[verification] files attached', { appendedFiles });
+    const totalKb = Math.round(totalUploadBytes / 1024);
+    const totalMb = Number((totalUploadBytes / (1024 * 1024)).toFixed(2));
+    console.log('[verification-upload] total', totalKb, 'KB', `${totalMb} MB`);
+    logTiming('upload size summary', {
+      appendedFiles,
+      totalKb,
+      totalMb,
+    });
 
+    logTiming('fetch request started');
     const response = await fetch(`${getApiBaseUrl()}/enroll/verification`, {
       method: 'POST',
       body: formData,
     });
+    logTiming('response headers received', {
+      status: response.status,
+      ok: response.ok,
+    });
 
-    return await parseEnrollmentResponse(
+    const parsed = await parseEnrollmentResponse(
       response,
       errorMessage,
       'verification'
     );
+    logTiming('response body parsed', {
+      success: parsed.success,
+      message: parsed.message,
+    });
+    return parsed;
   } catch (error) {
     console.error('[verification] request failed', error);
     throw error;

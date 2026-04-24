@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from typing import Any
 
+import cv2
+import numpy as np
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.api.routes.debug as debug_routes
@@ -49,12 +52,50 @@ def _verification_metadata(student_id: str) -> dict[str, object]:
 
 
 def _verification_files(metadata: dict[str, object]) -> list[tuple[str, tuple[Any, ...]]]:
+    student_id = str(metadata.get("student_id", "unknown"))
     files: list[tuple[str, tuple[Any, ...]]] = [
         ("metadata", (None, json.dumps(metadata), "application/json")),
     ]
     for angle in ALLOWED_ANGLES:
-        files.append((angle, (f"{angle}.jpg", b"fake-image-bytes", "image/jpeg")))
+        files.append(
+            (
+                angle,
+                (f"{angle}.jpg", _build_image_bytes(student_id=student_id, angle=angle), "image/jpeg"),
+            )
+        )
     return files
+
+
+def _build_image_bytes(*, student_id: str, angle: str, variant: int = 0) -> bytes:
+    seed_src = f"{student_id}:{angle}:{variant}".encode("utf-8")
+    seed = int.from_bytes(hashlib.sha256(seed_src).digest()[:8], "big")
+    rng = np.random.default_rng(seed)
+    image = rng.integers(0, 255, size=(96, 96, 3), dtype=np.uint8)
+    ok, encoded = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+    assert ok
+    return encoded.tobytes()
+
+
+def _verification_files_for_images(
+    metadata: dict[str, object],
+    image_by_angle: dict[str, bytes],
+) -> list[tuple[str, tuple[Any, ...]]]:
+    files: list[tuple[str, tuple[Any, ...]]] = [
+        ("metadata", (None, json.dumps(metadata), "application/json")),
+    ]
+    for angle in ALLOWED_ANGLES:
+        files.append((angle, (f"{angle}.jpg", image_by_angle[angle], "image/jpeg")))
+    return files
+
+
+def _build_near_duplicate_variant(image_bytes: bytes) -> bytes:
+    decoded = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    assert decoded is not None
+    mutated = decoded.copy()
+    mutated[0:3, 0:3, :] = (mutated[0:3, 0:3, :] + 3) % 255
+    ok, encoded = cv2.imencode(".jpg", mutated, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+    assert ok
+    return encoded.tobytes()
 
 
 def _count(db: Session, model: Any, *conditions: Any) -> int:
@@ -89,7 +130,7 @@ def _patch_validation_pass(monkeypatch: Any) -> None:
             "blocker": "ready",
         }
 
-    monkeypatch.setattr(enroll_routes, "validate_uploaded_image_sanity", _report)
+    monkeypatch.setattr(enroll_routes, "validate_uploaded_image_integrity", _report)
 
 
 def _patch_validation_fail(monkeypatch: Any) -> None:
@@ -108,13 +149,15 @@ def _patch_validation_fail(monkeypatch: Any) -> None:
             "blocker": "face_not_detected",
         }
 
-    monkeypatch.setattr(enroll_routes, "validate_uploaded_image_sanity", _report)
+    monkeypatch.setattr(enroll_routes, "validate_uploaded_image_integrity", _report)
 
 
 def _enroll_then_validate(
     client: TestClient,
     monkeypatch: Any,
     student_id: str,
+    *,
+    image_by_angle: dict[str, bytes] | None = None,
 ) -> None:
     _patch_validation_pass(monkeypatch)
 
@@ -122,9 +165,14 @@ def _enroll_then_validate(
     assert enroll_response.status_code == 200, enroll_response.text
     assert enroll_response.json().get("success") is True
 
+    metadata = _verification_metadata(student_id)
     verify_response = client.post(
         "/enroll/verification",
-        files=_verification_files(_verification_metadata(student_id)),
+        files=(
+            _verification_files_for_images(metadata, image_by_angle)
+            if image_by_angle is not None
+            else _verification_files(metadata)
+        ),
     )
     assert verify_response.status_code == 200, verify_response.text
     assert verify_response.json().get("success") is True
@@ -304,7 +352,7 @@ def test_approve_process_keeps_status_and_recognition_eligible(
                 "angle": embedding.angle,
                 "source_image_path": embedding.source_image_path,
                 "crop_path": embedding.crop_path,
-                "distance": 0.1 + (index * 0.01),
+                "distance": 0.01 + (index * 0.005),
             }
             for index, (embedding, _) in enumerate(rows)
         ]
@@ -472,3 +520,89 @@ def test_admin_queue_semantics_validated_only_and_state_targeting(
     )
     assert reject_validated.status_code == 200, reject_validated.text
     assert reject_validated.json().get("success") is True
+
+
+def test_approve_blocked_when_required_angle_missing(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1101"
+    _enroll_then_validate(client, monkeypatch, student_id)
+
+    with db_session_factory() as db:
+        enrollment = _latest_enrollment(db, student_id)
+        assert enrollment is not None
+        db.execute(
+            delete(EnrollmentImage).where(
+                EnrollmentImage.enrollment_id == enrollment.id,
+                EnrollmentImage.angle == "up",
+            )
+        )
+        db.commit()
+
+    approve_payload = _approve(
+        client,
+        student_id,
+        auth_tokens["admin"],
+        expected_status=500,
+    )
+    assert approve_payload.get("success") is False
+    assert approve_payload.get("message") == "required capture angles missing"
+
+
+def test_approve_blocked_for_cross_student_byte_identical_images(
+    client: TestClient,
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    source_id = "930-26-1102"
+    target_id = "930-26-1103"
+    shared_images = {
+        angle: _build_image_bytes(student_id="shared-seed", angle=angle)
+        for angle in ALLOWED_ANGLES
+    }
+
+    _enroll_then_validate(client, monkeypatch, source_id, image_by_angle=shared_images)
+    _enroll_then_validate(client, monkeypatch, target_id, image_by_angle=shared_images)
+
+    approve_payload = _approve(
+        client,
+        target_id,
+        auth_tokens["admin"],
+        expected_status=500,
+    )
+    assert approve_payload.get("success") is False
+    assert approve_payload.get("message") == "duplicate enrollment evidence detected"
+
+
+def test_approve_blocked_for_cross_student_near_duplicate_images(
+    client: TestClient,
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    source_id = "930-26-1104"
+    target_id = "930-26-1105"
+    source_images = {
+        angle: _build_image_bytes(student_id="near-seed-source", angle=angle)
+        for angle in ALLOWED_ANGLES
+    }
+    target_images = {
+        angle: _build_near_duplicate_variant(source_images[angle])
+        for angle in ALLOWED_ANGLES
+    }
+    for angle in ALLOWED_ANGLES:
+        assert target_images[angle] != source_images[angle]
+
+    _enroll_then_validate(client, monkeypatch, source_id, image_by_angle=source_images)
+    _enroll_then_validate(client, monkeypatch, target_id, image_by_angle=target_images)
+
+    approve_payload = _approve(
+        client,
+        target_id,
+        auth_tokens["admin"],
+        expected_status=500,
+    )
+    assert approve_payload.get("success") is False
+    assert approve_payload.get("message") == "near-duplicate evidence detected"

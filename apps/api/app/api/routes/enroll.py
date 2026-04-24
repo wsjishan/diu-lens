@@ -18,7 +18,7 @@ from app.core.enrollment_db import (
 )
 from app.core.image_validation import (
     build_validation_summary,
-    validate_uploaded_image_sanity,
+    validate_uploaded_image_integrity,
 )
 from app.core.storage import (
     ALLOWED_ANGLES,
@@ -269,7 +269,7 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
                 raise _bad_request(f"File too large for angle: {angle}")
 
             file_name = upload.filename or "unknown"
-            image_report = validate_uploaded_image_sanity(
+            image_report = validate_uploaded_image_integrity(
                 image_bytes=sample,
                 file_name=file_name,
                 angle=angle,

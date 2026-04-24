@@ -57,7 +57,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Health check: `GET http://127.0.0.1:8000/health`
 - Enrollment placeholder: `POST http://127.0.0.1:8000/enroll`
 - DB debug check: `GET http://127.0.0.1:8000/debug/db`
-- Face processing trigger: `POST http://127.0.0.1:8000/debug/process/{student_id}`
+- Admin processing trigger: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/process`
+- Debug processing trigger (super-admin): `POST http://127.0.0.1:8000/debug/process/{student_id}`
 - Admin approve: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/approve`
 - Admin reject: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/reject`
 - Admin reset: `POST http://127.0.0.1:8000/admin/enrollments/{student_id}/reset`

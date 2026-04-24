@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.approval_hygiene import ApprovalEvidenceIssue, assert_approval_hygiene
 from app.core.storage import ALLOWED_ANGLES, empty_uploaded_images
 from app.db.models import (
     AuditLog,
@@ -213,6 +214,15 @@ def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
             f"Current status: {enrollment.status}"
         )
 
+    try:
+        assert_approval_hygiene(
+            db,
+            student_id=student_id,
+            enrollment_id=enrollment.id,
+        )
+    except ApprovalEvidenceIssue as exc:
+        raise EnrollmentInvalidStateError(exc.message) from exc
+
     enrollment.status = "approved"
     enrollment.rejection_reason = None
     _create_audit_log(
@@ -367,6 +377,28 @@ def reset_enrollment(student_id: str) -> EnrollmentAdminActionResult:
         success=True,
         message="Enrollment reset successfully",
     )
+
+
+def assert_enrollment_processable(student_id: str) -> None:
+    """Ensure heavy processing can run for the student's latest enrollment."""
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        try:
+            enrollment = _latest_enrollment_for_student(db, student_id)
+            if enrollment is None:
+                raise EnrollmentNotFoundError("Enrollment not found for this student_id")
+
+            if enrollment.status not in {"approved", "processed"}:
+                raise EnrollmentInvalidStateError(
+                    "Only approved enrollments can be processed. "
+                    f"Current status: {enrollment.status}"
+                )
+        except EnrollmentNotFoundError:
+            raise
+        except EnrollmentInvalidStateError:
+            raise
+        except SQLAlchemyError as exc:
+            raise EnrollmentPersistenceError(str(exc)) from exc
 
 
 def persist_enrollment_to_db(payload: EnrollmentRecordInput) -> None:

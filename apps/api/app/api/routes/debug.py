@@ -185,7 +185,10 @@ async def admin_approve_enrollment(
             content={"success": False, "message": str(exc)},
         )
 
-    return {"success": result.success, "message": result.message}
+    payload: dict[str, object] = {"success": result.success, "message": result.message}
+    if result.debug_details is not None:
+        payload["hygiene_debug"] = result.debug_details
+    return payload
 
 
 @router.post("/debug/admin/reject/{student_id}")

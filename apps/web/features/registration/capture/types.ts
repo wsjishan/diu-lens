@@ -7,6 +7,9 @@ export type CapturedShot = {
   capturedAt: number;
   dataUrl: string;
   quality: {
+    selectionScore?: number;
+    captureConfidence?: 'ideal' | 'near_ready';
+    warnings?: string[];
     yaw: number;
     pitch: number;
     faceAreaRatio: number;

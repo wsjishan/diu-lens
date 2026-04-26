@@ -16,6 +16,8 @@ async def admin_match_face(
     threshold: float | None = Query(default=None, gt=0),
     top_k: int | None = Query(default=None, gt=0),
     candidate_pool_limit: int | None = Query(default=None, gt=0),
+    debug: bool = Query(default=False),
+    probe_label: str | None = Query(default=None, max_length=120),
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, object]:
     require_admin(credentials)
@@ -51,6 +53,8 @@ async def admin_match_face(
             threshold=threshold,
             top_k=top_k,
             candidate_pool_limit=candidate_pool_limit,
+            debug=debug,
+            probe_label=probe_label,
         )
     except FaceMatchingError as exc:
         return JSONResponse(

@@ -3,6 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ANGLE_THRESHOLDS,
   GUIDANCE_STICK_MS,
+  HARD_MAX_BRIGHTNESS,
+  HARD_MAX_CENTER_OFFSET,
+  HARD_MIN_BLUR_VARIANCE,
+  HARD_MIN_BRIGHTNESS,
   MAX_BRIGHTNESS,
   MAX_CENTER_OFFSET,
   MIN_BLUR_VARIANCE,
@@ -53,19 +57,34 @@ type FaceLandmarker = {
   close: () => void;
 };
 
-const detectionIntervalMs = 100;
+const detectionIntervalMs = 80;
 const CANVAS_SIZE = 72;
 const debugIntervalMs = 1200;
-const minStableFramesRequired = 4;
+const minStableFramesRequired = 3;
 const RIGHT_DEBUG_PREFIX = '[right-debug]';
 const CAPTURE_ERROR_PREFIX = '[capture-error]';
 const PREVIEW_IS_MIRRORED = true;
-const NEAR_CENTER_TOLERANCE = 0.05;
-const HARD_CENTER_TOLERANCE = 0.1;
-const NEAR_BLUR_RATIO = 0.82;
-const HARD_BLUR_RATIO = 0.65;
-const MIN_CAPTURE_BRIGHTNESS_PRECHECK = 50;
+const MIN_CAPTURE_BRIGHTNESS_PRECHECK = HARD_MIN_BRIGHTNESS;
 const MIN_CAPTURE_FILE_SIZE_BYTES = 10 * 1024;
+const BURST_CAPTURE_FRAME_COUNT = 3;
+const BURST_CAPTURE_GAP_MS = 70;
+
+type BurstCaptureCandidate = {
+  blob: Blob;
+  dataUrl: string;
+  score: number;
+  quality: {
+    yaw: number;
+    pitch: number;
+    faceAreaRatio: number;
+    centerOffset: number;
+    blurVariance: number;
+    brightness: number;
+    selectionScore: number;
+    captureConfidence: 'ideal' | 'near_ready';
+    warnings: string[];
+  };
+};
 
 let faceLandmarkerPromise: Promise<FaceLandmarker> | null = null;
 
@@ -392,6 +411,89 @@ function isAngleMatch(angle: VerificationAngle, yaw: number, pitch: number) {
   return (
     pitch >= ANGLE_THRESHOLDS.downPitch &&
     Math.abs(yaw) <= ANGLE_THRESHOLDS.verticalYawAbs
+  );
+}
+
+function waitMs(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}
+
+function computeAngleDeviation(angle: VerificationAngle, yaw: number, pitch: number) {
+  if (angle === 'front') {
+    return (
+      Math.abs(yaw) / Math.max(ANGLE_THRESHOLDS.frontYawAbs, 1) +
+      Math.abs(pitch) / Math.max(ANGLE_THRESHOLDS.frontPitchAbs, 1)
+    );
+  }
+  if (angle === 'left') {
+    return (
+      Math.max(0, ANGLE_THRESHOLDS.leftYaw - yaw) /
+        Math.max(Math.abs(ANGLE_THRESHOLDS.leftYaw), 1) +
+      Math.abs(pitch) / Math.max(ANGLE_THRESHOLDS.sidePitchAbs, 1)
+    );
+  }
+  if (angle === 'right') {
+    return (
+      Math.max(0, yaw - ANGLE_THRESHOLDS.rightYaw) /
+        Math.max(Math.abs(ANGLE_THRESHOLDS.rightYaw), 1) +
+      Math.abs(pitch) / Math.max(ANGLE_THRESHOLDS.sidePitchAbs, 1)
+    );
+  }
+  if (angle === 'up') {
+    return (
+      Math.max(0, pitch - ANGLE_THRESHOLDS.upPitch) /
+        Math.max(Math.abs(ANGLE_THRESHOLDS.upPitch), 1) +
+      Math.abs(yaw) / Math.max(ANGLE_THRESHOLDS.verticalYawAbs, 1)
+    );
+  }
+  return (
+    Math.max(0, ANGLE_THRESHOLDS.downPitch - pitch) /
+      Math.max(Math.abs(ANGLE_THRESHOLDS.downPitch), 1) +
+    Math.abs(yaw) / Math.max(ANGLE_THRESHOLDS.verticalYawAbs, 1)
+  );
+}
+
+function computeSelectionScore(
+  angle: VerificationAngle,
+  quality: {
+    yaw: number;
+    pitch: number;
+    faceAreaRatio: number;
+    centerOffset: number;
+    blurVariance: number;
+    brightness: number;
+  }
+) {
+  const blurScore = clamp(quality.blurVariance / Math.max(MIN_BLUR_VARIANCE * 1.7, 1), 0, 1);
+  const brightnessCenter = (MIN_BRIGHTNESS + MAX_BRIGHTNESS) / 2;
+  const brightnessTolerance = (MAX_BRIGHTNESS - MIN_BRIGHTNESS) / 2;
+  const brightnessScore = clamp(
+    1 - Math.abs(quality.brightness - brightnessCenter) / Math.max(brightnessTolerance, 1),
+    0,
+    1
+  );
+  const centerScore = clamp(
+    1 - quality.centerOffset / Math.max(MAX_CENTER_OFFSET + 0.14, 0.01),
+    0,
+    1
+  );
+  const faceSizeScore = clamp(
+    (quality.faceAreaRatio - MIN_FACE_AREA_RATIO * 0.85) /
+      Math.max(0.42 - MIN_FACE_AREA_RATIO * 0.85, 0.01),
+    0,
+    1
+  );
+  const angleDeviation = computeAngleDeviation(angle, quality.yaw, quality.pitch);
+  const angleScore = clamp(1 - angleDeviation / 2.2, 0, 1);
+
+  return (
+    blurScore * 0.32 +
+    brightnessScore * 0.18 +
+    centerScore * 0.2 +
+    faceSizeScore * 0.18 +
+    angleScore * 0.12
   );
 }
 
@@ -888,10 +990,7 @@ export function useFaceCapture({
         return;
       }
 
-      console.log('[loop] running');
-
       if (!landmarkerRef.current) {
-        console.log('[detect] result:', false);
         stableWindowStartRef.current = null;
         scheduleNext();
         return;
@@ -906,7 +1005,6 @@ export function useFaceCapture({
         videoElement.paused ||
         videoElement.ended
       ) {
-        console.log('[detect] result:', false);
         stableWindowStartRef.current = null;
         stableFramesRef.current = 0;
         lastAllValidAtRef.current = null;
@@ -916,7 +1014,6 @@ export function useFaceCapture({
 
       const now = performance.now();
       if (now < cooldownUntilRef.current) {
-        console.log('[detect] result:', false);
         stableWindowStartRef.current = null;
         stableFramesRef.current = 0;
         lastAllValidAtRef.current = null;
@@ -936,8 +1033,6 @@ export function useFaceCapture({
 
       try {
         const result = safeDetect(videoElement);
-        console.log('[detect] result:', !!result);
-
         if (!result) {
           stableWindowStartRef.current = null;
           stableFramesRef.current = 0;
@@ -1100,19 +1195,37 @@ export function useFaceCapture({
           readiness.sharpEnough &&
           readiness.brightnessOk;
         const nearAngleMatch = isNearlyAngleMatch(activeAngle, yaw, pitch);
-        const isCenterNearEnough =
-          centerOffset <= MAX_CENTER_OFFSET + NEAR_CENTER_TOLERANCE;
-        const isCenterFarOff =
-          centerOffset > MAX_CENTER_OFFSET + HARD_CENTER_TOLERANCE;
-        const isBlurNearEnough =
-          blurVariance >= MIN_BLUR_VARIANCE * NEAR_BLUR_RATIO;
-        const isBlurTooLow = blurVariance < MIN_BLUR_VARIANCE * HARD_BLUR_RATIO;
-        const isNearReady =
-          readiness.faceLargeEnough &&
-          isCenterNearEnough &&
-          (readiness.angleMatch || nearAngleMatch) &&
-          isBlurNearEnough &&
-          readiness.brightnessOk;
+        const isWrongAngleHard = !readiness.angleMatch && !nearAngleMatch;
+        const isCenterHardFail = centerOffset > HARD_MAX_CENTER_OFFSET;
+        const isCenterWarn = !readiness.centered && !isCenterHardFail;
+        const isBlurHardFail = blurVariance < HARD_MIN_BLUR_VARIANCE;
+        const isBlurWarn = !readiness.sharpEnough && !isBlurHardFail;
+        const isBrightnessHardFail =
+          brightness < HARD_MIN_BRIGHTNESS || brightness > HARD_MAX_BRIGHTNESS;
+        const isBrightnessWarn = !readiness.brightnessOk && !isBrightnessHardFail;
+        const hasHardFailure =
+          !readiness.faceLargeEnough ||
+          isWrongAngleHard ||
+          isCenterHardFail ||
+          isBlurHardFail ||
+          isBrightnessHardFail;
+        const captureEligible = !hasHardFailure;
+        const isNearReady = captureEligible && !allValid;
+        const warningReasons: string[] = [];
+        if (!readiness.angleMatch && nearAngleMatch) {
+          warningReasons.push('angle');
+        }
+        if (isCenterWarn) {
+          warningReasons.push('centering');
+        }
+        if (isBlurWarn) {
+          warningReasons.push('blur');
+        }
+        if (isBrightnessWarn) {
+          warningReasons.push('brightness');
+        }
+        const captureConfidence: 'ideal' | 'near_ready' =
+          warningReasons.length > 0 ? 'near_ready' : 'ideal';
 
         const stableDurationMs =
           stableWindowStartRef.current === null
@@ -1126,32 +1239,47 @@ export function useFaceCapture({
         if (!readiness.faceLargeEnough) {
           blocker = 'face_too_small';
           guidanceState = 'face_too_small';
-          liveMessage = 'Move closer';
-        } else if (!readiness.angleMatch && !nearAngleMatch) {
+          liveMessage = 'Move closer so your face fills the guide';
+        } else if (isWrongAngleHard) {
           blocker = 'wrong_angle';
           guidanceState = 'wrong_angle';
           liveMessage = getAngleGuidance(activeAngle, yaw, pitch);
-        } else if (!readiness.centered && isCenterFarOff) {
+        } else if (isCenterHardFail) {
           blocker = 'off_center';
           guidanceState = 'off_center';
-          liveMessage = 'Center your face';
-        } else if (!readiness.sharpEnough && isBlurTooLow) {
+          liveMessage = 'Center your face in the frame';
+        } else if (isBlurHardFail) {
           blocker = 'blurry';
           guidanceState = 'blurry';
-          liveMessage = 'Hold steady';
-        } else if (!readiness.brightnessOk) {
+          liveMessage = 'Hold still for a sharper image';
+        } else if (isBrightnessHardFail) {
           blocker =
-            brightness < MIN_BRIGHTNESS ? 'lighting_low' : 'lighting_high';
+            brightness < HARD_MIN_BRIGHTNESS ? 'lighting_low' : 'lighting_high';
           guidanceState =
-            brightness < MIN_BRIGHTNESS ? 'lighting_low' : 'lighting_high';
+            brightness < HARD_MIN_BRIGHTNESS ? 'lighting_low' : 'lighting_high';
           liveMessage =
-            brightness < MIN_BRIGHTNESS
-              ? 'Improve lighting'
-              : 'Reduce bright light';
-        } else if (!allValid && isNearReady) {
+            brightness < HARD_MIN_BRIGHTNESS
+              ? 'Improve lighting before capture'
+              : 'Reduce bright light before capture';
+        } else if (isBlurWarn) {
           blocker = 'near_ready';
           guidanceState = 'hold_steady';
-          liveMessage = 'Hold steady';
+          liveMessage = 'Almost there - hold still for a sharper image';
+        } else if (isCenterWarn) {
+          blocker = 'near_ready';
+          guidanceState = 'hold_steady';
+          liveMessage = 'Almost there - move slightly to center';
+        } else if (isBrightnessWarn) {
+          blocker = 'near_ready';
+          guidanceState = 'hold_steady';
+          liveMessage =
+            brightness < MIN_BRIGHTNESS
+              ? 'Almost there - add a little more light'
+              : 'Almost there - reduce bright light slightly';
+        } else if (isNearReady) {
+          blocker = 'near_ready';
+          guidanceState = 'hold_steady';
+          liveMessage = 'Almost there - hold steady';
         } else if (allValid) {
           blocker = 'ready';
           guidanceState = 'ready';
@@ -1161,7 +1289,7 @@ export function useFaceCapture({
           liveMessage = 'Hold steady';
         }
 
-        if (!allValid && now < stickyGuidanceUntilRef.current) {
+        if (!captureEligible && now < stickyGuidanceUntilRef.current) {
           guidanceState = 'hold_steady';
           liveMessage = 'Hold steady';
         }
@@ -1219,10 +1347,13 @@ export function useFaceCapture({
             blurVariance: Number(blurVariance.toFixed(1)),
             readiness,
             allValid,
+            captureEligible,
+            captureConfidence,
+            warningReasons,
           });
         }
 
-        if (!allValid) {
+        if (!captureEligible) {
           const withinGrace =
             isNearReady &&
             lastAllValidAtRef.current !== null &&
@@ -1263,7 +1394,12 @@ export function useFaceCapture({
         setFeedback({
           guidanceState: holdProgress >= 1 ? 'ready' : 'hold_steady',
           instruction: perAngleInstruction[activeAngle],
-          liveMessage: holdProgress >= 1 ? 'Hold still...' : 'Hold steady',
+          liveMessage:
+            holdProgress >= 1
+              ? 'Hold still...'
+              : captureConfidence === 'near_ready'
+                ? liveMessage
+                : 'Hold steady',
           holdProgress,
           readiness,
         });
@@ -1365,14 +1501,142 @@ export function useFaceCapture({
               return;
             }
 
-            const snapshot = await captureSnapshot();
-            if (!snapshot) {
+            if (!videoElement) {
+              return;
+            }
+
+            const candidates: BurstCaptureCandidate[] = [];
+
+            for (
+              let burstIndex = 0;
+              burstIndex < BURST_CAPTURE_FRAME_COUNT;
+              burstIndex += 1
+            ) {
+              const burstDetection = safeDetect(videoElement);
+              const burstLandmarksByFace = dedupeLandmarkFaces(
+                burstDetection?.faceLandmarks ?? []
+              );
+              if (burstLandmarksByFace.length === 1) {
+                const burstLandmarks = burstLandmarksByFace[0];
+                const burstBox = computeFaceBox(burstLandmarks);
+                const burstExpandedBox = expandNormalizedBox(burstBox, 0.08, 0.09);
+                const burstFaceAreaRatio = Math.max(
+                  0,
+                  (burstExpandedBox.maxX - burstExpandedBox.minX) *
+                    (burstExpandedBox.maxY - burstExpandedBox.minY)
+                );
+                const burstFaceCenterX = (burstBox.minX + burstBox.maxX) / 2;
+                const burstFaceCenterY = (burstBox.minY + burstBox.maxY) / 2;
+                const burstCenterOffset = Math.hypot(
+                  burstFaceCenterX - 0.5,
+                  burstFaceCenterY - 0.5
+                );
+                const burstPose = estimateYawPitch(burstLandmarks);
+                const burstQuality = computeBlurAndBrightness(
+                  videoElement,
+                  burstExpandedBox,
+                  offscreenCanvas,
+                  context
+                );
+                const burstAngleNearEnough = isNearlyAngleMatch(
+                  activeAngle,
+                  burstPose.yaw,
+                  burstPose.pitch
+                );
+                const burstAngleMatch = isAngleMatch(
+                  activeAngle,
+                  burstPose.yaw,
+                  burstPose.pitch
+                );
+                const burstCenterHardFail = burstCenterOffset > HARD_MAX_CENTER_OFFSET;
+                const burstBlurHardFail =
+                  burstQuality.blurVariance < HARD_MIN_BLUR_VARIANCE;
+                const burstBrightnessHardFail =
+                  burstQuality.brightness < HARD_MIN_BRIGHTNESS ||
+                  burstQuality.brightness > HARD_MAX_BRIGHTNESS;
+                const burstCenterWarn =
+                  burstCenterOffset > MAX_CENTER_OFFSET && !burstCenterHardFail;
+                const burstBlurWarn =
+                  burstQuality.blurVariance < MIN_BLUR_VARIANCE && !burstBlurHardFail;
+                const burstBrightnessWarn =
+                  (burstQuality.brightness < MIN_BRIGHTNESS ||
+                    burstQuality.brightness > MAX_BRIGHTNESS) &&
+                  !burstBrightnessHardFail;
+                const burstWarnings: string[] = [];
+                if (!burstAngleMatch && burstAngleNearEnough) {
+                  burstWarnings.push('angle');
+                }
+                if (burstCenterWarn) {
+                  burstWarnings.push('centering');
+                }
+                if (burstBlurWarn) {
+                  burstWarnings.push('blur');
+                }
+                if (burstBrightnessWarn) {
+                  burstWarnings.push('brightness');
+                }
+                const burstConfidence: 'ideal' | 'near_ready' =
+                  burstWarnings.length > 0 ? 'near_ready' : 'ideal';
+                const burstFrameAcceptable =
+                  burstFaceAreaRatio >= MIN_FACE_AREA_RATIO &&
+                  burstCenterOffset <= HARD_MAX_CENTER_OFFSET &&
+                  burstQuality.blurVariance >= HARD_MIN_BLUR_VARIANCE &&
+                  burstQuality.brightness >= MIN_CAPTURE_BRIGHTNESS_PRECHECK &&
+                  burstQuality.brightness <= HARD_MAX_BRIGHTNESS &&
+                  burstAngleNearEnough;
+
+                if (burstFrameAcceptable) {
+                  const snapshot = await captureSnapshot();
+                  if (snapshot && snapshot.size >= MIN_CAPTURE_FILE_SIZE_BYTES) {
+                    try {
+                      const dataUrl = await blobToDataUrl(snapshot);
+                      const selectionScore = computeSelectionScore(activeAngle, {
+                        yaw: burstPose.yaw,
+                        pitch: burstPose.pitch,
+                        faceAreaRatio: burstFaceAreaRatio,
+                        centerOffset: burstCenterOffset,
+                        blurVariance: burstQuality.blurVariance,
+                        brightness: burstQuality.brightness,
+                      });
+                      candidates.push({
+                        blob: snapshot,
+                        dataUrl,
+                        score: selectionScore,
+                        quality: {
+                          yaw: burstPose.yaw,
+                          pitch: burstPose.pitch,
+                          faceAreaRatio: burstFaceAreaRatio,
+                          centerOffset: burstCenterOffset,
+                          blurVariance: burstQuality.blurVariance,
+                          brightness: burstQuality.brightness,
+                          selectionScore,
+                          captureConfidence: burstConfidence,
+                          warnings: burstWarnings,
+                        },
+                      });
+                    } catch (error) {
+                      logCaptureError('capture_trigger', error, {
+                        targetAngle: activeAngle,
+                        blocker: 'snapshot_serialize_failed',
+                        burstIndex,
+                      });
+                    }
+                  }
+                }
+              }
+
+              if (burstIndex < BURST_CAPTURE_FRAME_COUNT - 1) {
+                await waitMs(BURST_CAPTURE_GAP_MS);
+              }
+            }
+
+            if (candidates.length === 0) {
               logCaptureError(
                 'capture_trigger',
-                new Error('captureSnapshot returned null'),
+                new Error('no acceptable frames captured during burst window'),
                 {
                   targetAngle: activeAngle,
-                  blocker: 'snapshot_null',
+                  blocker: 'snapshot_window_empty',
                 }
               );
               setFeedback((prev) => ({
@@ -1387,65 +1651,17 @@ export function useFaceCapture({
               return;
             }
 
-            if (snapshot.size < MIN_CAPTURE_FILE_SIZE_BYTES) {
-              logCaptureError(
-                'capture_trigger',
-                new Error('capture blob too small'),
-                {
-                  targetAngle: activeAngle,
-                  blocker: 'snapshot_too_small',
-                  fileSize: snapshot.size,
-                  contentType: snapshot.type,
-                }
-              );
-              setFeedback((prev) => ({
-                ...prev,
-                guidanceState: 'hold_steady',
-                liveMessage: 'Hold steady',
-              }));
-              stableWindowStartRef.current = null;
-              stableFramesRef.current = 0;
-              lastAllValidAtRef.current = null;
-              stickyGuidanceUntilRef.current = 0;
-              return;
-            }
-
-            let dataUrl: string;
-            try {
-              dataUrl = await blobToDataUrl(snapshot);
-            } catch (error) {
-              logCaptureError('capture_trigger', error, {
-                targetAngle: activeAngle,
-                blocker: 'snapshot_serialize_failed',
-              });
-              setFeedback((prev) => ({
-                ...prev,
-                guidanceState: 'hold_steady',
-                liveMessage: 'Hold steady',
-              }));
-              stableWindowStartRef.current = null;
-              stableFramesRef.current = 0;
-              lastAllValidAtRef.current = null;
-              stickyGuidanceUntilRef.current = 0;
-              return;
-            }
-
-            const previewUrl = toBlobUrl(snapshot);
-
+            const bestCandidate = candidates.reduce((best, current) =>
+              current.score > best.score ? current : best
+            );
+            const previewUrl = toBlobUrl(bestCandidate.blob);
             const shot: CapturedShot = {
               angle: activeAngle,
-              blob: snapshot,
-              dataUrl,
+              blob: bestCandidate.blob,
+              dataUrl: bestCandidate.dataUrl,
               previewUrl,
               capturedAt: Date.now(),
-              quality: {
-                yaw,
-                pitch,
-                faceAreaRatio,
-                centerOffset,
-                blurVariance,
-                brightness,
-              },
+              quality: bestCandidate.quality,
             };
 
             setCapturedShots((current) => {
@@ -1475,7 +1691,10 @@ export function useFaceCapture({
             if (nextAngle) {
               setActiveAngle(nextAngle);
             }
-            console.log(`[capture] captured angle=${activeAngle}`);
+            console.log(`[capture] captured angle=${activeAngle}`, {
+              burstCandidates: candidates.length,
+              selectedScore: Number(bestCandidate.score.toFixed(3)),
+            });
           } catch (error) {
             logCaptureError('capture_trigger', error, {
               targetAngle: activeAngle,

@@ -14,8 +14,8 @@ const mediaConstraints: MediaStreamConstraints = {
   },
 };
 const MIN_CAPTURE_DIMENSION_PX = 100;
-const MAX_UPLOAD_WIDTH_PX = 480;
-const CAPTURE_JPEG_QUALITY = 0.65;
+const MAX_UPLOAD_WIDTH_PX = 640;
+const CAPTURE_JPEG_QUALITY = 0.75;
 
 function stopMediaTracks(stream: MediaStream | null) {
   if (!stream) {

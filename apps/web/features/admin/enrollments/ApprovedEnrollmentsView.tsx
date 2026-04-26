@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, RefreshCw, ShieldAlert, Undo2 } from 'lucide-react';
-import { AdminApiAuthError, fetchEnrollments, resetEnrollment } from '@/features/admin/api';
+import { CheckCircle2, Loader2, RefreshCw, ShieldAlert, Undo2 } from 'lucide-react';
+import {
+  AdminApiAuthError,
+  fetchEnrollments,
+  processEnrollment,
+  resetEnrollment,
+} from '@/features/admin/api';
 import { useAdminAuth } from '@/features/admin/auth/AdminAuthContext';
 import { EnrollmentRecord } from '@/features/admin/auth/types';
 import { useAdminToast } from '@/features/admin/ui/AdminToastProvider';
@@ -37,7 +42,7 @@ export function ApprovedEnrollmentsView() {
   const { token, admin, clearSession } = useAdminAuth();
   const { showToast } = useAdminToast();
 
-  const [approvedRows, setApprovedRows] = useState<EnrollmentRecord[]>([]);
+  const [rows, setRows] = useState<EnrollmentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +79,8 @@ export function ApprovedEnrollmentsView() {
       setError(null);
 
       try {
-        const rows = await fetchEnrollments(token);
-        setApprovedRows(rows.filter((item) => item.status === 'approved'));
+        const nextRows = await fetchEnrollments(token);
+        setRows(nextRows.filter((item) => item.status === 'approved' || item.status === 'processed'));
       } catch (errorValue) {
         if (handleAuthFailure(errorValue)) {
           return;
@@ -115,6 +120,48 @@ export function ApprovedEnrollmentsView() {
       showToast({ title: 'Enrollment reset', message: result.message, variant: 'success' });
       await loadApproved(false);
       setResetDialog(null);
+    } catch (errorValue) {
+      if (handleAuthFailure(errorValue)) {
+        return;
+      }
+
+      showToast({
+        title: 'Request failed',
+        message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
+        variant: 'error',
+      });
+    } finally {
+      setActionKey(null);
+    }
+  };
+
+  const onProcess = async (item: EnrollmentRecord) => {
+    if (!token) {
+      return;
+    }
+
+    const processKey = `process:${item.student_id}`;
+    setActionKey(processKey);
+
+    try {
+      const result = await processEnrollment(token, item.student_id);
+      if (!result.success || !result.processing_passed || result.embeddings_generated_count <= 0) {
+        const message = !result.success
+          ? result.message
+          : result.embeddings_generated_count <= 0
+            ? 'Processing finished but no embeddings were generated.'
+            : result.message || 'Processing failed.';
+        showToast({ title: 'Processing failed', message, variant: 'error' });
+        await loadApproved(false);
+        return;
+      }
+
+      showToast({
+        title: 'Embeddings generated',
+        message: `Generated ${result.embeddings_generated_count} embeddings for ${item.student_id}.`,
+        variant: 'success',
+      });
+      await loadApproved(false);
     } catch (errorValue) {
       if (handleAuthFailure(errorValue)) {
         return;
@@ -187,13 +234,13 @@ export function ApprovedEnrollmentsView() {
             </div>
           ) : null}
 
-          {!error && approvedRows.length === 0 ? (
+          {!error && rows.length === 0 ? (
             <div className="rounded-xl border border-border bg-muted/35 p-8 text-center text-sm text-muted-foreground">
-              No approved enrollments found.
+              No approved or processed enrollments found.
             </div>
           ) : null}
 
-          {!error && approvedRows.length > 0 ? (
+          {!error && rows.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-muted/45 text-xs uppercase tracking-wide text-muted-foreground">
@@ -201,13 +248,20 @@ export function ApprovedEnrollmentsView() {
                     <th className="px-3 py-2.5">Student</th>
                     <th className="px-3 py-2.5">Contact</th>
                     <th className="px-3 py-2.5">Updated</th>
+                    <th className="px-3 py-2.5">Processing</th>
                     <th className="px-3 py-2.5">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {approvedRows.map((item) => {
+                  {rows.map((item) => {
                     const resetKey = `reset:${item.student_id}`;
-                    const rowBusy = actionKey === resetKey;
+                    const processKey = `process:${item.student_id}`;
+                    const rowBusy = actionKey === resetKey || actionKey === processKey;
+                    const processingState = item.processing_state;
+                    const isProcessed = processingState === 'processed';
+                    const isProcessingFailed = processingState === 'processing_failed';
+                    const needsProcessing = processingState === 'needs_processing';
+                    const canProcess = needsProcessing || isProcessingFailed;
 
                     return (
                       <tr key={item.student_id} className="border-t border-border/60 align-top">
@@ -224,25 +278,62 @@ export function ApprovedEnrollmentsView() {
                           <p>{item.updated_at ? `Created: ${formatDate(item.created_at)}` : ''}</p>
                         </td>
                         <td className="px-3 py-3">
-                          {isSuperAdmin ? (
+                          {isProcessed ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
+                              <CheckCircle2 className="size-3.5" />
+                              Processed
+                            </span>
+                          ) : isProcessingFailed ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-300">
+                              Processing failed
+                            </span>
+                          ) : needsProcessing ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
+                              Needs processing
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Not applicable</span>
+                          )}
+                          {item.last_processing_message ? (
+                            <p className="mt-1 max-w-xs text-[11px] text-muted-foreground">
+                              {item.last_processing_message}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                setResetDialog({
-                                  studentId: item.student_id,
-                                  fullName: item.full_name,
-                                })
-                              }
-                              disabled={rowBusy}
+                              onClick={() => onProcess(item)}
+                              disabled={rowBusy || !canProcess}
                             >
-                              <Undo2 className="size-3.5" />
-                              Reset
+                              {actionKey === processKey ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : null}
+                              {isProcessingFailed ? 'Retry Process' : isProcessed ? 'Processed' : 'Process'}
                             </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Not allowed</span>
-                          )}
+
+                            {isSuperAdmin ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setResetDialog({
+                                    studentId: item.student_id,
+                                    fullName: item.full_name,
+                                  })
+                                }
+                                disabled={rowBusy}
+                              >
+                                <Undo2 className="size-3.5" />
+                                Reset
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Reset not allowed</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

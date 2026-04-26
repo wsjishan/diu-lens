@@ -27,7 +27,9 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_TOP_K = '5';
-const DEFAULT_THRESHOLD = '0.45';
+const DEFAULT_THRESHOLD = '0.38';
+const STRONG_MATCH_DISTANCE = 0.2;
+const POSSIBLE_MATCH_DISTANCE = 0.38;
 
 function formatDistance(value: number) {
   if (!Number.isFinite(value)) {
@@ -62,7 +64,33 @@ function parsePositiveFloat(value: string): number | null {
   return parsed;
 }
 
+function getDistanceConfidence(distance: number): {
+  label: string;
+  className: string;
+} {
+  if (distance <= STRONG_MATCH_DISTANCE) {
+    return {
+      label: 'Strong match',
+      className: 'border-emerald-300/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200',
+    };
+  }
+
+  if (distance <= POSSIBLE_MATCH_DISTANCE) {
+    return {
+      label: 'Possible match',
+      className: 'border-amber-300/30 bg-amber-500/10 text-amber-700 dark:text-amber-200',
+    };
+  }
+
+  return {
+    label: 'Weak candidate',
+    className: 'border-rose-300/30 bg-rose-500/10 text-rose-700 dark:text-rose-200',
+  };
+}
+
 function CandidateCard({ candidate, isTopCandidate }: { candidate: RecognitionMatchCandidate; isTopCandidate: boolean }) {
+  const confidence = getDistanceConfidence(candidate.best_distance);
+
   return (
     <article
       className={cn(
@@ -79,24 +107,42 @@ function CandidateCard({ candidate, isTopCandidate }: { candidate: RecognitionMa
         <span
           className={cn(
             'rounded-md border px-2 py-1 text-xs',
-            candidate.is_likely_match
-              ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
-              : 'border-amber-300/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
+            confidence.className
           )}
         >
-          {candidate.is_likely_match ? 'Likely candidate' : 'Candidate, needs manual review'}
+          {confidence.label}
         </span>
       </div>
 
       <div className="grid gap-2 text-sm">
-        <p className="font-medium text-foreground">
-          {candidate.full_name || 'Name unavailable'}
-          <span className="ml-2 text-xs text-muted-foreground">({candidate.student_id})</span>
-        </p>
+        {candidate.full_name ? (
+          <p className="font-medium text-foreground">{candidate.full_name}</p>
+        ) : (
+          <p className="font-medium text-foreground">Name unavailable</p>
+        )}
+        <p className="text-xs text-muted-foreground">Student ID: <span className="text-foreground">{candidate.student_id}</span></p>
+        {candidate.university_email ? (
+          <p className="text-xs text-muted-foreground">
+            University email: <span className="text-foreground">{candidate.university_email}</span>
+          </p>
+        ) : null}
+        {candidate.phone ? (
+          <p className="text-xs text-muted-foreground">
+            Phone: <span className="text-foreground">{candidate.phone}</span>
+          </p>
+        ) : null}
 
         <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
           <p>Best distance: <span className="text-foreground">{formatDistance(candidate.best_distance)}</span></p>
+          <p>Top-3 avg distance: <span className="text-foreground">{formatDistance(candidate.top_avg_distance)}</span></p>
           <p>Support count: <span className="text-foreground">{candidate.support_count}</span></p>
+          <p>Matched angles count: <span className="text-foreground">{candidate.matched_angles_count}</span></p>
+          <p>
+            Rank gap to next:{' '}
+            <span className="text-foreground">
+              {candidate.rank_gap_to_next === null ? '-' : formatDistance(candidate.rank_gap_to_next)}
+            </span>
+          </p>
           <p>
             Matched angles:{' '}
             <span className="text-foreground">
@@ -110,6 +156,14 @@ function CandidateCard({ candidate, isTopCandidate }: { candidate: RecognitionMa
           <p className="sm:col-span-2">
             Source image path:{' '}
             <span className="break-all text-foreground">{candidate.representative_source_image_path || '-'}</span>
+          </p>
+          <p className="sm:col-span-2">
+            Decision factors:{' '}
+            <span className="text-foreground">
+              {candidate.decision_reasons.length > 0
+                ? candidate.decision_reasons.join(', ')
+                : '-'}
+            </span>
           </p>
         </div>
       </div>
@@ -233,6 +287,7 @@ export function RecognitionView() {
       return;
     }
 
+    setHasSearched(true);
     setIsMatching(true);
     setErrorMessage(null);
 
@@ -242,7 +297,6 @@ export function RecognitionView() {
         threshold: parsedThreshold,
       });
 
-      setHasSearched(true);
       if (!response.success) {
         setResults(null);
         setErrorMessage(response.message);
@@ -263,7 +317,6 @@ export function RecognitionView() {
           : 'Unable to run recognition match right now.';
       setErrorMessage(message);
       setResults(null);
-      setHasSearched(true);
       showToast({ title: 'Request failed', message, variant: 'error' });
     } finally {
       setIsMatching(false);
@@ -276,10 +329,31 @@ export function RecognitionView() {
   };
 
   const candidates = useMemo(() => results?.candidates ?? [], [results]);
-  const likelyCandidateCount = useMemo(
-    () => candidates.filter((item) => item.is_likely_match).length,
+  const reliableCandidates = useMemo(
+    () => candidates.filter((candidate) => candidate.best_distance <= POSSIBLE_MATCH_DISTANCE),
     [candidates]
   );
+  const weakCandidates = useMemo(
+    () => candidates.filter((candidate) => candidate.best_distance > POSSIBLE_MATCH_DISTANCE),
+    [candidates]
+  );
+  const confidenceCounts = useMemo(() => {
+    let strong = 0;
+    let possible = 0;
+    let weak = 0;
+
+    for (const candidate of candidates) {
+      if (candidate.best_distance <= STRONG_MATCH_DISTANCE) {
+        strong += 1;
+      } else if (candidate.best_distance <= POSSIBLE_MATCH_DISTANCE) {
+        possible += 1;
+      } else {
+        weak += 1;
+      }
+    }
+
+    return { strong, possible, weak };
+  }, [candidates]);
 
   return (
     <div className="grid gap-6">
@@ -399,7 +473,13 @@ export function RecognitionView() {
               </details>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="submit" disabled={!hasImage || isMatching}>
+                <Button
+                  type="button"
+                  disabled={!hasImage || isMatching}
+                  onClick={() => {
+                    void runMatch();
+                  }}
+                >
                   {isMatching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
                   {isMatching ? 'Finding matches...' : 'Find Matches'}
                 </Button>
@@ -435,13 +515,13 @@ export function RecognitionView() {
               <div className="grid place-items-center rounded-xl border border-border bg-muted/25 p-10 text-sm text-muted-foreground">
                 <div className="inline-flex items-center gap-2">
                   <Loader2 className="size-4 animate-spin" />
-                  Running recognition match...
+                  Searching...
                 </div>
               </div>
             ) : null}
 
             {!isMatching && errorMessage ? (
-              <div className="rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
+              <div className="rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-red-500">
                 <p>{errorMessage}</p>
                 <Button
                   type="button"
@@ -466,8 +546,8 @@ export function RecognitionView() {
 
             {!isMatching && !errorMessage && hasSearched && candidates.length === 0 ? (
               <div className="rounded-xl border border-border bg-muted/25 p-8 text-center text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">No likely matches found</p>
-                <p className="mt-2">Try another image or a clearer face crop.</p>
+                <p className="font-medium text-foreground">No reliable match found.</p>
+                <p className="mt-2">Try a clearer face image or search manually.</p>
               </div>
             ) : null}
 
@@ -476,8 +556,9 @@ export function RecognitionView() {
                 <div className="rounded-lg border border-border bg-muted/25 p-3 text-xs text-muted-foreground">
                   <p>
                     Ranked candidates: <span className="text-foreground">{candidates.length}</span>
-                    {' '}
-                    | Likely candidates: <span className="text-foreground">{likelyCandidateCount}</span>
+                    {' '}| Strong: <span className="text-foreground">{confidenceCounts.strong}</span>
+                    {' '}| Possible: <span className="text-foreground">{confidenceCounts.possible}</span>
+                    {' '}| Weak: <span className="text-foreground">{confidenceCounts.weak}</span>
                     {' '}
                     | Threshold used: <span className="text-foreground">{formatDistance(results?.threshold_used ?? 0)}</span>
                   </p>
@@ -486,23 +567,57 @@ export function RecognitionView() {
                   </p>
                 </div>
 
-                {!results?.match_found ? (
+                {reliableCandidates.length === 0 ? (
                   <div className="inline-flex items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
                     <AlertTriangle className="size-4" />
-                    No likely matches under current threshold. Candidates below are for manual review only.
+                    No reliable match found. Try a clearer face image or search manually.
                   </div>
                 ) : null}
 
-                <div className="grid gap-3">
-                  {candidates.map((candidate, index) => (
-                    <CandidateCard
-                      key={`${candidate.student_id}-${candidate.rank}-${index}`}
-                      candidate={candidate}
-                      isTopCandidate={index === 0}
-                    />
-                  ))}
-                </div>
+                {reliableCandidates.length > 0 ? (
+                  <div className="grid gap-3">
+                    {reliableCandidates.map((candidate, index) => (
+                      <CandidateCard
+                        key={`${candidate.student_id}-${candidate.rank}-${index}`}
+                        candidate={candidate}
+                        isTopCandidate={index === 0}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
+                {weakCandidates.length > 0 ? (
+                  <details className="rounded-xl border border-border bg-muted/20 p-3">
+                    <summary className="cursor-pointer text-xs text-muted-foreground">
+                      Show weak candidates for manual review ({weakCandidates.length})
+                    </summary>
+                    <div className="mt-2 grid gap-2 text-xs text-muted-foreground">
+                      {weakCandidates.map((candidate) => (
+                        <p key={`${candidate.student_id}-${candidate.rank}`}>
+                          Rank {candidate.rank} | Student ID: <span className="text-foreground">{candidate.student_id}</span>
+                          {' '}| Distance: <span className="text-foreground">{formatDistance(candidate.best_distance)}</span>
+                          {' '}| Label: <span className="text-foreground">Weak candidate</span>
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
               </div>
+            ) : null}
+
+            {!isMatching && results ? (
+              <details className="rounded-xl border border-border bg-muted/20 p-3">
+                <summary className="cursor-pointer text-xs text-muted-foreground">
+                  Show debug response
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Match found: <span className="text-foreground">{results.match_found ? 'Yes' : 'No'}</span>
+                  {' '}| Candidates: <span className="text-foreground">{results.candidates.length}</span>
+                </p>
+                <pre className="mt-2 max-h-72 overflow-auto rounded-lg border border-border/70 bg-background/80 p-2 text-[11px] leading-4 text-foreground">
+                  {JSON.stringify(results, null, 2)}
+                </pre>
+              </details>
             ) : null}
           </CardContent>
         </Card>

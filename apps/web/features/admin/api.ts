@@ -16,13 +16,34 @@ type ApiBusinessResponse = {
   message: string;
 };
 
+export type ProcessEnrollmentResponse = ApiBusinessResponse & {
+  processing_passed: boolean;
+  processed_images_count: number;
+  embeddings_generated_count: number;
+};
+
+export type ApproveEnrollmentResponse = ApiBusinessResponse & {
+  approved: boolean;
+  processing_attempted: boolean;
+  processing_passed: boolean;
+  processed_images_count: number;
+  embeddings_generated_count: number;
+  processing_error: string | null;
+};
+
 export type RecognitionMatchCandidate = {
   rank: number;
   student_id: string;
   full_name: string | null;
+  university_email: string | null;
+  phone: string | null;
   best_distance: number;
+  top_avg_distance: number;
   support_count: number;
   matched_angles: string[];
+  matched_angles_count: number;
+  rank_gap_to_next: number | null;
+  decision_reasons: string[];
   representative_crop_path: string | null;
   representative_source_image_path: string | null;
   is_likely_match: boolean;
@@ -123,9 +144,24 @@ function parseRecognitionCandidate(value: unknown): RecognitionMatchCandidate | 
     rank: typeof row.rank === 'number' ? row.rank : 0,
     student_id: row.student_id,
     full_name: typeof row.full_name === 'string' ? row.full_name : null,
+    university_email: typeof row.university_email === 'string' ? row.university_email : null,
+    phone: typeof row.phone === 'string' ? row.phone : null,
     best_distance: typeof row.best_distance === 'number' ? row.best_distance : Number.POSITIVE_INFINITY,
+    top_avg_distance:
+      typeof row.top_avg_distance === 'number'
+        ? row.top_avg_distance
+        : Number.POSITIVE_INFINITY,
     support_count: typeof row.support_count === 'number' ? row.support_count : 0,
     matched_angles: matchedAngles,
+    matched_angles_count:
+      typeof row.matched_angles_count === 'number'
+        ? row.matched_angles_count
+        : matchedAngles.length,
+    rank_gap_to_next:
+      typeof row.rank_gap_to_next === 'number' ? row.rank_gap_to_next : null,
+    decision_reasons: Array.isArray(row.decision_reasons)
+      ? row.decision_reasons.filter((item): item is string => typeof item === 'string')
+      : [],
     representative_crop_path:
       typeof row.representative_crop_path === 'string' ? row.representative_crop_path : null,
     representative_source_image_path:
@@ -221,6 +257,27 @@ function parseEnrollment(value: unknown): EnrollmentRecord | null {
       typeof row.total_required_shots === 'number' ? row.total_required_shots : null,
     total_accepted_shots:
       typeof row.total_accepted_shots === 'number' ? row.total_accepted_shots : null,
+    active_embeddings_count:
+      typeof row.active_embeddings_count === 'number' ? row.active_embeddings_count : 0,
+    has_active_embeddings:
+      typeof row.has_active_embeddings === 'boolean'
+        ? row.has_active_embeddings
+        : false,
+    processing_state:
+      row.processing_state === 'processed' ||
+      row.processing_state === 'needs_processing' ||
+      row.processing_state === 'processing_failed' ||
+      row.processing_state === 'not_applicable'
+        ? row.processing_state
+        : 'not_applicable',
+    last_processing_passed:
+      typeof row.last_processing_passed === 'boolean'
+        ? row.last_processing_passed
+        : null,
+    last_processing_message:
+      typeof row.last_processing_message === 'string'
+        ? row.last_processing_message
+        : null,
   };
 }
 
@@ -342,17 +399,39 @@ export async function fetchEnrollments(token: string): Promise<EnrollmentRecord[
 export async function approveEnrollment(
   token: string,
   studentId: string
-): Promise<ApiBusinessResponse> {
+): Promise<ApproveEnrollmentResponse> {
   const { payload } = await requestJson(`/admin/enrollments/${encodeURIComponent(studentId)}/approve`, {
     method: 'POST',
     token,
   });
 
-  if (isApiBusinessResponse(payload)) {
-    return payload;
+  if (!payload || typeof payload !== 'object') {
+    return {
+      success: false,
+      approved: false,
+      message: GENERIC_ADMIN_ERROR,
+      processing_attempted: false,
+      processing_passed: false,
+      processed_images_count: 0,
+      embeddings_generated_count: 0,
+      processing_error: null,
+    };
   }
 
-  return { success: false, message: GENERIC_ADMIN_ERROR };
+  const data = payload as Record<string, unknown>;
+  return {
+    success: typeof data.success === 'boolean' ? data.success : false,
+    approved: typeof data.approved === 'boolean' ? data.approved : false,
+    message: getMessageFromPayload(payload),
+    processing_attempted: Boolean(data.processing_attempted),
+    processing_passed: Boolean(data.processing_passed),
+    processed_images_count:
+      typeof data.processed_images_count === 'number' ? data.processed_images_count : 0,
+    embeddings_generated_count:
+      typeof data.embeddings_generated_count === 'number' ? data.embeddings_generated_count : 0,
+    processing_error:
+      typeof data.processing_error === 'string' ? data.processing_error : null,
+  };
 }
 
 export async function rejectEnrollment(
@@ -387,6 +466,37 @@ export async function resetEnrollment(
   }
 
   return { success: false, message: GENERIC_ADMIN_ERROR };
+}
+
+export async function processEnrollment(
+  token: string,
+  studentId: string
+): Promise<ProcessEnrollmentResponse> {
+  const { payload } = await requestJson(`/admin/enrollments/${encodeURIComponent(studentId)}/process`, {
+    method: 'POST',
+    token,
+  });
+
+  if (!payload || typeof payload !== 'object') {
+    return {
+      success: false,
+      message: GENERIC_ADMIN_ERROR,
+      processing_passed: false,
+      processed_images_count: 0,
+      embeddings_generated_count: 0,
+    };
+  }
+
+  const data = payload as Record<string, unknown>;
+  return {
+    success: typeof data.success === 'boolean' ? data.success : false,
+    message: getMessageFromPayload(payload),
+    processing_passed: Boolean(data.processing_passed),
+    processed_images_count:
+      typeof data.processed_images_count === 'number' ? data.processed_images_count : 0,
+    embeddings_generated_count:
+      typeof data.embeddings_generated_count === 'number' ? data.embeddings_generated_count : 0,
+  };
 }
 
 export async function matchRecognitionProbe(

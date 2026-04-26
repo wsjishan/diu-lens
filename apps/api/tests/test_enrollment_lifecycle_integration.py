@@ -12,10 +12,21 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.api.routes.debug as debug_routes
+import app.api.routes.admin as admin_routes
 import app.api.routes.enroll as enroll_routes
+import app.core.enrollment_db as enrollment_db_module
 import app.core.face_matching as face_matching_module
+from app.core.face_pipeline import FacePipelineError
 from app.core.storage_service import ALLOWED_ANGLES, LocalStorageService
-from app.db.models import AuditLog, Enrollment, EnrollmentImage, FaceEmbedding, Student
+from app.db.models import (
+    AuditLog,
+    Enrollment,
+    EnrollmentImage,
+    FaceEmbedding,
+    SelectedCrop,
+    Student,
+)
+from app.scripts.reset_operational_data import reset_operational_data
 
 
 def _auth_header(token: str) -> dict[str, str]:
@@ -323,8 +334,21 @@ def test_approve_process_keeps_status_and_recognition_eligible(
         assert enrollment.status == "approved"
         assert _count(db, FaceEmbedding, FaceEmbedding.student_id == student_id) == 2
 
-    def _query_embedding(_image_bytes: bytes) -> list[float]:
-        return [0.0] * 512
+    def _query_features(
+        _image_bytes: bytes,
+        *,
+        debug: bool = False,
+        probe_label: str | None = None,
+    ) -> dict[str, object]:
+        assert debug is False
+        assert probe_label is None
+        return {
+            "embedding": [0.0] * 512,
+            "mirror_embedding": [0.0] * 512,
+            "embedding_dim": 512,
+            "probe_inferred_angle": "front",
+            "preprocessing_warnings": [],
+        }
 
     def _search_embeddings(
         query_embedding: list[float],
@@ -357,7 +381,7 @@ def test_approve_process_keeps_status_and_recognition_eligible(
             for index, (embedding, _) in enumerate(rows)
         ]
 
-    monkeypatch.setattr(face_matching_module, "generate_query_embedding", _query_embedding)
+    monkeypatch.setattr(face_matching_module, "generate_query_features", _query_features)
     monkeypatch.setattr(face_matching_module, "search_face_matches", _search_embeddings)
 
     match_response = client.post(
@@ -375,6 +399,123 @@ def test_approve_process_keeps_status_and_recognition_eligible(
     assert len(candidates) >= 1
     assert candidates[0]["student_id"] == student_id
     assert candidates[0]["is_likely_match"] is True
+
+
+def test_approve_auto_process_success_response_and_embeddings(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1091"
+    _enroll_then_validate(client, monkeypatch, student_id)
+
+    monkeypatch.setattr(admin_routes, "process_student_images", _process_stub(processed_count=2))
+
+    approve_payload = _approve(client, student_id, auth_tokens["admin"])
+    assert approve_payload.get("success") is True
+    assert approve_payload.get("approved") is True
+    assert approve_payload.get("processing_passed") is True
+    assert int(approve_payload.get("embeddings_generated_count", 0)) == 2
+
+    with db_session_factory() as db:
+        enrollment = _latest_enrollment(db, student_id)
+        assert enrollment is not None
+        assert enrollment.status == "approved"
+        assert _count(db, FaceEmbedding, FaceEmbedding.student_id == student_id) == 2
+
+
+def test_approve_auto_process_failure_keeps_approved_and_returns_error(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1092"
+    _enroll_then_validate(client, monkeypatch, student_id)
+
+    def _raise_processing_error(student_id: str, storage: object) -> dict[str, object]:
+        raise FacePipelineError("forced processing failure")
+
+    monkeypatch.setattr(admin_routes, "process_student_images", _raise_processing_error)
+
+    approve_payload = _approve(client, student_id, auth_tokens["admin"])
+    assert approve_payload.get("success") is True
+    assert approve_payload.get("approved") is True
+    assert approve_payload.get("processing_passed") is False
+    assert "processing failed" in str(approve_payload.get("message", "")).lower()
+    assert (
+        "forced processing failure"
+        in str(approve_payload.get("processing_error", "")).lower()
+    )
+
+    with db_session_factory() as db:
+        enrollment = _latest_enrollment(db, student_id)
+        assert enrollment is not None
+        assert enrollment.status == "approved"
+        assert _count(db, FaceEmbedding, FaceEmbedding.student_id == student_id) == 0
+
+def test_recognition_debug_mode_returns_probe_and_top_match_diagnostics(
+    client: TestClient,
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    def _query_features(
+        _image_bytes: bytes,
+        *,
+        debug: bool = False,
+        probe_label: str | None = None,
+    ) -> dict[str, object]:
+        assert debug is True
+        assert probe_label == "lod"
+        return {
+            "embedding": [0.0] * 512,
+            "embedding_dim": 512,
+            "face_bbox": [10.0, 20.0, 90.0, 120.0],
+            "face_detection_confidence": 0.98,
+            "query_crop_size": {"width": 112, "height": 112},
+            "query_crop_path": "processed/probe_debug/lod_123456789abc_crop.jpg",
+            "embedding_norm": 1.0,
+            "preprocessing_warnings": [],
+        }
+
+    def _search_embeddings(
+        query_embedding: list[float],
+        *,
+        candidate_pool_limit: int,
+    ) -> list[dict[str, object]]:
+        assert len(query_embedding) == 512
+        assert candidate_pool_limit > 0
+        return [
+            {
+                "embedding_id": 101,
+                "student_id": "222-15-6540",
+                "enrollment_id": 55,
+                "angle": "front",
+                "source_image_path": "uploads/222-15-6540/front/front_1.jpg",
+                "crop_path": "processed/222-15-6540/front/front_1_crop.jpg",
+                "distance": 0.456,
+            }
+        ]
+
+    monkeypatch.setattr(face_matching_module, "generate_query_features", _query_features)
+    monkeypatch.setattr(face_matching_module, "search_face_matches", _search_embeddings)
+
+    match_response = client.post(
+        "/admin/recognition/match?debug=true&probe_label=lod",
+        headers=_auth_header(auth_tokens["admin"]),
+        files={"image": ("probe.jpg", b"probe-image", "image/jpeg")},
+    )
+    assert match_response.status_code == 200, match_response.text
+    payload = match_response.json()
+    assert payload.get("success") is True
+    assert payload.get("match_found") is False
+    assert payload.get("query_debug", {}).get("query_crop_path") == (
+        "processed/probe_debug/lod_123456789abc_crop.jpg"
+    )
+    assert payload.get("top_match_debug", {}).get("student_id") == "222-15-6540"
+    assert float(payload.get("top_match_debug", {}).get("distance", 0.0)) == 0.456
+    assert int(payload.get("top_match_debug", {}).get("support_count", 0)) == 1
 
 
 def test_approved_processed_student_can_reset_and_reregister(
@@ -493,7 +634,7 @@ def test_admin_queue_semantics_validated_only_and_state_targeting(
         client,
         pending_id,
         auth_tokens["admin"],
-        expected_status=500,
+        expected_status=200,
     )
     assert approve_pending.get("success") is False
     assert "current status: pending" in str(approve_pending.get("message", "")).lower()
@@ -546,7 +687,7 @@ def test_approve_blocked_when_required_angle_missing(
         client,
         student_id,
         auth_tokens["admin"],
-        expected_status=500,
+        expected_status=200,
     )
     assert approve_payload.get("success") is False
     assert approve_payload.get("message") == "required capture angles missing"
@@ -571,10 +712,17 @@ def test_approve_blocked_for_cross_student_byte_identical_images(
         client,
         target_id,
         auth_tokens["admin"],
-        expected_status=500,
+        expected_status=200,
     )
     assert approve_payload.get("success") is False
     assert approve_payload.get("message") == "duplicate enrollment evidence detected"
+    debug_details = approve_payload.get("hygiene_debug")
+    assert isinstance(debug_details, dict)
+    assert debug_details.get("blocked_student_id") == target_id
+    assert debug_details.get("matched_existing_student_id") == source_id
+    assert debug_details.get("duplicate_type") == "byte-identical"
+    assert debug_details.get("dhash_distance") == 0
+    assert "cleanup_recommendation" in debug_details
 
 
 def test_approve_blocked_for_cross_student_near_duplicate_images(
@@ -602,7 +750,203 @@ def test_approve_blocked_for_cross_student_near_duplicate_images(
         client,
         target_id,
         auth_tokens["admin"],
-        expected_status=500,
+        expected_status=200,
     )
     assert approve_payload.get("success") is False
     assert approve_payload.get("message") == "near-duplicate evidence detected"
+    debug_details = approve_payload.get("hygiene_debug")
+    assert isinstance(debug_details, dict)
+    assert debug_details.get("blocked_student_id") == target_id
+    assert debug_details.get("matched_existing_student_id") == source_id
+    assert debug_details.get("duplicate_type") == "near-duplicate"
+    assert isinstance(debug_details.get("dhash_distance"), int)
+    assert int(debug_details.get("dhash_distance")) <= 4
+    assert "cleanup_recommendation" in debug_details
+
+
+def test_reset_operational_data_clears_tables_and_storage(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    auth_tokens: dict[str, str],
+    storage_service: LocalStorageService,
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1201"
+    _enroll_then_validate(client, monkeypatch, student_id)
+    approve_payload = _approve(client, student_id, auth_tokens["admin"])
+    assert approve_payload.get("success") is True
+
+    monkeypatch.setattr(debug_routes, "process_student_images", _process_stub(processed_count=2))
+    process_response = client.post(
+        f"/debug/process/{student_id}",
+        headers=_auth_header(auth_tokens["super_admin"]),
+    )
+    assert process_response.status_code == 200, process_response.text
+
+    with db_session_factory() as db:
+        assert _count(db, Student) == 1
+        assert _count(db, Enrollment) == 1
+        assert _count(db, EnrollmentImage) > 0
+        assert _count(db, FaceEmbedding) > 0
+
+    report = reset_operational_data(clear_storage=True)
+    after_counts = report["database"]["after"]
+    assert int(after_counts["students"]) == 0
+    assert int(after_counts["enrollments"]) == 0
+    assert int(after_counts["enrollment_images"]) == 0
+    assert int(after_counts["selected_crops"]) == 0
+    assert int(after_counts["face_embeddings"]) == 0
+
+    assert storage_service.list_all_relative_files("uploads") == []
+    assert storage_service.list_all_relative_files("processed") == []
+
+
+def test_reverification_replaces_student_upload_files_without_accumulation(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1202"
+    _patch_validation_pass(monkeypatch)
+
+    enroll_response = client.post("/enroll", json=_basic_payload(student_id))
+    assert enroll_response.status_code == 200, enroll_response.text
+
+    metadata = _verification_metadata(student_id)
+    first_images = {
+        angle: _build_image_bytes(student_id="first-pass", angle=angle)
+        for angle in ALLOWED_ANGLES
+    }
+    second_images = {
+        angle: _build_image_bytes(student_id="second-pass", angle=angle)
+        for angle in ALLOWED_ANGLES
+    }
+
+    first_response = client.post(
+        "/enroll/verification",
+        files=_verification_files_for_images(metadata, first_images),
+    )
+    assert first_response.status_code == 200, first_response.text
+
+    second_response = client.post(
+        "/enroll/verification",
+        files=_verification_files_for_images(metadata, second_images),
+    )
+    assert second_response.status_code == 200, second_response.text
+
+    uploads_response = client.get(f"/debug/uploads/{student_id}")
+    assert uploads_response.status_code == 200, uploads_response.text
+    uploads_payload = uploads_response.json()
+    angles = uploads_payload.get("angles", {})
+    assert isinstance(angles, dict)
+    assert sum(len(paths) for paths in angles.values()) == len(ALLOWED_ANGLES)
+    for angle in ALLOWED_ANGLES:
+        paths = angles.get(angle, [])
+        assert len(paths) == 1
+        assert paths[0] == f"{angle}_1.jpg"
+
+    with db_session_factory() as db:
+        enrollment = _latest_enrollment(db, student_id)
+        assert enrollment is not None
+        image_rows = db.scalars(
+            select(EnrollmentImage).where(EnrollmentImage.enrollment_id == enrollment.id)
+        ).all()
+        assert len(image_rows) == len(ALLOWED_ANGLES)
+        expected_prefix = f"uploads/{student_id}/"
+        assert all(str(row.file_path).startswith(expected_prefix) for row in image_rows)
+
+
+def test_processing_source_images_are_db_scoped_only(
+    client: TestClient,
+    auth_tokens: dict[str, str],
+    storage_service: LocalStorageService,
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1203"
+    _enroll_then_validate(client, monkeypatch, student_id)
+    approve_payload = _approve(client, student_id, auth_tokens["admin"])
+    assert approve_payload.get("success") is True
+
+    # Stray file in uploads path should not be used unless linked in DB.
+    stray = storage_service.resolve_relative_path(
+        f"uploads/{student_id}/front/front_99.jpg"
+    )
+    stray.parent.mkdir(parents=True, exist_ok=True)
+    stray.write_bytes(_build_image_bytes(student_id="stray", angle="front"))
+
+    source_bundle = enrollment_db_module.get_processing_source_images(student_id)
+    sources = list(source_bundle.get("source_images", []))
+    source_paths = {str(item.get("source_image", "")) for item in sources}
+    assert f"uploads/{student_id}/front/front_99.jpg" not in source_paths
+    assert len(sources) == len(ALLOWED_ANGLES)
+
+
+def test_processing_integrity_rejects_cross_student_image_paths(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    student_id = "930-26-1204"
+    _enroll_then_validate(client, monkeypatch, student_id)
+    approve_payload = _approve(client, student_id, auth_tokens["admin"])
+    assert approve_payload.get("success") is True
+
+    with db_session_factory() as db:
+        enrollment = _latest_enrollment(db, student_id)
+        assert enrollment is not None
+        row = db.scalar(
+            select(EnrollmentImage)
+            .where(EnrollmentImage.enrollment_id == enrollment.id)
+            .order_by(EnrollmentImage.id.asc())
+            .limit(1)
+        )
+        assert row is not None
+        row.file_path = "uploads/other-student/front/front_1.jpg"
+        db.commit()
+
+    try:
+        enrollment_db_module.get_processing_source_images(student_id)
+        assert False, "Expected processing integrity guard to reject cross-student path"
+    except enrollment_db_module.EnrollmentInvalidStateError as exc:
+        assert "outside the target student's uploads scope" in str(exc)
+
+
+def test_embeddings_saved_for_correct_student_only_after_processing(
+    client: TestClient,
+    db_session_factory: sessionmaker[Session],
+    auth_tokens: dict[str, str],
+    monkeypatch: Any,
+) -> None:
+    student_a = "930-26-1205"
+    student_b = "930-26-1206"
+    _enroll_then_validate(client, monkeypatch, student_a)
+    _enroll_then_validate(client, monkeypatch, student_b)
+    assert _approve(client, student_a, auth_tokens["admin"]).get("success") is True
+    assert _approve(client, student_b, auth_tokens["admin"]).get("success") is True
+
+    monkeypatch.setattr(debug_routes, "process_student_images", _process_stub(processed_count=3))
+    process_response = client.post(
+        f"/debug/process/{student_a}",
+        headers=_auth_header(auth_tokens["super_admin"]),
+    )
+    assert process_response.status_code == 200, process_response.text
+
+    with db_session_factory() as db:
+        a_rows = db.scalars(
+            select(FaceEmbedding).where(
+                FaceEmbedding.student_id == student_a,
+                FaceEmbedding.is_active.is_(True),
+            )
+        ).all()
+        b_rows = db.scalars(
+            select(FaceEmbedding).where(
+                FaceEmbedding.student_id == student_b,
+                FaceEmbedding.is_active.is_(True),
+            )
+        ).all()
+
+        assert len(a_rows) == 3
+        assert len(b_rows) == 0
+        assert all(str(row.source_image_path).startswith(f"uploads/{student_a}/") for row in a_rows)
+        assert all(str(row.crop_path).startswith(f"processed/{student_a}/") for row in a_rows)

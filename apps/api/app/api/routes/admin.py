@@ -29,6 +29,116 @@ class RejectEnrollmentRequest(BaseModel):
     reason: str | None = None
 
 
+def _run_student_processing(student_id: str) -> dict[str, object]:
+    try:
+        assert_enrollment_processable(student_id)
+    except EnrollmentNotFoundError as exc:
+        return {
+            "ok": False,
+            "status_code": 404,
+            "processing_passed": False,
+            "processed_images_count": 0,
+            "embeddings_generated_count": 0,
+            "processing_error": str(exc),
+        }
+    except EnrollmentInvalidStateError as exc:
+        return {
+            "ok": False,
+            "status_code": 400,
+            "processing_passed": False,
+            "processed_images_count": 0,
+            "embeddings_generated_count": 0,
+            "processing_error": str(exc),
+        }
+    except EnrollmentPersistenceError as exc:
+        return {
+            "ok": False,
+            "status_code": 500,
+            "processing_passed": False,
+            "processed_images_count": 0,
+            "embeddings_generated_count": 0,
+            "processing_error": str(exc),
+        }
+
+    try:
+        result = process_student_images(student_id, storage=get_storage_service())
+        processed_images_count = int(result.get("processed_images_count", 0))
+        embeddings_generated_count = int(result.get("embeddings_generated_count", 0))
+        processing_passed = bool(result.get("processing_passed", False))
+        if processing_passed and embeddings_generated_count > 0:
+            persist_face_embeddings(
+                student_id=student_id,
+                processed_crops=list(result.get("processed_crops", [])),
+            )
+        elif processing_passed and embeddings_generated_count <= 0:
+            processing_passed = False
+
+        record_processing_completed_in_db(
+            student_id,
+            processed_images_count=processed_images_count,
+            processing_passed=processing_passed,
+        )
+        return {
+            "ok": processing_passed,
+            "status_code": 200 if processing_passed else 500,
+            "processing_passed": processing_passed,
+            "processed_images_count": processed_images_count,
+            "embeddings_generated_count": embeddings_generated_count,
+            "processing_error": (
+                None
+                if processing_passed
+                else (
+                    "Processing completed but embeddings were not generated."
+                    if embeddings_generated_count <= 0
+                    else "Processing did not pass."
+                )
+            ),
+            "processing_result": result,
+        }
+    except FacePipelineError as exc:
+        record_processing_completed_in_db(
+            student_id,
+            processed_images_count=0,
+            processing_passed=False,
+        )
+        return {
+            "ok": False,
+            "status_code": 400,
+            "processing_passed": False,
+            "processed_images_count": 0,
+            "embeddings_generated_count": 0,
+            "processing_error": str(exc),
+        }
+    except (EnrollmentPersistenceError, FaceEmbeddingPersistenceError, RuntimeError) as exc:
+        record_processing_completed_in_db(
+            student_id,
+            processed_images_count=0,
+            processing_passed=False,
+        )
+        return {
+            "ok": False,
+            "status_code": 500,
+            "processing_passed": False,
+            "processed_images_count": 0,
+            "embeddings_generated_count": 0,
+            "processing_error": str(exc),
+        }
+    except OSError:
+        record_processing_completed_in_db(
+            student_id,
+            processed_images_count=0,
+            processing_passed=False,
+        )
+        return {
+            "ok": False,
+            "status_code": 500,
+            "processing_passed": False,
+            "processed_images_count": 0,
+            "embeddings_generated_count": 0,
+            "processing_error": "Failed to write processed outputs.",
+        }
+
+
 @router.post("/enrollments/{student_id}/approve")
 async def approve_enrollment_admin(
     student_id: str,
@@ -50,7 +160,37 @@ async def approve_enrollment_admin(
             content={"success": False, "message": str(exc)},
         )
 
-    return {"success": result.success, "message": result.message}
+    payload: dict[str, object] = {
+        "success": result.success,
+        "approved": bool(result.success),
+        "message": result.message,
+        "processing_attempted": False,
+        "processing_passed": False,
+        "processed_images_count": 0,
+        "embeddings_generated_count": 0,
+        "processing_error": None,
+    }
+    if result.debug_details is not None:
+        payload["hygiene_debug"] = result.debug_details
+    if not result.success:
+        return payload
+
+    processing = _run_student_processing(student_id)
+    payload["processing_attempted"] = True
+    payload["processing_passed"] = bool(processing.get("processing_passed", False))
+    payload["processed_images_count"] = int(processing.get("processed_images_count", 0))
+    payload["embeddings_generated_count"] = int(
+        processing.get("embeddings_generated_count", 0)
+    )
+    payload["processing_error"] = processing.get("processing_error")
+    if bool(processing.get("ok", False)):
+        payload["message"] = "Enrollment approved and processed successfully."
+    else:
+        payload["message"] = (
+            "Enrollment approved, but processing failed. "
+            "Use Process to retry."
+        )
+    return payload
 
 
 @router.post("/enrollments/{student_id}/reject")
@@ -117,56 +257,24 @@ async def process_enrollment_admin(
             content={"success": False, "message": "student_id is required."},
         )
 
-    try:
-        assert_enrollment_processable(student_id)
-    except EnrollmentNotFoundError as exc:
+    processing = _run_student_processing(student_id)
+    if not bool(processing.get("ok", False)):
         return JSONResponse(
-            status_code=404,
-            content={"success": False, "message": str(exc)},
-        )
-    except EnrollmentInvalidStateError as exc:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "message": str(exc)},
-        )
-    except EnrollmentPersistenceError as exc:
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": str(exc)},
+            status_code=int(processing.get("status_code", 500)),
+            content={
+                "success": False,
+                "message": str(processing.get("processing_error") or "Processing failed."),
+                "processing_passed": False,
+                "processed_images_count": int(processing.get("processed_images_count", 0)),
+                "embeddings_generated_count": int(
+                    processing.get("embeddings_generated_count", 0)
+                ),
+            },
         )
 
-    try:
-        result = process_student_images(student_id, storage=get_storage_service())
-
-        if bool(result.get("processing_passed")) and int(
-            result.get("embeddings_generated_count", 0)
-        ) > 0:
-            persist_face_embeddings(
-                student_id=student_id,
-                processed_crops=list(result.get("processed_crops", [])),
-            )
-
-        record_processing_completed_in_db(
-            student_id,
-            processed_images_count=int(result.get("processed_images_count", 0)),
-            processing_passed=bool(result.get("processing_passed", False)),
-        )
-    except FacePipelineError as exc:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "message": str(exc)},
-        )
-    except (EnrollmentPersistenceError, FaceEmbeddingPersistenceError, RuntimeError) as exc:
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": str(exc)},
-        )
-    except OSError:
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": "Failed to write processed outputs."},
-        )
-
+    result = processing.get("processing_result", {})
+    if not isinstance(result, dict):
+        result = {}
     return {
         "success": True,
         "message": "Enrollment processing completed.",

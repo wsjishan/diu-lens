@@ -40,8 +40,8 @@ APP_ENV=development
 Optional face matching settings:
 
 ```bash
-# TEMPORARY/PROVISIONAL until clean calibration set is rebuilt
-FACE_MATCH_DISTANCE_THRESHOLD=0.07
+# Calibrated ArcFace cosine-distance threshold (adjust with real false-probe data)
+FACE_MATCH_DISTANCE_THRESHOLD=0.38
 FACE_MATCH_TOP_K=5
 FACE_MATCH_CANDIDATE_POOL_LIMIT=200
 ```

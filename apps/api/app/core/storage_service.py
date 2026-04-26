@@ -53,6 +53,16 @@ class StorageService(Protocol):
 
     def remove_relative_file(self, relative_path: str) -> None: ...
 
+    def clear_student_uploads(self, student_id: str) -> None: ...
+
+    def clear_student_processed(self, student_id: str) -> None: ...
+
+    def clear_all_uploads(self) -> None: ...
+
+    def clear_all_processed(self) -> None: ...
+
+    def list_all_relative_files(self, root: str) -> list[str]: ...
+
 
 class LocalStorageService:
     def __init__(self, base_dir: Path | None = None) -> None:
@@ -198,6 +208,42 @@ class LocalStorageService:
     def remove_relative_file(self, relative_path: str) -> None:
         self.resolve_relative_path(relative_path).unlink(missing_ok=True)
 
+    def clear_student_uploads(self, student_id: str) -> None:
+        sanitized_student_id = self.sanitize_student_id(student_id)
+        self._remove_tree(self._uploads_dir / sanitized_student_id)
+
+    def clear_student_processed(self, student_id: str) -> None:
+        sanitized_student_id = self.sanitize_student_id(student_id)
+        self._remove_tree(self._processed_dir / sanitized_student_id)
+
+    def clear_all_uploads(self) -> None:
+        self._uploads_dir.mkdir(parents=True, exist_ok=True)
+        for path in self._uploads_dir.iterdir():
+            self._remove_tree(path)
+
+    def clear_all_processed(self) -> None:
+        self._processed_dir.mkdir(parents=True, exist_ok=True)
+        for path in self._processed_dir.iterdir():
+            self._remove_tree(path)
+
+    def list_all_relative_files(self, root: str) -> list[str]:
+        if root == "uploads":
+            base = self._uploads_dir
+        elif root == "processed":
+            base = self._processed_dir
+        else:
+            raise ValueError(f"Unsupported root for listing files: {root}")
+
+        if not base.exists() or not base.is_dir():
+            return []
+
+        relative_paths: list[str] = []
+        for path in sorted(base.rglob("*")):
+            if not path.is_file():
+                continue
+            relative_paths.append(path.relative_to(self._storage_dir).as_posix())
+        return relative_paths
+
     def _ensure_enrollments_file(self) -> None:
         self._storage_dir.mkdir(parents=True, exist_ok=True)
         self._uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -218,3 +264,17 @@ class LocalStorageService:
                 max_index = file_index
         return max_index + 1
 
+    @staticmethod
+    def _remove_tree(path: Path) -> None:
+        if not path.exists():
+            return
+        if path.is_file():
+            path.unlink(missing_ok=True)
+            return
+
+        for child in sorted(path.rglob("*"), reverse=True):
+            if child.is_file():
+                child.unlink(missing_ok=True)
+            elif child.is_dir():
+                child.rmdir()
+        path.rmdir()

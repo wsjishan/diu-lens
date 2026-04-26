@@ -72,6 +72,8 @@ async def save_uploaded_images(
     saved_relative_paths: list[str] = []
 
     try:
+        # Prevent stale image carry-over across re-verification attempts.
+        storage.clear_student_uploads(student_id)
         for angle in ALLOWED_ANGLES:
             for upload in files_by_angle.get(angle, []):
                 content_type = (upload.content_type or "").lower()

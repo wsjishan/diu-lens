@@ -30,4 +30,13 @@ export type EnrollmentRecord = {
   validation_passed: boolean | null;
   total_required_shots: number | null;
   total_accepted_shots: number | null;
+  active_embeddings_count: number;
+  has_active_embeddings: boolean;
+  processing_state:
+    | 'processed'
+    | 'needs_processing'
+    | 'processing_failed'
+    | 'not_applicable';
+  last_processing_passed: boolean | null;
+  last_processing_message: string | null;
 };

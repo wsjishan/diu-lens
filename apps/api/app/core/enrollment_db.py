@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.approval_hygiene import ApprovalEvidenceIssue, assert_approval_hygiene
-from app.core.storage import ALLOWED_ANGLES, empty_uploaded_images
+from app.core.storage import ALLOWED_ANGLES, empty_uploaded_images, get_storage_service
 from app.db.models import (
     AuditLog,
     Enrollment,
@@ -36,11 +36,21 @@ class EnrollmentNotFoundError(EnrollmentPersistenceError):
 class EnrollmentInvalidStateError(EnrollmentPersistenceError):
     """Raised when an admin action is not allowed for current enrollment state."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        debug_details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.debug_details = debug_details
+
 
 @dataclass(frozen=True)
 class EnrollmentAdminActionResult:
     success: bool
     message: str
+    debug_details: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -221,7 +231,10 @@ def approve_enrollment_by_student_id(db: Session, student_id: str) -> bool:
             enrollment_id=enrollment.id,
         )
     except ApprovalEvidenceIssue as exc:
-        raise EnrollmentInvalidStateError(exc.message) from exc
+        raise EnrollmentInvalidStateError(
+            exc.message,
+            debug_details=exc.debug_details,
+        ) from exc
 
     enrollment.status = "approved"
     enrollment.rejection_reason = None
@@ -305,6 +318,13 @@ def approve_enrollment(student_id: str) -> EnrollmentAdminActionResult:
             return EnrollmentAdminActionResult(
                 success=False,
                 message="Enrollment not found for this student_id",
+            )
+        except EnrollmentInvalidStateError as exc:
+            db.rollback()
+            return EnrollmentAdminActionResult(
+                success=False,
+                message=str(exc),
+                debug_details=exc.debug_details,
             )
         except SQLAlchemyError as exc:
             db.rollback()
@@ -393,6 +413,93 @@ def assert_enrollment_processable(student_id: str) -> None:
                     "Only approved enrollments can be processed. "
                     f"Current status: {enrollment.status}"
                 )
+        except EnrollmentNotFoundError:
+            raise
+        except EnrollmentInvalidStateError:
+            raise
+        except SQLAlchemyError as exc:
+            raise EnrollmentPersistenceError(str(exc)) from exc
+
+
+def get_processing_source_images(student_id: str) -> dict[str, Any]:
+    """Return DB-scoped processing source images after integrity validation."""
+    session_factory = get_session_factory()
+    storage = get_storage_service()
+    with session_factory() as db:
+        try:
+            student = db.scalar(select(Student).where(Student.student_id == student_id))
+            if student is None:
+                raise EnrollmentNotFoundError("Student not found for this student_id")
+
+            enrollment = _latest_enrollment_for_student(db, student_id)
+            if enrollment is None:
+                raise EnrollmentNotFoundError("Enrollment not found for this student_id")
+
+            if enrollment.student_id != student_id:
+                raise EnrollmentInvalidStateError(
+                    "Processing integrity check failed: enrollment/student mismatch."
+                )
+            if enrollment.status not in {"approved", "processed"}:
+                raise EnrollmentInvalidStateError(
+                    "Processing integrity check failed: enrollment is not in processable status."
+                )
+
+            rows = db.scalars(
+                select(EnrollmentImage)
+                .where(EnrollmentImage.enrollment_id == enrollment.id)
+                .order_by(EnrollmentImage.id.asc())
+            ).all()
+
+            if not rows:
+                raise EnrollmentInvalidStateError(
+                    "Processing integrity check failed: no enrollment images found."
+                )
+
+            expected_prefix = f"uploads/{student_id}/"
+            counts_by_angle = {angle: 0 for angle in ALLOWED_ANGLES}
+            source_images: list[dict[str, str]] = []
+
+            for row in rows:
+                angle = str(row.angle)
+                file_path = str(row.file_path)
+
+                if angle not in counts_by_angle:
+                    raise EnrollmentInvalidStateError(
+                        f"Processing integrity check failed: unsupported angle '{angle}'."
+                    )
+
+                if not file_path.startswith(expected_prefix):
+                    raise EnrollmentInvalidStateError(
+                        "Processing integrity check failed: enrollment image path is outside "
+                        "the target student's uploads scope."
+                    )
+
+                absolute_path = storage.resolve_relative_path(file_path)
+                if not absolute_path.exists() or not absolute_path.is_file():
+                    raise EnrollmentInvalidStateError(
+                        f"Processing integrity check failed: missing source file '{file_path}'."
+                    )
+
+                counts_by_angle[angle] += 1
+                source_images.append(
+                    {
+                        "angle": angle,
+                        "source_image": file_path,
+                    }
+                )
+
+            missing_angles = [angle for angle in ALLOWED_ANGLES if counts_by_angle[angle] <= 0]
+            if missing_angles:
+                raise EnrollmentInvalidStateError(
+                    "Processing integrity check failed: required angles missing "
+                    f"({', '.join(missing_angles)})."
+                )
+
+            return {
+                "student_id": student_id,
+                "enrollment_id": int(enrollment.id),
+                "source_images": source_images,
+            }
         except EnrollmentNotFoundError:
             raise
         except EnrollmentInvalidStateError:
@@ -529,7 +636,9 @@ def record_processing_completed_in_db(
 
             _create_audit_log(
                 db,
-                event_type="processing_completed",
+                event_type=(
+                    "processing_completed" if processing_passed else "processing_failed"
+                ),
                 student_pk=student.id if student is not None else None,
                 enrollment_pk=enrollment_id,
                 message=(
@@ -566,9 +675,38 @@ def get_enrollments_snapshot_from_db() -> dict[str, Any]:
                 }
 
             enrollment_ids = [row[0].id for row in enrollment_rows]
+            student_ids = [str(row[0].student_id) for row in enrollment_rows]
             image_rows = db.execute(
                 select(EnrollmentImage).where(EnrollmentImage.enrollment_id.in_(enrollment_ids))
             ).scalars()
+            active_embedding_rows = db.execute(
+                select(
+                    FaceEmbedding.student_id,
+                    func.count(FaceEmbedding.id),
+                )
+                .where(
+                    FaceEmbedding.is_active.is_(True),
+                    FaceEmbedding.student_id.in_(student_ids),
+                )
+                .group_by(FaceEmbedding.student_id)
+            ).all()
+            active_embeddings_by_student: dict[str, int] = {
+                str(student_id): int(count)
+                for student_id, count in active_embedding_rows
+            }
+            processing_audit_rows = db.execute(
+                select(AuditLog)
+                .where(
+                    AuditLog.enrollment_id.in_(enrollment_ids),
+                    AuditLog.event_type.in_(["processing_completed", "processing_failed"]),
+                )
+                .order_by(AuditLog.id.asc())
+            ).scalars()
+            latest_processing_audit_by_enrollment: dict[int, AuditLog] = {}
+            for audit_row in processing_audit_rows:
+                if audit_row.enrollment_id is None:
+                    continue
+                latest_processing_audit_by_enrollment[int(audit_row.enrollment_id)] = audit_row
 
             images_by_enrollment: dict[int, dict[str, list[str]]] = {
                 enrollment_id: empty_uploaded_images() for enrollment_id in enrollment_ids
@@ -588,6 +726,28 @@ def get_enrollments_snapshot_from_db() -> dict[str, Any]:
                 total_images_passed = (
                     total_images_checked if enrollment.validation_passed else 0
                 )
+                active_embeddings_count = int(
+                    active_embeddings_by_student.get(str(student.student_id), 0)
+                )
+                has_active_embeddings = active_embeddings_count > 0
+                latest_processing_audit = latest_processing_audit_by_enrollment.get(
+                    int(enrollment.id)
+                )
+                last_processing_passed: bool | None = None
+                last_processing_message: str | None = None
+                if latest_processing_audit is not None:
+                    last_processing_passed = (
+                        str(latest_processing_audit.event_type) == "processing_completed"
+                    )
+                    last_processing_message = str(latest_processing_audit.message)
+                if has_active_embeddings:
+                    processing_state = "processed"
+                elif last_processing_passed is False:
+                    processing_state = "processing_failed"
+                elif enrollment.status in {"approved", "processed"}:
+                    processing_state = "needs_processing"
+                else:
+                    processing_state = "not_applicable"
 
                 entries.append(
                     {
@@ -599,6 +759,12 @@ def get_enrollments_snapshot_from_db() -> dict[str, Any]:
                         "verification_completed": enrollment.verification_completed,
                         "total_required_shots": enrollment.total_required_shots,
                         "total_accepted_shots": enrollment.total_accepted_shots,
+                        "rejection_reason": enrollment.rejection_reason,
+                        "active_embeddings_count": active_embeddings_count,
+                        "has_active_embeddings": has_active_embeddings,
+                        "processing_state": processing_state,
+                        "last_processing_passed": last_processing_passed,
+                        "last_processing_message": last_processing_message,
                         "angles": [],
                         "uploaded_images": uploaded_images,
                         "validation": {

@@ -151,11 +151,44 @@ export function EnrollmentsView() {
       return;
     }
 
-    await runAction(
-      `approve:${studentId}`,
-      () => approveEnrollment(token, studentId),
-      'Enrollment approved'
-    );
+    setActionKey(`approve:${studentId}`);
+    try {
+      const result = await approveEnrollment(token, studentId);
+      if (!result.success || !result.approved) {
+        showToast({ title: 'Approval failed', message: result.message, variant: 'error' });
+        return;
+      }
+
+      if (result.processing_passed && result.embeddings_generated_count > 0) {
+        showToast({
+          title: 'Approved and processed',
+          message: `Generated ${result.embeddings_generated_count} embeddings.`,
+          variant: 'success',
+        });
+      } else {
+        showToast({
+          title: 'Approved, but processing failed',
+          message:
+            result.processing_error ||
+            result.message ||
+            'Approval succeeded but processing failed. Use Process to retry.',
+          variant: 'error',
+        });
+      }
+
+      await loadEnrollments(false);
+    } catch (errorValue) {
+      if (handleAuthFailure(errorValue)) {
+        return;
+      }
+      showToast({
+        title: 'Request failed',
+        message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
+        variant: 'error',
+      });
+    } finally {
+      setActionKey(null);
+    }
   };
 
   const onRejectSubmit = async (event: FormEvent<HTMLFormElement>) => {

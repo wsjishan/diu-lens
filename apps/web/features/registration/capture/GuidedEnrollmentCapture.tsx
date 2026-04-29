@@ -1,13 +1,10 @@
 'use client';
 
-import { AlertTriangle, Camera, Loader2 } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import {
-  guidedAngles,
-  perAngleHint,
-} from '@/features/registration/capture/constants';
+import { guidedAngles } from '@/features/registration/capture/constants';
 import { CameraPreview } from '@/features/registration/capture/CameraPreview';
 import { CaptureProgress } from '@/features/registration/capture/CaptureProgress';
 import { CapturedShotStrip } from '@/features/registration/capture/CapturedShotStrip';
@@ -66,6 +63,7 @@ export function GuidedEnrollmentCapture({
     firstMissingAngle,
     retakeAngle,
     focusAngle,
+    captureAnyway,
     clearSession,
   } = useFaceCapture({
     videoElement,
@@ -304,7 +302,6 @@ export function GuidedEnrollmentCapture({
             </div>
 
             <p className="text-sm text-slate-600">{state.feedback.instruction}</p>
-            <p className="text-xs text-slate-500">{perAngleHint[state.currentAngle]}</p>
 
             <div className="relative mx-auto w-full max-w-sm">
               <CameraPreview
@@ -314,19 +311,6 @@ export function GuidedEnrollmentCapture({
               />
 
               <div className="pointer-events-none absolute inset-[9%] rounded-[28%] border-2 border-blue-300/80" />
-              <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                Hold for capture
-              </div>
-
-              <div className="pointer-events-none absolute right-3 bottom-3 left-3 h-1.5 overflow-hidden rounded-full bg-slate-900/30">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all duration-150',
-                    state.feedback.holdProgress >= 1 ? 'bg-emerald-400' : 'bg-blue-400'
-                  )}
-                  style={{ width: `${Math.round(state.feedback.holdProgress * 100)}%` }}
-                />
-              </div>
             </div>
 
             {permissionBlocked ? (
@@ -342,7 +326,17 @@ export function GuidedEnrollmentCapture({
                 <Camera className="size-4" />
                 {permissionButtonLabel}
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void captureAnyway()}
+                disabled={isSubmittingCompletion || !state.modelReady || state.isAutoCapturing}
+                className="h-11 w-full"
+              >
+                Capture anyway
+              </Button>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -367,11 +361,7 @@ export function GuidedEnrollmentCapture({
                 {statusText}
               </p>
 
-              {!permissionBlocked && !state.canSubmit ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  Complete all five required angles. Next required: {firstMissingAngle}.
-                </p>
-              ) : null}
+              {!permissionBlocked && !state.canSubmit ? <p className="mt-2 text-xs text-slate-500">Next: {firstMissingAngle}</p> : null}
             </div>
 
             <CapturedShotStrip
@@ -384,12 +374,7 @@ export function GuidedEnrollmentCapture({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2.5">
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          <AlertTriangle className="size-3.5" />
-          <span>Submission is locked until all 5 required angles are captured.</span>
-        </div>
-
+      <div className="flex items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2.5">
         <Button
           type="button"
           onClick={() => void handleSubmit()}

@@ -1,11 +1,16 @@
 import { useMemo } from 'react';
 
-import { guidedAngles } from '@/features/registration/capture/constants';
+import {
+  BURST_CAPTURE_FRAME_COUNT,
+  guidedAngles,
+} from '@/features/registration/capture/constants';
 import type { CapturedShotsByAngle } from '@/features/registration/capture/types';
 import type { VerificationAngle } from '@/features/registration/verification/types';
 
 function getFirstMissingAngle(capturedShots: CapturedShotsByAngle): VerificationAngle {
-  const missing = guidedAngles.find((angle) => capturedShots[angle] === null);
+  const missing = guidedAngles.find(
+    (angle) => capturedShots[angle].length < BURST_CAPTURE_FRAME_COUNT
+  );
   return missing ?? guidedAngles[guidedAngles.length - 1];
 }
 
@@ -15,7 +20,9 @@ export function useAngleProgress(
 ) {
   return useMemo(() => {
     const capturedCount = guidedAngles.reduce(
-      (total, angle) => total + (capturedShots[angle] ? 1 : 0),
+      (total, angle) =>
+        total +
+        (capturedShots[angle].length >= BURST_CAPTURE_FRAME_COUNT ? 1 : 0),
       0
     );
     const canSubmit = capturedCount === guidedAngles.length;

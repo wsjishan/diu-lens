@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -25,6 +25,12 @@ class EnrollmentImage(Base):
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     passed_validation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    blur_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    brightness: Mapped[float | None] = mapped_column(Float, nullable=True)
+    face_area_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    center_offset: Mapped[float | None] = mapped_column(Float, nullable=True)
+    detection_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

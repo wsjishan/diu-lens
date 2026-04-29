@@ -189,7 +189,8 @@ export function RegistrationFlow({
               required_shots: entry.requiredShots,
             })),
           },
-          summary.capturesByAngle
+          summary.capturesByAngle,
+          summary.frameMetadataByAngle
         );
 
         if (!result.success) {

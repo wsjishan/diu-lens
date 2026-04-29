@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ANGLE_THRESHOLDS,
+  BURST_CAPTURE_FRAME_COUNT,
   MIN_FACE_AREA_RATIO,
   POST_CAPTURE_COOLDOWN_MS,
   captureStorageVersion,
@@ -18,6 +19,7 @@ import type {
 import type {
   VerificationAngle,
   VerificationCapturesByAngle,
+  VerificationFrameMetadataByAngle,
 } from '@/features/registration/verification/types';
 
 type CaptureSnapshotFn = () => Promise<Blob | null>;
@@ -46,7 +48,6 @@ type FaceLandmarker = {
 
 const detectionIntervalMs = 90;
 const MIN_CAPTURE_FILE_SIZE_BYTES = 10 * 1024;
-const BURST_CAPTURE_FRAME_COUNT = 3;
 const BURST_CAPTURE_GAP_MS = 60;
 
 let faceLandmarkerPromise: Promise<FaceLandmarker> | null = null;
@@ -56,11 +57,25 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function emptyCapturedShots(): CapturedShotsByAngle {
-  return { front: null, left: null, right: null, up: null, down: null };
+  return { front: [], left: [], right: [], up: [], down: [] };
+}
+
+function isAngleComplete(
+  capturedShots: CapturedShotsByAngle,
+  angle: VerificationAngle
+) {
+  return capturedShots[angle].length >= BURST_CAPTURE_FRAME_COUNT;
+}
+
+function allAnglesComplete(capturedShots: CapturedShotsByAngle) {
+  return guidedAngles.every((angle) => isAngleComplete(capturedShots, angle));
 }
 
 function findFirstMissingAngle(capturedShots: CapturedShotsByAngle): VerificationAngle | null {
-  return guidedAngles.find((angle) => capturedShots[angle] === null) ?? null;
+  return (
+    guidedAngles.find((angle) => capturedShots[angle].length < BURST_CAPTURE_FRAME_COUNT) ??
+    null
+  );
 }
 
 function getStoragePayload(activeAngle: VerificationAngle, capturedShots: CapturedShotsByAngle): CapturePersistencePayload {
@@ -68,15 +83,13 @@ function getStoragePayload(activeAngle: VerificationAngle, capturedShots: Captur
     version: captureStorageVersion,
     activeAngle,
     shots: guidedAngles
-      .filter((angle) => capturedShots[angle] !== null)
-      .map((angle) => {
-        const shot = capturedShots[angle];
-        return {
+      .flatMap((angle) =>
+        capturedShots[angle].map((shot) => ({
           angle,
-          dataUrl: shot?.dataUrl ?? '',
-          capturedAt: shot?.capturedAt ?? Date.now(),
-        };
-      })
+          dataUrl: shot.dataUrl,
+          capturedAt: shot.capturedAt,
+        }))
+      )
       .filter((entry) => entry.dataUrl.length > 0),
   };
 }
@@ -227,6 +240,16 @@ function waitMs(durationMs: number) {
   });
 }
 
+function stopVideoStream(videoElement: HTMLVideoElement | null) {
+  if (!videoElement) return;
+  const source = videoElement.srcObject;
+  if (!(source instanceof MediaStream)) return;
+  for (const track of source.getTracks()) {
+    track.stop();
+  }
+  videoElement.srcObject = null;
+}
+
 async function loadFaceLandmarker() {
   if (faceLandmarkerPromise) return faceLandmarkerPromise;
 
@@ -264,6 +287,7 @@ export function useFaceCapture({
   const autoCaptureLockRef = useRef(false);
   const currentAngleRef = useRef<VerificationAngle>('front');
   const latestShotsRef = useRef<CapturedShotsByAngle>(emptyCapturedShots());
+  const finalizedRef = useRef(false);
   const persistenceEnabledRef = useRef(true);
 
   const [modelReady, setModelReady] = useState(false);
@@ -299,6 +323,10 @@ export function useFaceCapture({
   }, [currentAngle]);
 
   useEffect(() => {
+    finalizedRef.current = canSubmit;
+  }, [canSubmit]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     let raw: string | null = null;
@@ -321,7 +349,7 @@ export function useFaceCapture({
         const blob = dataUrlToBlob(shot.dataUrl);
         if (!blob) continue;
 
-        restored[shot.angle] = {
+        restored[shot.angle].push({
           angle: shot.angle,
           blob,
           previewUrl: toBlobUrl(blob),
@@ -335,7 +363,7 @@ export function useFaceCapture({
             blurVariance: 0,
             brightness: 0,
           },
-        };
+        });
       }
 
       setCapturedShots(restored);
@@ -383,7 +411,9 @@ export function useFaceCapture({
   useEffect(() => {
     return () => {
       for (const shot of Object.values(latestShotsRef.current)) {
-        if (shot) URL.revokeObjectURL(shot.previewUrl);
+        for (const frame of shot) {
+          URL.revokeObjectURL(frame.previewUrl);
+        }
       }
 
       if (landmarkerRef.current) {
@@ -396,8 +426,10 @@ export function useFaceCapture({
           faceLandmarkerPromise = null;
         }
       }
+
+      stopVideoStream(videoElement);
     };
-  }, []);
+  }, [videoElement]);
 
   const safeDetect = useCallback((targetVideoElement: HTMLVideoElement | null) => {
     if (!landmarkerRef.current) return null;
@@ -413,9 +445,15 @@ export function useFaceCapture({
   const captureAngle = useCallback(
     async (targetAngle: VerificationAngle, force: boolean) => {
       if (!videoElement) return false;
+      if (finalizedRef.current) return false;
+      if (isAngleComplete(latestShotsRef.current, targetAngle)) return false;
+      if (!force && currentAngleRef.current !== targetAngle) return false;
 
       const candidates: CapturedShot[] = [];
       for (let i = 0; i < BURST_CAPTURE_FRAME_COUNT; i += 1) {
+        if (finalizedRef.current) break;
+        if (isAngleComplete(latestShotsRef.current, targetAngle)) break;
+        if (!force && currentAngleRef.current !== targetAngle) break;
         const detection = safeDetect(videoElement);
         const faces = detection?.faceLandmarks ?? [];
 
@@ -436,28 +474,30 @@ export function useFaceCapture({
           const angleOk = force ? true : isRoughAngleMatch(targetAngle, yaw, pitch);
           const sizeOk = force ? true : faceAreaRatio >= MIN_FACE_AREA_RATIO;
 
-          if (angleOk && sizeOk) {
-            const snapshot = await captureSnapshot();
-            if (snapshot && snapshot.size >= MIN_CAPTURE_FILE_SIZE_BYTES) {
-              const dataUrl = await blobToDataUrl(snapshot);
-              candidates.push({
-                angle: targetAngle,
-                blob: snapshot,
-                dataUrl,
-                previewUrl: toBlobUrl(snapshot),
-                capturedAt: Date.now(),
-                quality: {
-                  yaw,
-                  pitch,
-                  faceAreaRatio,
-                  centerOffset: 0,
-                  blurVariance: 0,
-                  brightness: 0,
-                  captureConfidence: force ? 'near_ready' : 'ideal',
-                  warnings: force ? ['manual_fallback'] : !isAngleMatch(targetAngle, yaw, pitch) ? ['angle'] : [],
-                },
-              });
-            }
+          const snapshot = await captureSnapshot();
+          if (snapshot && snapshot.size >= MIN_CAPTURE_FILE_SIZE_BYTES) {
+            const dataUrl = await blobToDataUrl(snapshot);
+            const warnings: string[] = [];
+            if (force) warnings.push('manual_fallback');
+            if (!angleOk) warnings.push('angle');
+            if (!sizeOk) warnings.push('face_size');
+            candidates.push({
+              angle: targetAngle,
+              blob: snapshot,
+              dataUrl,
+              previewUrl: toBlobUrl(snapshot),
+              capturedAt: Date.now(),
+              quality: {
+                yaw,
+                pitch,
+                faceAreaRatio,
+                centerOffset: 0,
+                blurVariance: 0,
+                brightness: 0,
+                captureConfidence: !force && angleOk && sizeOk ? 'ideal' : 'near_ready',
+                warnings,
+              },
+            });
           }
         }
 
@@ -468,27 +508,38 @@ export function useFaceCapture({
 
       if (candidates.length === 0) return false;
 
-      const best = candidates[candidates.length - 1];
       setCapturedShots((current) => {
-        const previous = current[targetAngle];
-        if (previous) URL.revokeObjectURL(previous.previewUrl);
-        return { ...current, [targetAngle]: best };
+        if (isAngleComplete(current, targetAngle)) {
+          for (const candidate of candidates) {
+            URL.revokeObjectURL(candidate.previewUrl);
+          }
+          return current;
+        }
+        for (const previous of current[targetAngle]) {
+          URL.revokeObjectURL(previous.previewUrl);
+        }
+        return { ...current, [targetAngle]: candidates };
       });
 
       const nextShots: CapturedShotsByAngle = {
         ...latestShotsRef.current,
-        [targetAngle]: best,
+        [targetAngle]: candidates,
       };
       const nextAngle = findFirstMissingAngle(nextShots);
       cooldownUntilRef.current = performance.now() + POST_CAPTURE_COOLDOWN_MS;
-      if (nextAngle) setActiveAngle(nextAngle);
+      if (nextAngle) {
+        setActiveAngle(nextAngle);
+      } else {
+        finalizedRef.current = true;
+        stopVideoStream(videoElement);
+      }
       return true;
     },
     [captureSnapshot, safeDetect, videoElement]
   );
 
   useEffect(() => {
-    if (!streamActive || !videoElement || !modelReady) return;
+    if (!streamActive || !videoElement || !modelReady || canSubmit) return;
     runningRef.current = true;
 
     let cancelled = false;
@@ -499,6 +550,16 @@ export function useFaceCapture({
 
     const loop = () => {
       if (cancelled || !runningRef.current) return;
+      if (finalizedRef.current || allAnglesComplete(latestShotsRef.current)) {
+        finalizedRef.current = true;
+        runningRef.current = false;
+        const timerId = detectionTimerRef.current;
+        if (timerId !== null) window.clearTimeout(timerId);
+        detectionTimerRef.current = null;
+        setIsAutoCapturing(false);
+        stopVideoStream(videoElement);
+        return;
+      }
       if (!videoElement || videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
         scheduleNext();
         return;
@@ -512,6 +573,18 @@ export function useFaceCapture({
       }
 
       const angle = currentAngleRef.current;
+      if (isAngleComplete(latestShotsRef.current, angle)) {
+        const nextAngle = findFirstMissingAngle(latestShotsRef.current);
+        if (nextAngle) {
+          setActiveAngle(nextAngle);
+          scheduleNext();
+          return;
+        }
+        finalizedRef.current = true;
+        runningRef.current = false;
+        stopVideoStream(videoElement);
+        return;
+      }
       const detection = safeDetect(videoElement);
       const faces = detection?.faceLandmarks ?? [];
 
@@ -626,14 +699,15 @@ export function useFaceCapture({
       detectionTimerRef.current = null;
       autoCaptureLockRef.current = false;
     };
-  }, [captureAngle, modelReady, safeDetect, streamActive, videoElement]);
+  }, [canSubmit, captureAngle, modelReady, safeDetect, streamActive, videoElement]);
 
   const retakeAngle = useCallback((angle: VerificationAngle) => {
     setCapturedShots((current) => {
       const next = { ...current };
-      const existing = next[angle];
-      if (existing) URL.revokeObjectURL(existing.previewUrl);
-      next[angle] = null;
+      for (const existing of next[angle]) {
+        URL.revokeObjectURL(existing.previewUrl);
+      }
+      next[angle] = [];
       return next;
     });
     cooldownUntilRef.current = 0;
@@ -646,7 +720,7 @@ export function useFaceCapture({
   }, []);
 
   const captureAnyway = useCallback(async () => {
-    if (!streamActive || !videoElement || isAutoCapturing) return false;
+    if (!streamActive || !videoElement || isAutoCapturing || canSubmit) return false;
     const ok = await captureAngle(currentAngleRef.current, true);
     if (!ok) {
       setFeedback((prev) => ({ ...prev, liveMessage: 'Capture failed. Try again.' }));
@@ -667,10 +741,22 @@ export function useFaceCapture({
   const capturesByAngle = useMemo(() => {
     return guidedAngles.reduce(
       (accumulator, angle) => {
-        accumulator[angle] = capturedShots[angle] ? [capturedShots[angle].blob] : [];
+        accumulator[angle] = capturedShots[angle].map((shot) => shot.blob);
         return accumulator;
       },
       { front: [], left: [], right: [], up: [], down: [] } as VerificationCapturesByAngle
+    );
+  }, [capturedShots]);
+
+  const frameMetadataByAngle = useMemo(() => {
+    return guidedAngles.reduce(
+      (accumulator, angle) => {
+        accumulator[angle] = capturedShots[angle].map((shot) => ({
+          capturedAt: shot.capturedAt,
+        }));
+        return accumulator;
+      },
+      { front: [], left: [], right: [], up: [], down: [] } as VerificationFrameMetadataByAngle
     );
   }, [capturedShots]);
 
@@ -689,6 +775,7 @@ export function useFaceCapture({
   return {
     state,
     capturesByAngle,
+    frameMetadataByAngle,
     firstMissingAngle,
     retakeAngle,
     focusAngle,

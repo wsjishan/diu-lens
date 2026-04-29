@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +66,7 @@ class EnrollmentRecordInput:
     total_accepted_shots: int
     validation_passed: bool
     uploaded_images: dict[str, list[str]]
+    frame_metadata_by_path: dict[str, dict[str, Any]]
     event_type: str
     event_message: str
     mode: str  # "basic" | "final"
@@ -90,6 +92,27 @@ def _create_student(db: Session, payload: EnrollmentRecordInput) -> Student:
     db.add(student)
     db.flush()
     return student
+
+
+def _to_datetime_from_epoch_ms(value: object) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        milliseconds = int(value)
+    except (TypeError, ValueError):
+        return None
+    if milliseconds <= 0:
+        return None
+    return datetime.fromtimestamp(milliseconds / 1000.0, tz=timezone.utc)
+
+
+def _to_optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _latest_enrollment_for_student(db: Session, student_id: str) -> Enrollment | None:
@@ -136,6 +159,7 @@ def _replace_enrollment_images(
     db: Session,
     enrollment_id: int,
     uploaded_images: dict[str, list[str]],
+    frame_metadata_by_path: dict[str, dict[str, Any]],
     validation_passed: bool,
 ) -> None:
     db.execute(
@@ -144,6 +168,10 @@ def _replace_enrollment_images(
 
     for angle in ALLOWED_ANGLES:
         for relative_path in uploaded_images.get(angle, []):
+            metadata = frame_metadata_by_path.get(relative_path, {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            captured_at = _to_datetime_from_epoch_ms(metadata.get("captured_at"))
             db.add(
                 EnrollmentImage(
                     enrollment_id=enrollment_id,
@@ -153,6 +181,14 @@ def _replace_enrollment_images(
                     content_type=None,
                     file_size=None,
                     passed_validation=validation_passed,
+                    captured_at=captured_at,
+                    blur_score=_to_optional_float(metadata.get("blur_score")),
+                    brightness=_to_optional_float(metadata.get("brightness")),
+                    face_area_ratio=_to_optional_float(metadata.get("face_area_ratio")),
+                    center_offset=_to_optional_float(metadata.get("center_offset")),
+                    detection_confidence=_to_optional_float(
+                        metadata.get("detection_confidence")
+                    ),
                 )
             )
 
@@ -485,6 +521,16 @@ def get_processing_source_images(student_id: str) -> dict[str, Any]:
                     {
                         "angle": angle,
                         "source_image": file_path,
+                        "captured_at": (
+                            row.captured_at.isoformat()
+                            if row.captured_at is not None
+                            else None
+                        ),
+                        "blur_score": row.blur_score,
+                        "brightness": row.brightness,
+                        "face_area_ratio": row.face_area_ratio,
+                        "center_offset": row.center_offset,
+                        "detection_confidence": row.detection_confidence,
                     }
                 )
 
@@ -540,6 +586,7 @@ def persist_enrollment_to_db(payload: EnrollmentRecordInput) -> None:
                     db,
                     enrollment_id=enrollment.id,
                     uploaded_images=payload.uploaded_images,
+                    frame_metadata_by_path=payload.frame_metadata_by_path,
                     validation_passed=payload.validation_passed,
                 )
 
@@ -597,6 +644,7 @@ def persist_enrollment_verification_to_db(payload: EnrollmentRecordInput) -> Non
                     db,
                     enrollment_id=enrollment.id,
                     uploaded_images=payload.uploaded_images,
+                    frame_metadata_by_path=payload.frame_metadata_by_path,
                     validation_passed=payload.validation_passed,
                 )
 

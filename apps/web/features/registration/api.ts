@@ -1,7 +1,9 @@
 import type {
   VerificationAngle,
   VerificationCapturesByAngle,
+  VerificationFrameMetadataByAngle,
 } from '@/features/registration/verification/types';
+import { requiredShotsPerAngle } from '@/features/registration/verification/constants';
 
 const GENERIC_ENROLLMENT_ERROR =
   'Unable to continue right now. Please try again.';
@@ -16,6 +18,7 @@ const REQUIRED_VERIFICATION_ANGLES: VerificationAngle[] = [
   'up',
   'down',
 ];
+const MAX_CAPTURES_PER_ANGLE = 5;
 
 export type EnrollmentPayload = {
   student_id: string;
@@ -35,6 +38,10 @@ export type EnrollmentCompletionPayload = EnrollmentPayload & {
   total_required_shots: number;
   total_accepted_shots: number;
   angles: AngleCaptureSummaryPayload[];
+  frame_metadata_by_angle?: {
+    angle: string;
+    frames: { captured_at: number }[];
+  }[];
 };
 
 type EnrollmentResponse = {
@@ -211,11 +218,13 @@ export async function submitEnrollment(payload: EnrollmentPayload) {
 
 export async function submitEnrollmentCompletion(
   payload: EnrollmentCompletionPayload,
-  capturesByAngle: VerificationCapturesByAngle
+  capturesByAngle: VerificationCapturesByAngle,
+  frameMetadataByAngle: VerificationFrameMetadataByAngle
 ) {
   return submitEnrollmentCompletionRequest(
     payload,
     capturesByAngle,
+    frameMetadataByAngle,
     GENERIC_REGISTRATION_COMPLETION_ERROR
   );
 }
@@ -245,6 +254,7 @@ async function submitEnrollmentRequest(
 async function submitEnrollmentCompletionRequest(
   payload: EnrollmentCompletionPayload,
   capturesByAngle: VerificationCapturesByAngle,
+  frameMetadataByAngle: VerificationFrameMetadataByAngle,
   errorMessage: string
 ) {
   try {
@@ -264,9 +274,19 @@ async function submitEnrollmentCompletionRequest(
       total_accepted_shots: payload.total_accepted_shots,
     });
 
+    const metadataWithFrames: EnrollmentCompletionPayload = {
+      ...payload,
+      frame_metadata_by_angle: REQUIRED_VERIFICATION_ANGLES.map((angle) => ({
+        angle,
+        frames: (frameMetadataByAngle[angle] ?? []).map((frame) => ({
+          captured_at: frame.capturedAt,
+        })),
+      })),
+    };
+
     logTiming('FormData creation started');
     const formData = new FormData();
-    formData.append('metadata', JSON.stringify(payload));
+    formData.append('metadata', JSON.stringify(metadataWithFrames));
 
     let appendedFiles = 0;
     let totalUploadBytes = 0;
@@ -280,10 +300,16 @@ async function submitEnrollmentCompletionRequest(
         };
       }
 
-      if (captures.length !== 1) {
+      if (captures.length < requiredShotsPerAngle) {
         return {
           success: false,
-          message: `Expected exactly 1 captured file for angle: ${angle}. Please retake this shot.`,
+          message: `Expected at least ${requiredShotsPerAngle} captured files for angle: ${angle}. Please retake this angle.`,
+        };
+      }
+      if (captures.length > MAX_CAPTURES_PER_ANGLE) {
+        return {
+          success: false,
+          message: `Too many captured files for angle: ${angle}. Maximum is ${MAX_CAPTURES_PER_ANGLE}.`,
         };
       }
 

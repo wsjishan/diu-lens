@@ -19,7 +19,7 @@ export type CapturedShot = {
   };
 };
 
-export type CapturedShotsByAngle = Record<VerificationAngle, CapturedShot | null>;
+export type CapturedShotsByAngle = Record<VerificationAngle, CapturedShot[]>;
 
 export type CaptureReadiness = {
   faceDetected: boolean;

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -17,6 +18,19 @@ class FaceEmbeddingPersistenceError(Exception):
 
 
 EMBEDDING_DIMENSION = 512
+
+
+def _normalize_embedding_vector(vector: list[float]) -> list[float]:
+    arr = np.asarray(vector, dtype=np.float32).flatten()
+    if arr.size != EMBEDDING_DIMENSION:
+        raise FaceEmbeddingPersistenceError(
+            f"Invalid embedding dimension: expected {EMBEDDING_DIMENSION}, got {arr.size}."
+        )
+    norm = float(np.linalg.norm(arr))
+    if norm <= 0:
+        raise FaceEmbeddingPersistenceError("Invalid embedding norm: vector norm is zero.")
+    normalized = arr / norm
+    return normalized.astype(np.float32).tolist()
 
 
 def deactivate_embeddings_for_student(db: Session, student_id: str) -> int:
@@ -65,11 +79,9 @@ def persist_face_embeddings(
                     raise FaceEmbeddingPersistenceError(
                         f"Invalid embedding payload at index={index}: embedding must be a list."
                     )
-                if len(vector) != EMBEDDING_DIMENSION:
-                    raise FaceEmbeddingPersistenceError(
-                        f"Invalid embedding dimension at index={index}: "
-                        f"expected {EMBEDDING_DIMENSION}, got {len(vector)}."
-                    )
+                normalized_vector = _normalize_embedding_vector(
+                    [float(v) for v in vector]
+                )
 
                 angle = str(row.get("angle", "unknown"))
                 source_image = str(row.get("source_image", ""))
@@ -86,7 +98,7 @@ def persist_face_embeddings(
                         angle=angle,
                         source_image_path=source_image,
                         crop_path=crop_path,
-                        embedding=[float(v) for v in vector],
+                        embedding=normalized_vector,
                         embedding_dim=EMBEDDING_DIMENSION,
                         is_active=True,
                     )

@@ -28,6 +28,8 @@ from app.db.models import (
 )
 from app.scripts.reset_operational_data import reset_operational_data
 
+TEST_FRAMES_PER_ANGLE = 3
+
 
 def _auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
@@ -49,13 +51,23 @@ def _verification_metadata(student_id: str) -> dict[str, object]:
         "phone": "01700000000",
         "university_email": f"{student_id.replace('-', '')}@diu.edu.bd",
         "verification_completed": True,
-        "total_required_shots": len(ALLOWED_ANGLES),
-        "total_accepted_shots": len(ALLOWED_ANGLES),
+        "total_required_shots": len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE,
+        "total_accepted_shots": len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE,
         "angles": [
             {
                 "angle": angle,
-                "accepted_shots": 1,
-                "required_shots": 1,
+                "accepted_shots": TEST_FRAMES_PER_ANGLE,
+                "required_shots": TEST_FRAMES_PER_ANGLE,
+            }
+            for angle in ALLOWED_ANGLES
+        ],
+        "frame_metadata_by_angle": [
+            {
+                "angle": angle,
+                "frames": [
+                    {"captured_at": 1710000000000 + idx}
+                    for idx in range(TEST_FRAMES_PER_ANGLE)
+                ],
             }
             for angle in ALLOWED_ANGLES
         ],
@@ -68,12 +80,17 @@ def _verification_files(metadata: dict[str, object]) -> list[tuple[str, tuple[An
         ("metadata", (None, json.dumps(metadata), "application/json")),
     ]
     for angle in ALLOWED_ANGLES:
-        files.append(
-            (
-                angle,
-                (f"{angle}.jpg", _build_image_bytes(student_id=student_id, angle=angle), "image/jpeg"),
+        for variant in range(TEST_FRAMES_PER_ANGLE):
+            files.append(
+                (
+                    angle,
+                    (
+                        f"{angle}_{variant + 1}.jpg",
+                        _build_image_bytes(student_id=student_id, angle=angle, variant=variant),
+                        "image/jpeg",
+                    ),
+                )
             )
-        )
     return files
 
 
@@ -95,7 +112,17 @@ def _verification_files_for_images(
         ("metadata", (None, json.dumps(metadata), "application/json")),
     ]
     for angle in ALLOWED_ANGLES:
-        files.append((angle, (f"{angle}.jpg", image_by_angle[angle], "image/jpeg")))
+        for variant in range(TEST_FRAMES_PER_ANGLE):
+            files.append(
+                (
+                    angle,
+                    (
+                        f"{angle}_{variant + 1}.jpg",
+                        image_by_angle[angle],
+                        "image/jpeg",
+                    ),
+                )
+            )
     return files
 
 
@@ -317,7 +344,7 @@ def test_approve_process_keeps_status_and_recognition_eligible(
     approve_payload = _approve(client, student_id, auth_tokens["admin"])
     assert approve_payload.get("success") is True
 
-    monkeypatch.setattr(debug_routes, "process_student_images", _process_stub(processed_count=2))
+    monkeypatch.setattr(debug_routes, "process_student_images", _process_stub(processed_count=3))
 
     process_response = client.post(
         f"/debug/process/{student_id}",
@@ -326,13 +353,13 @@ def test_approve_process_keeps_status_and_recognition_eligible(
     assert process_response.status_code == 200, process_response.text
     process_payload = process_response.json()
     assert process_payload.get("processing_passed") is True
-    assert int(process_payload.get("embeddings_generated_count", 0)) == 2
+    assert int(process_payload.get("embeddings_generated_count", 0)) == 3
 
     with db_session_factory() as db:
         enrollment = _latest_enrollment(db, student_id)
         assert enrollment is not None
         assert enrollment.status == "approved"
-        assert _count(db, FaceEmbedding, FaceEmbedding.student_id == student_id) == 2
+        assert _count(db, FaceEmbedding, FaceEmbedding.student_id == student_id) == 3
 
     def _query_features(
         _image_bytes: bytes,
@@ -839,11 +866,12 @@ def test_reverification_replaces_student_upload_files_without_accumulation(
     uploads_payload = uploads_response.json()
     angles = uploads_payload.get("angles", {})
     assert isinstance(angles, dict)
-    assert sum(len(paths) for paths in angles.values()) == len(ALLOWED_ANGLES)
+    assert sum(len(paths) for paths in angles.values()) == len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE
     for angle in ALLOWED_ANGLES:
         paths = angles.get(angle, [])
-        assert len(paths) == 1
+        assert len(paths) == TEST_FRAMES_PER_ANGLE
         assert paths[0] == f"{angle}_1.jpg"
+        assert paths[-1] == f"{angle}_{TEST_FRAMES_PER_ANGLE}.jpg"
 
     with db_session_factory() as db:
         enrollment = _latest_enrollment(db, student_id)
@@ -851,7 +879,7 @@ def test_reverification_replaces_student_upload_files_without_accumulation(
         image_rows = db.scalars(
             select(EnrollmentImage).where(EnrollmentImage.enrollment_id == enrollment.id)
         ).all()
-        assert len(image_rows) == len(ALLOWED_ANGLES)
+        assert len(image_rows) == len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE
         expected_prefix = f"uploads/{student_id}/"
         assert all(str(row.file_path).startswith(expected_prefix) for row in image_rows)
 
@@ -878,7 +906,7 @@ def test_processing_source_images_are_db_scoped_only(
     sources = list(source_bundle.get("source_images", []))
     source_paths = {str(item.get("source_image", "")) for item in sources}
     assert f"uploads/{student_id}/front/front_99.jpg" not in source_paths
-    assert len(sources) == len(ALLOWED_ANGLES)
+    assert len(sources) == len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE
 
 
 def test_processing_integrity_rejects_cross_student_image_paths(

@@ -23,6 +23,11 @@ class FaceMatchingError(Exception):
     """Raised for face matching failures."""
 
 
+STRICT_BEST_DISTANCE_MAX = 0.20
+STRICT_TOP_AVG_DISTANCE_MAX = 0.35
+STRICT_SUPPORT_COUNT_MIN = 3
+
+
 def _encode_mirrored_probe(image_bytes: bytes) -> bytes | None:
     image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
@@ -275,10 +280,13 @@ def aggregate_student_candidates(
             if compatible_distances
             else None
         )
-        support_count = len(distances)
-        compatible_support_count = len(compatible_distances)
+        raw_support_count = len(distances)
+        compatible_raw_support_count = len(compatible_distances)
         matched_angles_count = len(bucket["angles"])
         compatible_angles_count = len(bucket["compatible_angles"])
+        support_count = (
+            compatible_angles_count if compatible_angles_count > 0 else matched_angles_count
+        )
         best_row = bucket["best_row"]
         distances_by_angle_raw = bucket["distances_by_angle"]
         angle_best_distances = {
@@ -292,7 +300,9 @@ def aggregate_student_candidates(
                 "student_id": student_id,
                 "best_distance": best_distance,
                 "support_count": support_count,
-                "compatible_support_count": compatible_support_count,
+                "raw_support_count": raw_support_count,
+                "compatible_support_count": compatible_angles_count,
+                "compatible_raw_support_count": compatible_raw_support_count,
                 "matched_angles": sorted(bucket["angles"]),
                 "matched_angles_count": matched_angles_count,
                 "compatible_matched_angles": sorted(bucket["compatible_angles"]),
@@ -360,6 +370,10 @@ def aggregate_student_candidates(
         )
         support_count = int(row["support_count"])
         compatible_support_count = int(row["compatible_support_count"])
+        raw_support_count = int(row.get("raw_support_count", support_count))
+        compatible_raw_support_count = int(
+            row.get("compatible_raw_support_count", compatible_support_count)
+        )
         matched_angles_count = int(row["matched_angles_count"])
         compatible_matched_angles_count = int(row["compatible_matched_angles_count"])
         rank_gap_to_next_raw = row.get("rank_gap_to_next")
@@ -367,53 +381,35 @@ def aggregate_student_candidates(
             float(rank_gap_to_next_raw) if rank_gap_to_next_raw is not None else None
         )
 
-        effective_best_distance = (
-            best_compatible_distance
-            if best_compatible_distance is not None
-            else best_distance
-        )
-        effective_top_avg_distance = (
-            top_avg_compatible_distance
-            if top_avg_compatible_distance is not None
-            else top_avg_distance
-        )
-        effective_support_count = (
-            compatible_support_count if compatible_support_count > 0 else support_count
-        )
-        distance_ok = effective_best_distance <= threshold
-        very_strong_best = effective_best_distance <= (threshold * 0.5)
-        top_avg_limit = max(threshold * 1.25, threshold + 0.01)
-        top_avg_ok = effective_top_avg_distance <= top_avg_limit
-        support_ok = effective_support_count >= 2 or (
-            effective_support_count == 1 and effective_best_distance <= (threshold * 0.65)
-        )
-        rank_gap_limit = max(0.01, threshold * 0.2)
-        rank_gap_ok = rank_gap_to_next is None or rank_gap_to_next >= rank_gap_limit
-        is_likely_match = (
-            distance_ok and rank_gap_ok and very_strong_best
-        ) or (
-            distance_ok and top_avg_ok and support_ok and rank_gap_ok
-        )
+        best_distance_ok = best_distance <= STRICT_BEST_DISTANCE_MAX
+        top_avg_distance_ok = top_avg_distance <= STRICT_TOP_AVG_DISTANCE_MAX
+        support_count_ok = support_count >= STRICT_SUPPORT_COUNT_MIN
+        is_likely_match = best_distance_ok and top_avg_distance_ok and support_count_ok
+
+        classification = "rejected"
+        if is_likely_match:
+            classification = "strong_match"
+        elif best_distance_ok:
+            classification = "possible_match"
 
         decision_reasons: list[str] = []
-        decision_reasons.append(
-            "best_distance_within_threshold"
-            if distance_ok
-            else "best_distance_above_threshold"
-        )
-        decision_reasons.append(
-            "probe_angle_compatible_support"
-            if compatible_support_count > 0
-            else "probe_angle_compatible_support_unavailable"
-        )
-        decision_reasons.append(
-            "best_distance_very_strong" if very_strong_best else "best_distance_not_very_strong"
-        )
-        decision_reasons.append("top_avg_consistent" if top_avg_ok else "top_avg_inconsistent")
-        decision_reasons.append("support_sufficient" if support_ok else "support_insufficient")
-        decision_reasons.append(
-            "rank_gap_safe_or_unavailable" if rank_gap_ok else "rank_gap_too_small"
-        )
+        if not best_distance_ok:
+            decision_reasons.append(
+                "best_distance_above_limit"
+                f"({best_distance:.4f}>{STRICT_BEST_DISTANCE_MAX:.4f})"
+            )
+        if not top_avg_distance_ok:
+            decision_reasons.append(
+                "top_avg_distance_above_limit"
+                f"({top_avg_distance:.4f}>{STRICT_TOP_AVG_DISTANCE_MAX:.4f})"
+            )
+        if not support_count_ok:
+            decision_reasons.append(
+                "support_count_below_min"
+                f"({support_count}<{STRICT_SUPPORT_COUNT_MIN})"
+            )
+        if not decision_reasons:
+            decision_reasons.append("all_strict_conditions_satisfied")
 
         candidates.append(
             {
@@ -422,10 +418,12 @@ def aggregate_student_candidates(
                 "best_distance": best_distance,
                 "top_avg_distance": top_avg_distance,
                 "support_count": support_count,
+                "raw_support_count": raw_support_count,
                 "best_angle": row["best_angle"],
                 "best_compatible_distance": best_compatible_distance,
                 "top_avg_compatible_distance": top_avg_compatible_distance,
                 "compatible_support_count": compatible_support_count,
+                "compatible_raw_support_count": compatible_raw_support_count,
                 "matched_angles": row["matched_angles"],
                 "matched_angles_count": matched_angles_count,
                 "compatible_matched_angles": row["compatible_matched_angles"],
@@ -438,6 +436,7 @@ def aggregate_student_candidates(
                 "university_email": row["university_email"],
                 "phone": row["phone"],
                 "decision_reasons": decision_reasons,
+                "classification": classification,
                 "is_likely_match": is_likely_match,
             }
         )
@@ -489,7 +488,7 @@ def match_face_probe(
         primary_rows,
         mirrored_rows,
     )
-    candidates = aggregate_student_candidates(
+    ranked_candidates = aggregate_student_candidates(
         embedding_rows,
         top_k=resolved_top_k,
         threshold=resolved_threshold,
@@ -500,7 +499,17 @@ def match_face_probe(
         ),
     )
 
-    match_found = any(bool(candidate["is_likely_match"]) for candidate in candidates)
+    strong_candidates = [
+        candidate
+        for candidate in ranked_candidates
+        if str(candidate.get("classification")) == "strong_match"
+    ]
+    weak_candidates = [
+        candidate
+        for candidate in ranked_candidates
+        if str(candidate.get("classification")) != "strong_match"
+    ]
+    match_found = len(strong_candidates) > 0
 
     response: dict[str, Any] = {
         "match_found": match_found,
@@ -512,12 +521,18 @@ def match_face_probe(
         "mirror_query_enabled": bool(mirrored_rows),
         "mirror_wins_count": int(mirror_wins),
         "searched_embedding_rows": len(embedding_rows),
-        "candidates": candidates,
+        "strict_criteria": {
+            "best_distance_max": STRICT_BEST_DISTANCE_MAX,
+            "top_avg_distance_max": STRICT_TOP_AVG_DISTANCE_MAX,
+            "support_count_min": STRICT_SUPPORT_COUNT_MIN,
+        },
+        "candidates": strong_candidates if match_found else [],
+        "weak_candidates": weak_candidates,
     }
 
     if debug:
         top_row = embedding_rows[0] if embedding_rows else None
-        top_candidate = candidates[0] if candidates else None
+        top_candidate = ranked_candidates[0] if ranked_candidates else None
         response["query_debug"] = {
             "query_image_size": query_features.get("query_image_size"),
             "face_bbox": query_features.get("face_bbox"),

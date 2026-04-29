@@ -7,6 +7,7 @@ export const guidedAngles: VerificationAngle[] = [
   'up',
   'down',
 ];
+export const BURST_CAPTURE_FRAME_COUNT = 3;
 
 export const perAngleInstruction: Record<VerificationAngle, string> = {
   front: 'Look straight ahead with a neutral face.',
@@ -50,4 +51,4 @@ export const ANGLE_THRESHOLDS = {
   verticalYawAbs: 16,
 } as const;
 
-export const captureStorageVersion = 1;
+export const captureStorageVersion = 2;

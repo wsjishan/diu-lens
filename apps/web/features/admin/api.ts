@@ -44,6 +44,7 @@ export type RecognitionMatchCandidate = {
   matched_angles_count: number;
   rank_gap_to_next: number | null;
   decision_reasons: string[];
+  classification: 'strong_match' | 'possible_match' | 'rejected';
   representative_crop_path: string | null;
   representative_source_image_path: string | null;
   is_likely_match: boolean;
@@ -57,6 +58,7 @@ export type RecognitionMatchResponse = ApiBusinessResponse & {
   query_embedding_dim: number;
   searched_embedding_rows: number;
   candidates: RecognitionMatchCandidate[];
+  weak_candidates: RecognitionMatchCandidate[];
 };
 
 type RecognitionMatchOptions = {
@@ -162,6 +164,12 @@ function parseRecognitionCandidate(value: unknown): RecognitionMatchCandidate | 
     decision_reasons: Array.isArray(row.decision_reasons)
       ? row.decision_reasons.filter((item): item is string => typeof item === 'string')
       : [],
+    classification:
+      row.classification === 'strong_match' ||
+      row.classification === 'possible_match' ||
+      row.classification === 'rejected'
+        ? row.classification
+        : 'rejected',
     representative_crop_path:
       typeof row.representative_crop_path === 'string' ? row.representative_crop_path : null,
     representative_source_image_path:
@@ -184,12 +192,18 @@ function parseRecognitionResponse(payload: JsonPayload): RecognitionMatchRespons
       query_embedding_dim: 0,
       searched_embedding_rows: 0,
       candidates: [],
+      weak_candidates: [],
     };
   }
 
   const data = payload as Record<string, unknown>;
   const candidatesRaw = Array.isArray(data.candidates) ? data.candidates : [];
+  const weakCandidatesRaw = Array.isArray(data.weak_candidates) ? data.weak_candidates : [];
   const candidates = candidatesRaw
+    .map(parseRecognitionCandidate)
+    .filter((item): item is RecognitionMatchCandidate => item !== null)
+    .sort((a, b) => a.rank - b.rank);
+  const weakCandidates = weakCandidatesRaw
     .map(parseRecognitionCandidate)
     .filter((item): item is RecognitionMatchCandidate => item !== null)
     .sort((a, b) => a.rank - b.rank);
@@ -206,6 +220,7 @@ function parseRecognitionResponse(payload: JsonPayload): RecognitionMatchRespons
     query_embedding_dim: typeof data.query_embedding_dim === 'number' ? data.query_embedding_dim : 0,
     searched_embedding_rows: typeof data.searched_embedding_rows === 'number' ? data.searched_embedding_rows : 0,
     candidates,
+    weak_candidates: weakCandidates,
   };
 }
 

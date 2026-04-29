@@ -10,6 +10,7 @@ import { CaptureProgress } from '@/features/registration/capture/CaptureProgress
 import { CapturedShotStrip } from '@/features/registration/capture/CapturedShotStrip';
 import { useFaceCapture } from '@/features/registration/capture/useFaceCapture';
 import { useCamera } from '@/features/registration/verification/useCamera';
+import { requiredShotsPerAngle, totalRequiredShots } from '@/features/registration/verification/constants';
 import type {
   VerificationCompletionSummary,
 } from '@/features/registration/verification/types';
@@ -60,6 +61,7 @@ export function GuidedEnrollmentCapture({
   const {
     state,
     capturesByAngle,
+    frameMetadataByAngle,
     firstMissingAngle,
     retakeAngle,
     focusAngle,
@@ -214,14 +216,18 @@ export function GuidedEnrollmentCapture({
     try {
       const summary: VerificationCompletionSummary = {
         verificationCompleted: true,
-        totalRequiredShots: guidedAngles.length,
-        totalAcceptedShots: guidedAngles.length,
+        totalRequiredShots,
+        totalAcceptedShots: guidedAngles.reduce(
+          (total, angle) => total + capturesByAngle[angle].length,
+          0
+        ),
         angles: guidedAngles.map((angle) => ({
           angle,
-          acceptedShots: 1,
-          requiredShots: 1,
+          acceptedShots: capturesByAngle[angle].length,
+          requiredShots: requiredShotsPerAngle,
         })),
         capturesByAngle,
+        frameMetadataByAngle,
       };
 
       await onComplete(summary);
@@ -233,6 +239,7 @@ export function GuidedEnrollmentCapture({
   }, [
     capturesByAngle,
     clearSession,
+    frameMetadataByAngle,
     isSubmittingCompletion,
     onComplete,
     state.canSubmit,

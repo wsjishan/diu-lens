@@ -1,6 +1,9 @@
 import { Check } from 'lucide-react';
 
-import { guidedAngles } from '@/features/registration/capture/constants';
+import {
+  BURST_CAPTURE_FRAME_COUNT,
+  guidedAngles,
+} from '@/features/registration/capture/constants';
 import type { CapturedShotsByAngle } from '@/features/registration/capture/types';
 import type { VerificationAngle } from '@/features/registration/verification/types';
 import { cn } from '@/lib/utils';
@@ -33,7 +36,8 @@ export function CaptureProgress({
 
       <div className="grid grid-cols-5 gap-1.5">
         {guidedAngles.map((angle) => {
-          const completed = Boolean(capturedShots[angle]);
+          const frameCount = capturedShots[angle].length;
+          const completed = frameCount >= BURST_CAPTURE_FRAME_COUNT;
           const active = !completed && angle === currentAngle;
 
           return (
@@ -49,7 +53,7 @@ export function CaptureProgress({
               )}
             >
               {completed ? <Check className="mr-1 size-3.5" /> : null}
-              <span>{angleLabel[angle]}</span>
+              <span>{angleLabel[angle]} {frameCount}/{BURST_CAPTURE_FRAME_COUNT}</span>
             </div>
           );
         })}

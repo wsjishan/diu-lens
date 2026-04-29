@@ -19,6 +19,7 @@ from app.core.enrollment_db import (
 )
 from app.core.image_validation import (
     build_validation_summary,
+    extract_image_quality_metadata,
     validate_uploaded_image_integrity,
 )
 from app.core.storage import (
@@ -30,8 +31,8 @@ from app.core.storage import (
 )
 
 
-REQUIRED_IMAGES_PER_ANGLE = 1
-REQUIRED_TOTAL_SHOTS = 5
+MIN_IMAGES_PER_ANGLE = 2
+MAX_IMAGES_PER_ANGLE = 5
 EYES_VISIBLE_VALUES: tuple[str, ...] = ("passed", "failed", "not_yet_implemented")
 ENROLLMENT_STATUSES: tuple[str, ...] = (
     "pending",
@@ -63,6 +64,15 @@ class AngleCaptureSummary(BaseModel):
     required_shots: int = Field(..., ge=0)
 
 
+class FrameMetadata(BaseModel):
+    captured_at: int | None = Field(default=None, ge=0)
+
+
+class AngleFrameMetadata(BaseModel):
+    angle: str
+    frames: list[FrameMetadata] = Field(default_factory=list)
+
+
 class EnrollmentRequest(BaseModel):
     student_id: str
     full_name: str
@@ -76,6 +86,7 @@ class EnrollmentRequest(BaseModel):
     total_required_shots: int = Field(default=0, ge=0)
     total_accepted_shots: int = Field(default=0, ge=0)
     angles: list[AngleCaptureSummary] = Field(default_factory=list)
+    frame_metadata_by_angle: list[AngleFrameMetadata] = Field(default_factory=list)
 
 
 class EnrollmentResponse(BaseModel):
@@ -149,14 +160,25 @@ def _validate_final_multipart_metadata(payload: EnrollmentRequest) -> None:
             "verification_completed must be true for final multipart enrollment"
         )
 
-    if payload.total_required_shots != REQUIRED_TOTAL_SHOTS:
+    min_total_shots = len(ALLOWED_ANGLES) * MIN_IMAGES_PER_ANGLE
+    max_total_shots = len(ALLOWED_ANGLES) * MAX_IMAGES_PER_ANGLE
+
+    if (
+        payload.total_required_shots < min_total_shots
+        or payload.total_required_shots > max_total_shots
+    ):
         raise _bad_request(
-            f"total_required_shots must equal {REQUIRED_TOTAL_SHOTS}"
+            "total_required_shots must be between "
+            f"{min_total_shots} and {max_total_shots}"
         )
 
-    if payload.total_accepted_shots != REQUIRED_TOTAL_SHOTS:
+    if (
+        payload.total_accepted_shots < min_total_shots
+        or payload.total_accepted_shots > max_total_shots
+    ):
         raise _bad_request(
-            f"total_accepted_shots must equal {REQUIRED_TOTAL_SHOTS}"
+            "total_accepted_shots must be between "
+            f"{min_total_shots} and {max_total_shots}"
         )
 
     angle_names = [summary.angle for summary in payload.angles]
@@ -186,23 +208,95 @@ def _validate_final_multipart_metadata(payload: EnrollmentRequest) -> None:
         )
 
     for summary in payload.angles:
-        if summary.required_shots != REQUIRED_IMAGES_PER_ANGLE:
+        if (
+            summary.required_shots < MIN_IMAGES_PER_ANGLE
+            or summary.required_shots > MAX_IMAGES_PER_ANGLE
+        ):
             raise _bad_request(
-                f"required_shots must be {REQUIRED_IMAGES_PER_ANGLE} for angle: {summary.angle}"
+                "required_shots must be between "
+                f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE} "
+                f"for angle: {summary.angle}"
             )
-        if summary.accepted_shots != REQUIRED_IMAGES_PER_ANGLE:
+        if (
+            summary.accepted_shots < MIN_IMAGES_PER_ANGLE
+            or summary.accepted_shots > MAX_IMAGES_PER_ANGLE
+        ):
             raise _bad_request(
-                f"accepted_shots must be {REQUIRED_IMAGES_PER_ANGLE} for angle: {summary.angle}"
+                "accepted_shots must be between "
+                f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE} "
+                f"for angle: {summary.angle}"
+            )
+        if summary.accepted_shots < summary.required_shots:
+            raise _bad_request(
+                f"accepted_shots must be >= required_shots for angle: {summary.angle}"
             )
 
 
-def _validate_file_counts(files_by_angle: dict[str, list[UploadFile]]) -> None:
+def _validate_file_counts(
+    files_by_angle: dict[str, list[UploadFile]],
+    payload: EnrollmentRequest,
+) -> None:
+    expected_by_angle = {
+        summary.angle: int(summary.accepted_shots) for summary in payload.angles
+    }
     for angle in ALLOWED_ANGLES:
         file_count = len(files_by_angle.get(angle, []))
-        if file_count != REQUIRED_IMAGES_PER_ANGLE:
+        if file_count < MIN_IMAGES_PER_ANGLE or file_count > MAX_IMAGES_PER_ANGLE:
             raise _bad_request(
-                f"Exactly {REQUIRED_IMAGES_PER_ANGLE} images are required for angle: {angle}"
+                "Image count for angle must be between "
+                f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE}: {angle}"
             )
+        expected_count = int(expected_by_angle.get(angle, file_count))
+        if file_count != expected_count:
+            raise _bad_request(
+                f"Metadata/upload count mismatch for angle {angle}: "
+                f"metadata={expected_count}, uploaded={file_count}"
+            )
+
+
+def _capture_timestamps_by_angle(
+    payload: EnrollmentRequest,
+) -> dict[str, list[int | None]]:
+    mapping: dict[str, list[int | None]] = {angle: [] for angle in ALLOWED_ANGLES}
+    for entry in payload.frame_metadata_by_angle:
+        angle = str(entry.angle)
+        if angle not in mapping:
+            continue
+        mapping[angle] = [frame.captured_at for frame in entry.frames]
+    return mapping
+
+
+def _build_frame_metadata_by_path(
+    uploaded_images: dict[str, list[str]],
+    validation_summary: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    metadata_by_path: dict[str, dict[str, object]] = {}
+    quality_by_angle_raw = validation_summary.get("quality_by_angle", {})
+    quality_by_angle = (
+        quality_by_angle_raw
+        if isinstance(quality_by_angle_raw, dict)
+        else {}
+    )
+
+    for angle in ALLOWED_ANGLES:
+        paths = uploaded_images.get(angle, [])
+        quality_rows_raw = quality_by_angle.get(angle, [])
+        quality_rows = quality_rows_raw if isinstance(quality_rows_raw, list) else []
+
+        for index, path in enumerate(paths):
+            quality = quality_rows[index] if index < len(quality_rows) else {}
+            if not isinstance(quality, dict):
+                quality = {}
+            metadata_by_path[str(path)] = {
+                "captured_at": quality.get("captured_at"),
+                "blur_score": quality.get("blur_score"),
+                "brightness": quality.get("brightness"),
+                "face_area_ratio": quality.get("face_area_ratio"),
+                "center_offset": quality.get("center_offset"),
+                "detection_confidence": quality.get("detection_confidence"),
+            }
+
+    return metadata_by_path
 
 
 def _extract_sanity_failure_details(
@@ -251,12 +345,18 @@ def _dimensions_from_report(report: dict[str, object]) -> str:
     return "unknown"
 
 
-async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[str, object]:
+async def _validate_files(
+    files_by_angle: dict[str, list[UploadFile]],
+    capture_timestamps_by_angle: dict[str, list[int | None]],
+) -> dict[str, object]:
     image_reports: list[dict[str, object]] = []
     total_uploaded_bytes = 0
+    quality_by_angle: dict[str, list[dict[str, object]]] = {
+        angle: [] for angle in ALLOWED_ANGLES
+    }
 
     for angle in ALLOWED_ANGLES:
-        for upload in files_by_angle.get(angle, []):
+        for index, upload in enumerate(files_by_angle.get(angle, [])):
             content_type = (upload.content_type or "").lower()
             if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
                 raise _bad_request(f"Unsupported file type for angle: {angle}")
@@ -276,6 +376,24 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
                 image_bytes=sample,
                 file_name=file_name,
                 angle=angle,
+            )
+            quality = extract_image_quality_metadata(sample)
+            captured_at_rows = capture_timestamps_by_angle.get(angle, [])
+            captured_at = (
+                captured_at_rows[index]
+                if index < len(captured_at_rows)
+                else None
+            )
+            quality_by_angle[angle].append(
+                {
+                    "file_name": file_name,
+                    "captured_at": captured_at,
+                    "blur_score": quality.get("blur_score"),
+                    "brightness": quality.get("brightness"),
+                    "face_area_ratio": quality.get("face_area_ratio"),
+                    "center_offset": quality.get("center_offset"),
+                    "detection_confidence": quality.get("detection_confidence"),
+                }
             )
             blocking_reasons = image_report.get("blocking_reasons", [])
             non_blocking_reasons = image_report.get("non_blocking_reasons", [])
@@ -316,6 +434,7 @@ async def _validate_files(files_by_angle: dict[str, list[UploadFile]]) -> dict[s
         summary.get("failed_images_count"),
     )
     summary["total_uploaded_bytes"] = total_uploaded_bytes
+    summary["quality_by_angle"] = quality_by_angle
     if not summary["validation_passed"]:
         failure_details = _extract_sanity_failure_details(image_reports)
         logger.warning(
@@ -349,6 +468,7 @@ def _default_validation_summary() -> dict[str, object]:
         "total_images_passed": 0,
         "failed_images_count": 0,
         "image_reports": [],
+        "quality_by_angle": {angle: [] for angle in ALLOWED_ANGLES},
     }
 
 
@@ -459,6 +579,7 @@ def _build_enrollment_entry(
     payload: EnrollmentRequest,
     uploaded_images: dict[str, list[str]],
     validation_summary: dict[str, object],
+    frame_metadata_by_path: dict[str, dict[str, object]],
     *,
     status_override: EnrollmentStatus | None = None,
 ) -> dict[str, object]:
@@ -481,6 +602,7 @@ def _build_enrollment_entry(
         "total_accepted_shots": payload.total_accepted_shots,
         "angles": normalized_angles,
         "uploaded_images": normalized_uploaded_images,
+        "frame_metadata_by_path": frame_metadata_by_path,
         "validation": normalized_validation,
         "created_at": now_iso,
         "updated_at": now_iso,
@@ -497,10 +619,13 @@ def _persist_enrollment_metadata(
 ) -> None:
     validation = entry.get("validation", {})
     uploaded_images = entry.get("uploaded_images", {})
+    frame_metadata_raw = entry.get("frame_metadata_by_path", {})
     if not isinstance(validation, dict):
         validation = {}
     if not isinstance(uploaded_images, dict):
         uploaded_images = empty_uploaded_images()
+    if not isinstance(frame_metadata_raw, dict):
+        frame_metadata_raw = {}
 
     try:
         payload = EnrollmentRecordInput(
@@ -518,6 +643,12 @@ def _persist_enrollment_metadata(
                 if isinstance(uploaded_images.get(angle, []), list)
                 else []
                 for angle in ALLOWED_ANGLES
+            },
+            frame_metadata_by_path={
+                str(path): (
+                    metadata if isinstance(metadata, dict) else {}
+                )
+                for path, metadata in frame_metadata_raw.items()
             },
             event_type=event_type,
             event_message=event_message,
@@ -593,6 +724,7 @@ async def _handle_multipart_enrollment(
     after_metadata_parse_at = perf_counter()
 
     files_by_angle = _extract_multipart_files(form_data)
+    capture_timestamps_by_angle = _capture_timestamps_by_angle(payload)
     after_file_access_at = perf_counter()
     logger.info(
         "[verification-timing] metadata parsed ms=%s",
@@ -609,8 +741,11 @@ async def _handle_multipart_enrollment(
 
     try:
         _validate_final_multipart_metadata(payload)
-        _validate_file_counts(files_by_angle)
-        validation_summary = await _validate_files(files_by_angle)
+        _validate_file_counts(files_by_angle, payload)
+        validation_summary = await _validate_files(
+            files_by_angle,
+            capture_timestamps_by_angle,
+        )
         after_validation_at = perf_counter()
         logger.info(
             "[verification-timing] integrity validation complete ms=%s",
@@ -631,6 +766,7 @@ async def _handle_multipart_enrollment(
             payload=failed_payload,
             uploaded_images=uploaded_images,
             validation_summary=failed_validation,
+            frame_metadata_by_path={},
             status_override="pending",
         )
         try:
@@ -715,6 +851,7 @@ async def enroll(request: Request) -> EnrollmentResponse:
         payload=payload,
         uploaded_images=uploaded_images,
         validation_summary=validation_summary,
+        frame_metadata_by_path={},
         status_override="pending" if mode == "basic" else None,
     )
 
@@ -797,6 +934,10 @@ async def enroll_verification(request: Request) -> EnrollmentResponse:
             payload=payload,
             uploaded_images=uploaded_images,
             validation_summary=validation_summary,
+            frame_metadata_by_path=_build_frame_metadata_by_path(
+                uploaded_images,
+                validation_summary,
+            ),
         )
 
         try:

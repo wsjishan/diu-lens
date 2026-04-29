@@ -24,7 +24,7 @@ from app.core.enrollment_db import (
     EnrollmentPersistenceError,
     get_processing_source_images,
 )
-from app.core.storage_service import StorageService
+from app.core.storage_service import ALLOWED_ANGLES, StorageService
 _STUDENT_ID_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 _PROBE_LABEL_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 
@@ -36,6 +36,15 @@ _MIN_FACE_AREA_RATIO = 0.06
 _MIN_BLUR_VARIANCE = 22.0
 _MIN_BRIGHTNESS = 35.0
 _MAX_BRIGHTNESS = 235.0
+_EXTREME_MIN_DET_SCORE = 0.20
+_EXTREME_MIN_FACE_AREA_RATIO = 0.03
+_EXTREME_MIN_BLUR_VARIANCE = 10.0
+_EXTREME_MIN_BRIGHTNESS = 20.0
+_EXTREME_MAX_BRIGHTNESS = 245.0
+_TOP_FRAMES_PER_ANGLE = 3
+_MIN_SELECTED_FRAMES_PER_ANGLE = 2
+_MIN_EMBEDDING_DISTANCE_FROM_TOP = 0.08
+_MIN_EMBEDDING_DISTANCE_BETWEEN_SELECTED = 0.04
 
 
 class FacePipelineError(Exception):
@@ -186,6 +195,140 @@ def _compute_face_area_ratio(face: Any, image: np.ndarray) -> float:
     return area / float(width * height)
 
 
+def _compute_center_offset(face: Any, image: np.ndarray) -> float:
+    bbox = getattr(face, "bbox", None)
+    if bbox is None or len(bbox) != 4:
+        return 1.0
+    height, width = image.shape[:2]
+    if height <= 0 or width <= 0:
+        return 1.0
+    x1, y1, x2, y2 = [float(v) for v in bbox]
+    center_x = (x1 + x2) / 2.0
+    center_y = (y1 + y2) / 2.0
+    norm_x = center_x / float(width)
+    norm_y = center_y / float(height)
+    return float(np.hypot(norm_x - 0.5, norm_y - 0.5))
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _compute_quality_score(
+    *,
+    det_score: float | None,
+    face_area_ratio: float,
+    blur_score: float,
+    brightness: float,
+    center_offset: float,
+) -> float:
+    det_component = _clamp01((det_score or 0.0) / 1.0)
+    size_component = _clamp01(face_area_ratio / 0.25)
+    blur_component = _clamp01(blur_score / 120.0)
+    brightness_component = 1.0 - _clamp01(abs(brightness - 130.0) / 130.0)
+    center_component = 1.0 - _clamp01(center_offset / 0.35)
+
+    weighted = (
+        det_component * 0.35
+        + size_component * 0.25
+        + blur_component * 0.20
+        + brightness_component * 0.10
+        + center_component * 0.10
+    )
+    return round(weighted * 100.0, 4)
+
+
+def _extreme_rejection_reason(
+    *,
+    det_score: float | None,
+    face_area_ratio: float,
+    blur_score: float,
+    brightness: float,
+) -> str | None:
+    if det_score is not None and det_score < _EXTREME_MIN_DET_SCORE:
+        return (
+            "extreme_low_detection_confidence"
+            f"({det_score:.3f}<{_EXTREME_MIN_DET_SCORE:.3f})"
+        )
+    if face_area_ratio < _EXTREME_MIN_FACE_AREA_RATIO:
+        return (
+            "extreme_small_face_area_ratio"
+            f"({face_area_ratio:.4f}<{_EXTREME_MIN_FACE_AREA_RATIO:.4f})"
+        )
+    if blur_score < _EXTREME_MIN_BLUR_VARIANCE:
+        return (
+            "extreme_low_blur_score"
+            f"({blur_score:.2f}<{_EXTREME_MIN_BLUR_VARIANCE:.2f})"
+        )
+    if brightness < _EXTREME_MIN_BRIGHTNESS or brightness > _EXTREME_MAX_BRIGHTNESS:
+        return (
+            "extreme_brightness_out_of_range"
+            f"({brightness:.2f} not in {_EXTREME_MIN_BRIGHTNESS:.2f}-{_EXTREME_MAX_BRIGHTNESS:.2f})"
+        )
+    return None
+
+
+def _embedding_cosine_distance(a: list[float], b: list[float]) -> float:
+    va = np.asarray(a, dtype=np.float32).flatten()
+    vb = np.asarray(b, dtype=np.float32).flatten()
+    if va.size == 0 or vb.size == 0 or va.size != vb.size:
+        return 1.0
+    dot = float(np.dot(va, vb))
+    na = float(np.linalg.norm(va))
+    nb = float(np.linalg.norm(vb))
+    if na <= 0.0 or nb <= 0.0:
+        return 1.0
+    cosine_similarity = max(-1.0, min(1.0, dot / (na * nb)))
+    return 1.0 - cosine_similarity
+
+
+def _select_diverse_candidates(
+    candidates_sorted: list[dict[str, Any]],
+    *,
+    max_count: int,
+) -> list[dict[str, Any]]:
+    if not candidates_sorted:
+        return []
+    top = candidates_sorted[0]
+    selected: list[dict[str, Any]] = [top]
+    top_embedding = list(top.get("embedding", []))
+
+    for candidate in candidates_sorted[1:]:
+        if len(selected) >= max_count:
+            break
+        embedding = list(candidate.get("embedding", []))
+        if not embedding or not top_embedding:
+            continue
+        distance_from_top = _embedding_cosine_distance(embedding, top_embedding)
+        if distance_from_top < _MIN_EMBEDDING_DISTANCE_FROM_TOP:
+            continue
+
+        too_close_to_selected = False
+        for chosen in selected:
+            chosen_embedding = list(chosen.get("embedding", []))
+            distance_to_chosen = _embedding_cosine_distance(embedding, chosen_embedding)
+            if distance_to_chosen < _MIN_EMBEDDING_DISTANCE_BETWEEN_SELECTED:
+                too_close_to_selected = True
+                break
+        if too_close_to_selected:
+            continue
+
+        selected.append(candidate)
+
+    # Fallback to quality order when diversity constraints cannot fill target count.
+    if len(selected) < max_count:
+        selected_ids = {id(item) for item in selected}
+        for candidate in candidates_sorted[1:]:
+            if len(selected) >= max_count:
+                break
+            if id(candidate) in selected_ids:
+                continue
+            selected.append(candidate)
+            selected_ids.add(id(candidate))
+
+    return selected
+
+
 def _extract_pose(face: Any) -> dict[str, float] | None:
     pose_raw = getattr(face, "pose", None)
     if pose_raw is None:
@@ -289,6 +432,10 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
     processed_crops: list[dict[str, Any]] = []
     failed_images: list[dict[str, str]] = []
     failure_reasons: set[str] = set()
+    skipped_images: list[dict[str, Any]] = []
+    candidate_by_angle: dict[str, list[dict[str, Any]]] = {
+        angle: [] for angle in ALLOWED_ANGLES
+    }
 
     source_images = list(source_bundle.get("source_images", []))
     for row in source_images:
@@ -309,49 +456,71 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
             det_score_raw = getattr(face, "det_score", None)
             det_score = float(det_score_raw) if det_score_raw is not None else None
             face_area_ratio = _compute_face_area_ratio(face, image)
+            center_offset = _compute_center_offset(face, image)
             blur_score, brightness = _compute_blur_and_brightness(aligned_crop)
             pose = _extract_pose(face)
             inferred_angle = _infer_angle_from_pose(pose)
+            quality_score = _compute_quality_score(
+                det_score=det_score,
+                face_area_ratio=face_area_ratio,
+                blur_score=blur_score,
+                brightness=brightness,
+                center_offset=center_offset,
+            )
+            extreme_rejection = _extreme_rejection_reason(
+                det_score=det_score,
+                face_area_ratio=face_area_ratio,
+                blur_score=blur_score,
+                brightness=brightness,
+            )
+            if extreme_rejection is not None:
+                skipped_images.append(
+                    {
+                        "angle": angle,
+                        "file_name": file_name,
+                        "source_image": image_rel_path,
+                        "reason": extreme_rejection,
+                        "quality_score": quality_score,
+                    }
+                )
+                failure_reasons.add(extreme_rejection)
+                continue
 
+            warnings: list[str] = []
             if det_score is not None and det_score < _MIN_DET_SCORE:
-                raise FacePipelineError(
-                    f"Low face detection confidence ({det_score:.3f} < {_MIN_DET_SCORE:.3f})."
+                warnings.append(
+                    f"low_detection_confidence({det_score:.3f}<{_MIN_DET_SCORE:.3f})"
                 )
             if face_area_ratio < _MIN_FACE_AREA_RATIO:
-                raise FacePipelineError(
-                    f"Face is too small in frame ({face_area_ratio:.4f} < {_MIN_FACE_AREA_RATIO:.4f})."
+                warnings.append(
+                    f"small_face_area_ratio({face_area_ratio:.4f}<{_MIN_FACE_AREA_RATIO:.4f})"
                 )
             if blur_score < _MIN_BLUR_VARIANCE:
-                raise FacePipelineError(
-                    f"Image is too blurry ({blur_score:.2f} < {_MIN_BLUR_VARIANCE:.2f})."
+                warnings.append(
+                    f"low_blur_score({blur_score:.2f}<{_MIN_BLUR_VARIANCE:.2f})"
                 )
             if brightness < _MIN_BRIGHTNESS or brightness > _MAX_BRIGHTNESS:
-                raise FacePipelineError(
-                    "Image lighting is out of acceptable range "
-                    f"({brightness:.2f} not in {_MIN_BRIGHTNESS:.2f}-{_MAX_BRIGHTNESS:.2f})."
+                warnings.append(
+                    "brightness_out_of_range"
+                    f"({brightness:.2f} not in {_MIN_BRIGHTNESS:.2f}-{_MAX_BRIGHTNESS:.2f})"
                 )
 
-            crop_rel_path = _save_crop_image(
-                storage=storage,
-                student_id=sanitized_student_id,
-                angle=angle,
-                source_rel_path=image_rel_path,
-                crop=aligned_crop,
-            )
-
-            processed_crops.append(
+            candidate_by_angle.setdefault(angle, []).append(
                 {
                     "angle": angle,
                     "source_image": image_rel_path,
-                    "crop_path": crop_rel_path,
+                    "aligned_crop": aligned_crop,
                     "embedding": embedding,
                     "embedding_dim": len(embedding),
                     "det_score": det_score,
                     "face_area_ratio": face_area_ratio,
+                    "center_offset": center_offset,
                     "blur_score": blur_score,
                     "brightness": brightness,
                     "pose": pose,
                     "inferred_angle": inferred_angle,
+                    "quality_score": quality_score,
+                    "warnings": warnings,
                 }
             )
         except FacePipelineError as exc:
@@ -377,14 +546,114 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
             )
             failure_reasons.add(reason)
 
+    selection_by_angle: dict[str, list[dict[str, Any]]] = {}
+    for angle in ALLOWED_ANGLES:
+        candidates = list(candidate_by_angle.get(angle, []))
+        candidates.sort(key=lambda item: float(item.get("quality_score", 0.0)), reverse=True)
+        selected_count = min(_TOP_FRAMES_PER_ANGLE, len(candidates))
+        selected = _select_diverse_candidates(
+            candidates,
+            max_count=selected_count,
+        )
+        selection_by_angle[angle] = [
+            {
+                "source_image": str(item.get("source_image", "")),
+                "quality_score": float(item.get("quality_score", 0.0)),
+                "selected": True,
+                "distance_from_top": (
+                    _embedding_cosine_distance(
+                        list(item.get("embedding", [])),
+                        list(selected[0].get("embedding", [])),
+                    )
+                    if selected
+                    else None
+                ),
+            }
+            for item in selected
+        ]
+        selected_ids = {id(item) for item in selected}
+        for skipped in candidates:
+            if id(skipped) in selected_ids:
+                continue
+            skipped_images.append(
+                {
+                    "angle": angle,
+                    "file_name": Path(str(skipped.get("source_image", ""))).name
+                    or "unknown",
+                    "source_image": skipped.get("source_image"),
+                    "reason": "not_selected_by_quality_ranking",
+                    "quality_score": skipped.get("quality_score"),
+                }
+            )
+
+        if selected_count < _MIN_SELECTED_FRAMES_PER_ANGLE:
+            reason = (
+                f"insufficient_selected_frames_for_angle:{angle}"
+                f"(selected={selected_count},required={_MIN_SELECTED_FRAMES_PER_ANGLE})"
+            )
+            failure_reasons.add(reason)
+
+        for rank_index, selected_item in enumerate(selected, start=1):
+            crop_rel_path = _save_crop_image(
+                storage=storage,
+                student_id=sanitized_student_id,
+                angle=angle,
+                source_rel_path=str(selected_item.get("source_image", "")),
+                crop=np.asarray(selected_item["aligned_crop"]),
+            )
+            embedding_vector = [
+                float(v) for v in list(selected_item.get("embedding", []))
+            ]
+            embedding_norm = _embedding_l2_norm(embedding_vector)
+            processed_crops.append(
+                {
+                    "angle": angle,
+                    "source_image": selected_item.get("source_image"),
+                    "crop_path": crop_rel_path,
+                    "embedding": embedding_vector,
+                    "embedding_dim": len(embedding_vector),
+                    "embedding_norm": embedding_norm,
+                    "selection_rank": rank_index,
+                    "quality_score": selected_item.get("quality_score"),
+                    "det_score": selected_item.get("det_score"),
+                    "face_area_ratio": selected_item.get("face_area_ratio"),
+                    "center_offset": selected_item.get("center_offset"),
+                    "blur_score": selected_item.get("blur_score"),
+                    "brightness": selected_item.get("brightness"),
+                    "pose": selected_item.get("pose"),
+                    "inferred_angle": selected_item.get("inferred_angle"),
+                    "warnings": selected_item.get("warnings", []),
+                }
+            )
+
     embeddings_generated_count = sum(1 for item in processed_crops if item.get("embedding"))
+    missing_angles = [
+        angle
+        for angle in ALLOWED_ANGLES
+        if len([crop for crop in processed_crops if crop.get("angle") == angle])
+        < _MIN_SELECTED_FRAMES_PER_ANGLE
+    ]
     result = {
         "student_id": sanitized_student_id,
-        "processing_passed": bool(processed_crops) and not failed_images,
+        "processing_passed": bool(processed_crops) and len(missing_angles) == 0,
         "processed_images_count": len(processed_crops),
         "embeddings_generated_count": embeddings_generated_count,
+        "selection_policy": {
+            "strategy": "quality_plus_diversity",
+            "min_embedding_distance_from_top": _MIN_EMBEDDING_DISTANCE_FROM_TOP,
+            "min_embedding_distance_between_selected": _MIN_EMBEDDING_DISTANCE_BETWEEN_SELECTED,
+        },
+        "top_frames_per_angle": _TOP_FRAMES_PER_ANGLE,
+        "minimum_selected_frames_per_angle": _MIN_SELECTED_FRAMES_PER_ANGLE,
+        "selected_frames_by_angle": {
+            angle: len([crop for crop in processed_crops if crop.get("angle") == angle])
+            for angle in ALLOWED_ANGLES
+        },
+        "missing_angles": missing_angles,
+        "selection_by_angle": selection_by_angle,
         "processed_crops": processed_crops,
         "failed_images": failed_images,
+        "skipped_images": skipped_images,
         "failure_reasons": sorted(failure_reasons),
     }
 

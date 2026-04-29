@@ -1,6 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 
+import { BURST_CAPTURE_FRAME_COUNT } from '@/features/registration/capture/constants';
 import type { CapturedShotsByAngle } from '@/features/registration/capture/types';
 import type { VerificationAngle } from '@/features/registration/verification/types';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,9 @@ export function CapturedShotStrip({
 
       <div className="grid grid-cols-5 gap-2">
         {angleOrder.map((angle) => {
-          const shot = capturedShots[angle];
+          const shots = capturedShots[angle];
+          const shot = shots[shots.length - 1];
+          const completed = shots.length >= BURST_CAPTURE_FRAME_COUNT;
           const active = currentAngle === angle;
 
           return (
@@ -58,7 +61,7 @@ export function CapturedShotStrip({
                 className="w-full text-left"
               >
                 <div className="mb-1 text-[10px] font-semibold tracking-[0.02em] text-slate-600 uppercase">
-                  {angleLabel[angle]}
+                  {angleLabel[angle]} {shots.length}/{BURST_CAPTURE_FRAME_COUNT}
                 </div>
 
                 <div className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-900/90">
@@ -79,12 +82,16 @@ export function CapturedShotStrip({
                 </div>
               </button>
 
+              {completed ? (
+                <p className="mt-1 text-[10px] font-semibold text-emerald-700">Ready</p>
+              ) : null}
+
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => onRetake(angle)}
-                disabled={!shot}
+                disabled={!shots.length}
                 className="mt-1.5 h-7 w-full px-2 text-[10px] text-slate-600 hover:bg-slate-100"
               >
                 <RefreshCw className="size-3" />

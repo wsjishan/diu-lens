@@ -143,6 +143,61 @@ def _reason_code(reason: str) -> str:
     return reason.split("(", 1)[0].strip()
 
 
+def extract_image_quality_metadata(
+    image_bytes: bytes,
+    *,
+    config: ImageValidationConfig = _CONFIG,
+) -> dict[str, float | None]:
+    metadata: dict[str, float | None] = {
+        "blur_score": None,
+        "brightness": None,
+        "face_area_ratio": None,
+        "center_offset": None,
+        "detection_confidence": None,
+    }
+    if not image_bytes:
+        return metadata
+
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if image is None:
+        return metadata
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    metadata["blur_score"] = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    metadata["brightness"] = float(gray.mean())
+
+    if _FACE_CASCADE.empty():
+        return metadata
+
+    faces = _FACE_CASCADE.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(config.min_face_size, config.min_face_size),
+    )
+    if len(faces) <= 0:
+        metadata["detection_confidence"] = 0.0
+        return metadata
+
+    metadata["detection_confidence"] = 1.0
+    height, width = image.shape[:2]
+    largest_face = max(faces, key=lambda f: int(f[2]) * int(f[3]))
+    x, y, w, h = [int(v) for v in largest_face]
+
+    if height > 0 and width > 0:
+        metadata["face_area_ratio"] = (float(w) * float(h)) / float(width * height)
+        face_center_x = x + (w / 2.0)
+        face_center_y = y + (h / 2.0)
+        face_center_norm_x = face_center_x / float(width)
+        face_center_norm_y = face_center_y / float(height)
+        metadata["center_offset"] = float(
+            np.hypot(face_center_norm_x - 0.5, face_center_norm_y - 0.5)
+        )
+
+    return metadata
+
+
 def validate_uploaded_image_integrity(
     image_bytes: bytes,
     file_name: str,

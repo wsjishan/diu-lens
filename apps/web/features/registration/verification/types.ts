@@ -16,6 +16,10 @@ export type AngleCaptureSummary = {
 };
 
 export type VerificationCapturesByAngle = Record<VerificationAngle, Blob[]>;
+export type VerificationFrameMetadataByAngle = Record<
+  VerificationAngle,
+  { capturedAt: number }[]
+>;
 
 export type VerificationCompletionSummary = {
   verificationCompleted: boolean;
@@ -23,6 +27,7 @@ export type VerificationCompletionSummary = {
   totalAcceptedShots: number;
   angles: AngleCaptureSummary[];
   capturesByAngle: VerificationCapturesByAngle;
+  frameMetadataByAngle: VerificationFrameMetadataByAngle;
 };
 
 export type CameraHookResult = {

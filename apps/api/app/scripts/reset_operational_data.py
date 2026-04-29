@@ -73,11 +73,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only clear database operational tables; keep uploads/processed files.",
     )
+    parser.add_argument(
+        "--confirm-reset",
+        action="store_true",
+        help="Required safety flag to execute destructive reset.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if not args.confirm_reset:
+        raise SystemExit(
+            "Refusing to reset operational data without --confirm-reset."
+        )
     report = reset_operational_data(clear_storage=not args.no_storage_clear)
     print(report)
 

@@ -3,7 +3,6 @@
 import { ChangeEvent, DragEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  AlertTriangle,
   ImagePlus,
   Loader2,
   RefreshCw,
@@ -28,8 +27,6 @@ import { cn } from '@/lib/utils';
 
 const DEFAULT_TOP_K = '5';
 const DEFAULT_THRESHOLD = '0.38';
-const STRONG_MATCH_DISTANCE = 0.2;
-const POSSIBLE_MATCH_DISTANCE = 0.38;
 
 function formatDistance(value: number) {
   if (!Number.isFinite(value)) {
@@ -64,18 +61,18 @@ function parsePositiveFloat(value: string): number | null {
   return parsed;
 }
 
-function getDistanceConfidence(distance: number): {
+function getCandidateConfidence(classification: RecognitionMatchCandidate['classification']): {
   label: string;
   className: string;
 } {
-  if (distance <= STRONG_MATCH_DISTANCE) {
+  if (classification === 'strong_match') {
     return {
       label: 'Strong match',
       className: 'border-emerald-300/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200',
     };
   }
 
-  if (distance <= POSSIBLE_MATCH_DISTANCE) {
+  if (classification === 'possible_match') {
     return {
       label: 'Possible match',
       className: 'border-amber-300/30 bg-amber-500/10 text-amber-700 dark:text-amber-200',
@@ -89,7 +86,7 @@ function getDistanceConfidence(distance: number): {
 }
 
 function CandidateCard({ candidate, isTopCandidate }: { candidate: RecognitionMatchCandidate; isTopCandidate: boolean }) {
-  const confidence = getDistanceConfidence(candidate.best_distance);
+  const confidence = getCandidateConfidence(candidate.classification);
 
   return (
     <article
@@ -329,23 +326,16 @@ export function RecognitionView() {
   };
 
   const candidates = useMemo(() => results?.candidates ?? [], [results]);
-  const reliableCandidates = useMemo(
-    () => candidates.filter((candidate) => candidate.best_distance <= POSSIBLE_MATCH_DISTANCE),
-    [candidates]
-  );
-  const weakCandidates = useMemo(
-    () => candidates.filter((candidate) => candidate.best_distance > POSSIBLE_MATCH_DISTANCE),
-    [candidates]
-  );
+  const weakCandidates = useMemo(() => results?.weak_candidates ?? [], [results]);
   const confidenceCounts = useMemo(() => {
     let strong = 0;
     let possible = 0;
     let weak = 0;
 
-    for (const candidate of candidates) {
-      if (candidate.best_distance <= STRONG_MATCH_DISTANCE) {
+    for (const candidate of [...candidates, ...weakCandidates]) {
+      if (candidate.classification === 'strong_match') {
         strong += 1;
-      } else if (candidate.best_distance <= POSSIBLE_MATCH_DISTANCE) {
+      } else if (candidate.classification === 'possible_match') {
         possible += 1;
       } else {
         weak += 1;
@@ -353,7 +343,7 @@ export function RecognitionView() {
     }
 
     return { strong, possible, weak };
-  }, [candidates]);
+  }, [candidates, weakCandidates]);
 
   return (
     <div className="grid gap-6">
@@ -544,14 +534,14 @@ export function RecognitionView() {
               </div>
             ) : null}
 
-            {!isMatching && !errorMessage && hasSearched && candidates.length === 0 ? (
+            {!isMatching && !errorMessage && hasSearched && !results?.match_found ? (
               <div className="rounded-xl border border-border bg-muted/25 p-8 text-center text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">No reliable match found.</p>
                 <p className="mt-2">Try a clearer face image or search manually.</p>
               </div>
             ) : null}
 
-            {!isMatching && !errorMessage && hasSearched && candidates.length > 0 ? (
+            {!isMatching && !errorMessage && hasSearched && results?.match_found && candidates.length > 0 ? (
               <div className="space-y-4">
                 <div className="rounded-lg border border-border bg-muted/25 p-3 text-xs text-muted-foreground">
                   <p>
@@ -567,16 +557,9 @@ export function RecognitionView() {
                   </p>
                 </div>
 
-                {reliableCandidates.length === 0 ? (
-                  <div className="inline-flex items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
-                    <AlertTriangle className="size-4" />
-                    No reliable match found. Try a clearer face image or search manually.
-                  </div>
-                ) : null}
-
-                {reliableCandidates.length > 0 ? (
+                {candidates.length > 0 ? (
                   <div className="grid gap-3">
-                    {reliableCandidates.map((candidate, index) => (
+                    {candidates.map((candidate, index) => (
                       <CandidateCard
                         key={`${candidate.student_id}-${candidate.rank}-${index}`}
                         candidate={candidate}

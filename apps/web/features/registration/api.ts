@@ -3,7 +3,10 @@ import type {
   VerificationCapturesByAngle,
   VerificationFrameMetadataByAngle,
 } from '@/features/registration/verification/types';
-import { requiredShotsPerAngle } from '@/features/registration/verification/constants';
+import {
+  captureAngles,
+  getRequiredFramesForAngle,
+} from '@/features/registration/capture/constants';
 
 const GENERIC_ENROLLMENT_ERROR =
   'Unable to continue right now. Please try again.';
@@ -12,11 +15,7 @@ const GENERIC_REGISTRATION_COMPLETION_ERROR =
 const MIN_CAPTURE_FILE_SIZE_BYTES = 10 * 1024;
 const ALLOWED_CAPTURE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png']);
 const REQUIRED_VERIFICATION_ANGLES: VerificationAngle[] = [
-  'front',
-  'left',
-  'right',
-  'up',
-  'down',
+  ...captureAngles,
 ];
 const MAX_CAPTURES_PER_ANGLE = 5;
 
@@ -293,6 +292,7 @@ async function submitEnrollmentCompletionRequest(
 
     for (const angle of REQUIRED_VERIFICATION_ANGLES) {
       const captures = capturesByAngle[angle];
+      const requiredFramesForAngle = getRequiredFramesForAngle(angle);
       if (!Array.isArray(captures)) {
         return {
           success: false,
@@ -300,10 +300,10 @@ async function submitEnrollmentCompletionRequest(
         };
       }
 
-      if (captures.length < requiredShotsPerAngle) {
+      if (captures.length < requiredFramesForAngle) {
         return {
           success: false,
-          message: `Expected at least ${requiredShotsPerAngle} captured files for angle: ${angle}. Please retake this angle.`,
+          message: `Expected at least ${requiredFramesForAngle} captured files for angle: ${angle}. Please retake this angle.`,
         };
       }
       if (captures.length > MAX_CAPTURES_PER_ANGLE) {

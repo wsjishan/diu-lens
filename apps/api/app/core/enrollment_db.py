@@ -10,7 +10,12 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.approval_hygiene import ApprovalEvidenceIssue, assert_approval_hygiene
-from app.core.storage import ALLOWED_ANGLES, empty_uploaded_images, get_storage_service
+from app.core.storage import (
+    ALLOWED_ANGLES,
+    REQUIRED_CAPTURE_ANGLES,
+    empty_uploaded_images,
+    get_storage_service,
+)
 from app.db.models import (
     AuditLog,
     Enrollment,
@@ -534,7 +539,11 @@ def get_processing_source_images(student_id: str) -> dict[str, Any]:
                     }
                 )
 
-            missing_angles = [angle for angle in ALLOWED_ANGLES if counts_by_angle[angle] <= 0]
+            missing_angles = [
+                angle
+                for angle in REQUIRED_CAPTURE_ANGLES
+                if counts_by_angle[angle] <= 0
+            ]
             if missing_angles:
                 raise EnrollmentInvalidStateError(
                     "Processing integrity check failed: required angles missing "

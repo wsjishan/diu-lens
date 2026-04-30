@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
 
 import {
-  BURST_CAPTURE_FRAME_COUNT,
-  guidedAngles,
+  captureAngles,
+  getRequiredFramesForAngle,
 } from '@/features/registration/capture/constants';
 import type { CapturedShotsByAngle } from '@/features/registration/capture/types';
 import type { VerificationAngle } from '@/features/registration/verification/types';
 
 function getFirstMissingAngle(capturedShots: CapturedShotsByAngle): VerificationAngle {
-  const missing = guidedAngles.find(
-    (angle) => capturedShots[angle].length < BURST_CAPTURE_FRAME_COUNT
+  const missing = captureAngles.find(
+    (angle) => capturedShots[angle].length < getRequiredFramesForAngle(angle)
   );
-  return missing ?? guidedAngles[guidedAngles.length - 1];
+  return missing ?? captureAngles[captureAngles.length - 1];
 }
 
 export function useAngleProgress(
@@ -19,18 +19,18 @@ export function useAngleProgress(
   activeAngle: VerificationAngle | null
 ) {
   return useMemo(() => {
-    const capturedCount = guidedAngles.reduce(
+    const capturedCount = captureAngles.reduce(
       (total, angle) =>
         total +
-        (capturedShots[angle].length >= BURST_CAPTURE_FRAME_COUNT ? 1 : 0),
+        (capturedShots[angle].length >= getRequiredFramesForAngle(angle) ? 1 : 0),
       0
     );
-    const canSubmit = capturedCount === guidedAngles.length;
+    const canSubmit = capturedCount === captureAngles.length;
     const fallbackAngle = getFirstMissingAngle(capturedShots);
-    const currentAngle = canSubmit ? guidedAngles[guidedAngles.length - 1] : activeAngle ?? fallbackAngle;
+    const currentAngle = canSubmit ? captureAngles[captureAngles.length - 1] : activeAngle ?? fallbackAngle;
     const currentAngleIndex = Math.max(
       0,
-      guidedAngles.findIndex((angle) => angle === currentAngle)
+      captureAngles.findIndex((angle) => angle === currentAngle)
     );
 
     return {
@@ -39,7 +39,7 @@ export function useAngleProgress(
       currentAngle,
       currentAngleIndex,
       firstMissingAngle: fallbackAngle,
-      progressLabel: `${Math.min(capturedCount, guidedAngles.length)} / ${guidedAngles.length}`,
+      progressLabel: `${Math.min(capturedCount, captureAngles.length)} / ${captureAngles.length}`,
     };
   }, [activeAngle, capturedShots]);
 }

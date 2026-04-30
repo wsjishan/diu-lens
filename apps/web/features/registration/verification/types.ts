@@ -7,7 +7,13 @@ export type PermissionState =
   | 'denied'
   | 'unsupported';
 
-export type VerificationAngle = 'front' | 'left' | 'right' | 'up' | 'down';
+export type VerificationAngle =
+  | 'front'
+  | 'left'
+  | 'right'
+  | 'up'
+  | 'down'
+  | 'natural_front';
 
 export type AngleCaptureSummary = {
   angle: VerificationAngle;

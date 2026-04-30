@@ -29,6 +29,15 @@ from app.db.models import (
 from app.scripts.reset_operational_data import reset_operational_data
 
 TEST_FRAMES_PER_ANGLE = 3
+NATURAL_FRONT_FRAMES = 2
+
+
+def _required_frames_for_angle(angle: str) -> int:
+    return NATURAL_FRONT_FRAMES if angle == "natural_front" else TEST_FRAMES_PER_ANGLE
+
+
+def _total_required_frames() -> int:
+    return sum(_required_frames_for_angle(angle) for angle in ALLOWED_ANGLES)
 
 
 def _auth_header(token: str) -> dict[str, str]:
@@ -51,13 +60,13 @@ def _verification_metadata(student_id: str) -> dict[str, object]:
         "phone": "01700000000",
         "university_email": f"{student_id.replace('-', '')}@diu.edu.bd",
         "verification_completed": True,
-        "total_required_shots": len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE,
-        "total_accepted_shots": len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE,
+        "total_required_shots": _total_required_frames(),
+        "total_accepted_shots": _total_required_frames(),
         "angles": [
             {
                 "angle": angle,
-                "accepted_shots": TEST_FRAMES_PER_ANGLE,
-                "required_shots": TEST_FRAMES_PER_ANGLE,
+                "accepted_shots": _required_frames_for_angle(angle),
+                "required_shots": _required_frames_for_angle(angle),
             }
             for angle in ALLOWED_ANGLES
         ],
@@ -66,7 +75,7 @@ def _verification_metadata(student_id: str) -> dict[str, object]:
                 "angle": angle,
                 "frames": [
                     {"captured_at": 1710000000000 + idx}
-                    for idx in range(TEST_FRAMES_PER_ANGLE)
+                    for idx in range(_required_frames_for_angle(angle))
                 ],
             }
             for angle in ALLOWED_ANGLES
@@ -80,7 +89,7 @@ def _verification_files(metadata: dict[str, object]) -> list[tuple[str, tuple[An
         ("metadata", (None, json.dumps(metadata), "application/json")),
     ]
     for angle in ALLOWED_ANGLES:
-        for variant in range(TEST_FRAMES_PER_ANGLE):
+        for variant in range(_required_frames_for_angle(angle)):
             files.append(
                 (
                     angle,
@@ -112,7 +121,7 @@ def _verification_files_for_images(
         ("metadata", (None, json.dumps(metadata), "application/json")),
     ]
     for angle in ALLOWED_ANGLES:
-        for variant in range(TEST_FRAMES_PER_ANGLE):
+        for variant in range(_required_frames_for_angle(angle)):
             files.append(
                 (
                     angle,
@@ -866,12 +875,13 @@ def test_reverification_replaces_student_upload_files_without_accumulation(
     uploads_payload = uploads_response.json()
     angles = uploads_payload.get("angles", {})
     assert isinstance(angles, dict)
-    assert sum(len(paths) for paths in angles.values()) == len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE
+    assert sum(len(paths) for paths in angles.values()) == _total_required_frames()
     for angle in ALLOWED_ANGLES:
         paths = angles.get(angle, [])
-        assert len(paths) == TEST_FRAMES_PER_ANGLE
+        required_frames = _required_frames_for_angle(angle)
+        assert len(paths) == required_frames
         assert paths[0] == f"{angle}_1.jpg"
-        assert paths[-1] == f"{angle}_{TEST_FRAMES_PER_ANGLE}.jpg"
+        assert paths[-1] == f"{angle}_{required_frames}.jpg"
 
     with db_session_factory() as db:
         enrollment = _latest_enrollment(db, student_id)
@@ -879,7 +889,7 @@ def test_reverification_replaces_student_upload_files_without_accumulation(
         image_rows = db.scalars(
             select(EnrollmentImage).where(EnrollmentImage.enrollment_id == enrollment.id)
         ).all()
-        assert len(image_rows) == len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE
+        assert len(image_rows) == _total_required_frames()
         expected_prefix = f"uploads/{student_id}/"
         assert all(str(row.file_path).startswith(expected_prefix) for row in image_rows)
 
@@ -906,7 +916,7 @@ def test_processing_source_images_are_db_scoped_only(
     sources = list(source_bundle.get("source_images", []))
     source_paths = {str(item.get("source_image", "")) for item in sources}
     assert f"uploads/{student_id}/front/front_99.jpg" not in source_paths
-    assert len(sources) == len(ALLOWED_ANGLES) * TEST_FRAMES_PER_ANGLE
+    assert len(sources) == _total_required_frames()
 
 
 def test_processing_integrity_rejects_cross_student_image_paths(

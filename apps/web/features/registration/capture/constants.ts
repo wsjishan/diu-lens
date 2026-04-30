@@ -7,7 +7,16 @@ export const guidedAngles: VerificationAngle[] = [
   'up',
   'down',
 ];
+export const naturalFrontAngle: VerificationAngle = 'natural_front';
+export const captureAngles: VerificationAngle[] = [...guidedAngles, naturalFrontAngle];
 export const BURST_CAPTURE_FRAME_COUNT = 3;
+export const NATURAL_FRONT_FRAME_COUNT = 2;
+
+export function getRequiredFramesForAngle(angle: VerificationAngle): number {
+  return angle === naturalFrontAngle
+    ? NATURAL_FRONT_FRAME_COUNT
+    : BURST_CAPTURE_FRAME_COUNT;
+}
 
 export const perAngleInstruction: Record<VerificationAngle, string> = {
   front: 'Look straight ahead with a neutral face.',
@@ -15,6 +24,7 @@ export const perAngleInstruction: Record<VerificationAngle, string> = {
   right: 'Turn slightly right.',
   up: 'Look slightly up.',
   down: 'Look slightly down.',
+  natural_front: 'Look at the camera normally.',
 };
 
 export const perAngleHint: Record<VerificationAngle, string> = {
@@ -23,6 +33,7 @@ export const perAngleHint: Record<VerificationAngle, string> = {
   right: 'Keep both eyes visible while turning.',
   up: 'Lift your chin just a little.',
   down: 'Lower your chin just a little.',
+  natural_front: 'No strict pose needed. Keep one face visible.',
 };
 
 export const STABILITY_WINDOW_MS = 380;
@@ -51,4 +62,4 @@ export const ANGLE_THRESHOLDS = {
   verticalYawAbs: 16,
 } as const;
 
-export const captureStorageVersion = 2;
+export const captureStorageVersion = 3;

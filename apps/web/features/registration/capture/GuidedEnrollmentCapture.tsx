@@ -4,14 +4,18 @@ import { Camera, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { guidedAngles } from '@/features/registration/capture/constants';
+import {
+  captureAngles,
+  getRequiredFramesForAngle,
+} from '@/features/registration/capture/constants';
 import { CameraPreview } from '@/features/registration/capture/CameraPreview';
 import { CaptureProgress } from '@/features/registration/capture/CaptureProgress';
 import { CapturedShotStrip } from '@/features/registration/capture/CapturedShotStrip';
 import { useFaceCapture } from '@/features/registration/capture/useFaceCapture';
 import { useCamera } from '@/features/registration/verification/useCamera';
-import { requiredShotsPerAngle, totalRequiredShots } from '@/features/registration/verification/constants';
+import { totalRequiredShots } from '@/features/registration/verification/constants';
 import type {
+  VerificationAngle,
   VerificationCompletionSummary,
 } from '@/features/registration/verification/types';
 import { cn } from '@/lib/utils';
@@ -26,6 +30,11 @@ type GuidedEnrollmentCaptureProps = {
 function getStorageKey(studentId: string) {
   const normalized = studentId.trim().toLowerCase();
   return `diu-lens-capture:${normalized || 'unknown'}`;
+}
+
+function getAngleLabel(angle: VerificationAngle) {
+  if (angle === 'natural_front') return 'Natural Front';
+  return angle.charAt(0).toUpperCase() + angle.slice(1);
 }
 
 export function GuidedEnrollmentCapture({
@@ -217,14 +226,14 @@ export function GuidedEnrollmentCapture({
       const summary: VerificationCompletionSummary = {
         verificationCompleted: true,
         totalRequiredShots,
-        totalAcceptedShots: guidedAngles.reduce(
+        totalAcceptedShots: captureAngles.reduce(
           (total, angle) => total + capturesByAngle[angle].length,
           0
         ),
-        angles: guidedAngles.map((angle) => ({
+        angles: captureAngles.map((angle) => ({
           angle,
           acceptedShots: capturesByAngle[angle].length,
-          requiredShots: requiredShotsPerAngle,
+          requiredShots: getRequiredFramesForAngle(angle),
         })),
         capturesByAngle,
         frameMetadataByAngle,
@@ -299,12 +308,12 @@ export function GuidedEnrollmentCapture({
                   Current angle
                 </p>
                 <h3 className="text-xl font-semibold tracking-tight text-slate-900">
-                  {state.currentAngle.charAt(0).toUpperCase() + state.currentAngle.slice(1)}
+                  {getAngleLabel(state.currentAngle)}
                 </h3>
               </div>
 
               <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                {state.capturedCount} / {guidedAngles.length}
+                {state.capturedCount} / {captureAngles.length}
               </div>
             </div>
 
@@ -368,7 +377,7 @@ export function GuidedEnrollmentCapture({
                 {statusText}
               </p>
 
-              {!permissionBlocked && !state.canSubmit ? <p className="mt-2 text-xs text-slate-500">Next: {firstMissingAngle}</p> : null}
+              {!permissionBlocked && !state.canSubmit ? <p className="mt-2 text-xs text-slate-500">Next: {getAngleLabel(firstMissingAngle)}</p> : null}
             </div>
 
             <CapturedShotStrip

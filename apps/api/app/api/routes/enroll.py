@@ -26,6 +26,7 @@ from app.core.storage import (
     ALLOWED_ANGLES,
     ALLOWED_IMAGE_CONTENT_TYPES,
     MAX_UPLOAD_IMAGE_SIZE_BYTES,
+    REQUIRED_CAPTURE_ANGLES,
     empty_uploaded_images,
     save_uploaded_images,
 )
@@ -160,7 +161,7 @@ def _validate_final_multipart_metadata(payload: EnrollmentRequest) -> None:
             "verification_completed must be true for final multipart enrollment"
         )
 
-    min_total_shots = len(ALLOWED_ANGLES) * MIN_IMAGES_PER_ANGLE
+    min_total_shots = len(REQUIRED_CAPTURE_ANGLES) * MIN_IMAGES_PER_ANGLE
     max_total_shots = len(ALLOWED_ANGLES) * MAX_IMAGES_PER_ANGLE
 
     if (
@@ -190,22 +191,17 @@ def _validate_final_multipart_metadata(payload: EnrollmentRequest) -> None:
         raise _bad_request(f"Duplicate angle summaries are not allowed: {joined}")
 
     provided_angles = set(angle_names)
-    required_angles = set(ALLOWED_ANGLES)
+    required_angles = set(REQUIRED_CAPTURE_ANGLES)
 
     missing_angles = sorted(required_angles - provided_angles)
     if missing_angles:
         joined = ", ".join(missing_angles)
         raise _bad_request(f"Missing required angles: {joined}")
 
-    extra_angles = sorted(provided_angles - required_angles)
+    extra_angles = sorted(provided_angles - set(ALLOWED_ANGLES))
     if extra_angles:
         joined = ", ".join(extra_angles)
         raise _bad_request(f"Unexpected angles in metadata: {joined}")
-
-    if len(payload.angles) != len(ALLOWED_ANGLES):
-        raise _bad_request(
-            f"Exactly {len(ALLOWED_ANGLES)} angle summaries are required"
-        )
 
     for summary in payload.angles:
         if (
@@ -239,18 +235,30 @@ def _validate_file_counts(
     expected_by_angle = {
         summary.angle: int(summary.accepted_shots) for summary in payload.angles
     }
-    for angle in ALLOWED_ANGLES:
-        file_count = len(files_by_angle.get(angle, []))
+    expected_angles = set(expected_by_angle)
+    for angle in REQUIRED_CAPTURE_ANGLES:
+        if angle not in expected_angles:
+            raise _bad_request(f"Missing required angle metadata: {angle}")
+
+    for angle, expected_count in expected_by_angle.items():
+        file_count = len(files_by_angle.get(str(angle), []))
         if file_count < MIN_IMAGES_PER_ANGLE or file_count > MAX_IMAGES_PER_ANGLE:
             raise _bad_request(
                 "Image count for angle must be between "
                 f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE}: {angle}"
             )
-        expected_count = int(expected_by_angle.get(angle, file_count))
         if file_count != expected_count:
             raise _bad_request(
                 f"Metadata/upload count mismatch for angle {angle}: "
                 f"metadata={expected_count}, uploaded={file_count}"
+            )
+
+    for angle in ALLOWED_ANGLES:
+        if angle in expected_angles:
+            continue
+        if files_by_angle.get(angle):
+            raise _bad_request(
+                f"Uploaded files for angle '{angle}' are missing metadata summary."
             )
 
 

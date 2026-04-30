@@ -1,7 +1,10 @@
 import { RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 
-import { BURST_CAPTURE_FRAME_COUNT } from '@/features/registration/capture/constants';
+import {
+  captureAngles,
+  getRequiredFramesForAngle,
+} from '@/features/registration/capture/constants';
 import type { CapturedShotsByAngle } from '@/features/registration/capture/types';
 import type { VerificationAngle } from '@/features/registration/verification/types';
 import { Button } from '@/components/ui/button';
@@ -13,9 +16,10 @@ const angleLabel: Record<VerificationAngle, string> = {
   right: 'Right',
   up: 'Up',
   down: 'Down',
+  natural_front: 'Natural',
 };
 
-const angleOrder: VerificationAngle[] = ['front', 'left', 'right', 'up', 'down'];
+const angleOrder: VerificationAngle[] = captureAngles;
 
 type CapturedShotStripProps = {
   capturedShots: CapturedShotsByAngle;
@@ -36,11 +40,15 @@ export function CapturedShotStrip({
         Captured Shots
       </p>
 
-      <div className="grid grid-cols-5 gap-2">
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${angleOrder.length}, minmax(0, 1fr))` }}
+      >
         {angleOrder.map((angle) => {
           const shots = capturedShots[angle];
           const shot = shots[shots.length - 1];
-          const completed = shots.length >= BURST_CAPTURE_FRAME_COUNT;
+          const requiredFrames = getRequiredFramesForAngle(angle);
+          const completed = shots.length >= requiredFrames;
           const active = currentAngle === angle;
 
           return (
@@ -61,7 +69,7 @@ export function CapturedShotStrip({
                 className="w-full text-left"
               >
                 <div className="mb-1 text-[10px] font-semibold tracking-[0.02em] text-slate-600 uppercase">
-                  {angleLabel[angle]} {shots.length}/{BURST_CAPTURE_FRAME_COUNT}
+                  {angleLabel[angle]} {shots.length}/{requiredFrames}
                 </div>
 
                 <div className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-900/90">

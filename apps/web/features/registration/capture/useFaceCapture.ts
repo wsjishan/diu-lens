@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ANGLE_THRESHOLDS,
-  BURST_CAPTURE_FRAME_COUNT,
+  captureAngles,
+  getRequiredFramesForAngle,
   MIN_FACE_AREA_RATIO,
   POST_CAPTURE_COOLDOWN_MS,
   captureStorageVersion,
-  guidedAngles,
+  naturalFrontAngle,
   perAngleInstruction,
 } from '@/features/registration/capture/constants';
 import { useAngleProgress } from '@/features/registration/capture/useAngleProgress';
@@ -57,23 +58,23 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function emptyCapturedShots(): CapturedShotsByAngle {
-  return { front: [], left: [], right: [], up: [], down: [] };
+  return { front: [], left: [], right: [], up: [], down: [], natural_front: [] };
 }
 
 function isAngleComplete(
   capturedShots: CapturedShotsByAngle,
   angle: VerificationAngle
 ) {
-  return capturedShots[angle].length >= BURST_CAPTURE_FRAME_COUNT;
+  return capturedShots[angle].length >= getRequiredFramesForAngle(angle);
 }
 
 function allAnglesComplete(capturedShots: CapturedShotsByAngle) {
-  return guidedAngles.every((angle) => isAngleComplete(capturedShots, angle));
+  return captureAngles.every((angle) => isAngleComplete(capturedShots, angle));
 }
 
 function findFirstMissingAngle(capturedShots: CapturedShotsByAngle): VerificationAngle | null {
   return (
-    guidedAngles.find((angle) => capturedShots[angle].length < BURST_CAPTURE_FRAME_COUNT) ??
+    captureAngles.find((angle) => !isAngleComplete(capturedShots, angle)) ??
     null
   );
 }
@@ -82,7 +83,7 @@ function getStoragePayload(activeAngle: VerificationAngle, capturedShots: Captur
   return {
     version: captureStorageVersion,
     activeAngle,
-    shots: guidedAngles
+    shots: captureAngles
       .flatMap((angle) =>
         capturedShots[angle].map((shot) => ({
           angle,
@@ -185,26 +186,8 @@ function estimateYawPitch(landmarks: LandmarkPoint[]): { yaw: number; pitch: num
   };
 }
 
-function isAngleMatch(angle: VerificationAngle, yaw: number, pitch: number) {
-  if (angle === 'front') {
-    return (
-      Math.abs(yaw) <= ANGLE_THRESHOLDS.frontYawAbs &&
-      Math.abs(pitch) <= ANGLE_THRESHOLDS.frontPitchAbs
-    );
-  }
-  if (angle === 'left') {
-    return yaw >= ANGLE_THRESHOLDS.leftYaw && Math.abs(pitch) <= ANGLE_THRESHOLDS.sidePitchAbs;
-  }
-  if (angle === 'right') {
-    return yaw <= ANGLE_THRESHOLDS.rightYaw && Math.abs(pitch) <= ANGLE_THRESHOLDS.sidePitchAbs;
-  }
-  if (angle === 'up') {
-    return pitch <= ANGLE_THRESHOLDS.upPitch && Math.abs(yaw) <= ANGLE_THRESHOLDS.verticalYawAbs;
-  }
-  return pitch >= ANGLE_THRESHOLDS.downPitch && Math.abs(yaw) <= ANGLE_THRESHOLDS.verticalYawAbs;
-}
-
 function isRoughAngleMatch(angle: VerificationAngle, yaw: number, pitch: number) {
+  if (angle === naturalFrontAngle) return true;
   const yawMargin = 8;
   const pitchMargin = 8;
 
@@ -227,6 +210,7 @@ function isRoughAngleMatch(angle: VerificationAngle, yaw: number, pitch: number)
 }
 
 function getAngleGuidance(angle: VerificationAngle) {
+  if (angle === naturalFrontAngle) return 'Look at the camera naturally';
   if (angle === 'front') return 'Look forward';
   if (angle === 'left') return 'Look left';
   if (angle === 'right') return 'Look right';
@@ -345,7 +329,7 @@ export function useFaceCapture({
 
       const restored = emptyCapturedShots();
       for (const shot of parsed.shots) {
-        if (!guidedAngles.includes(shot.angle)) continue;
+        if (!captureAngles.includes(shot.angle)) continue;
         const blob = dataUrlToBlob(shot.dataUrl);
         if (!blob) continue;
 
@@ -367,7 +351,7 @@ export function useFaceCapture({
       }
 
       setCapturedShots(restored);
-      if (guidedAngles.includes(parsed.activeAngle)) {
+      if (captureAngles.includes(parsed.activeAngle)) {
         setActiveAngle(parsed.activeAngle);
       }
     } catch {
@@ -449,8 +433,9 @@ export function useFaceCapture({
       if (isAngleComplete(latestShotsRef.current, targetAngle)) return false;
       if (!force && currentAngleRef.current !== targetAngle) return false;
 
+      const requiredFrames = getRequiredFramesForAngle(targetAngle);
       const candidates: CapturedShot[] = [];
-      for (let i = 0; i < BURST_CAPTURE_FRAME_COUNT; i += 1) {
+      for (let i = 0; i < requiredFrames; i += 1) {
         if (finalizedRef.current) break;
         if (isAngleComplete(latestShotsRef.current, targetAngle)) break;
         if (!force && currentAngleRef.current !== targetAngle) break;
@@ -471,8 +456,14 @@ export function useFaceCapture({
             pitch = pose.pitch;
           }
 
-          const angleOk = force ? true : isRoughAngleMatch(targetAngle, yaw, pitch);
-          const sizeOk = force ? true : faceAreaRatio >= MIN_FACE_AREA_RATIO;
+          const angleOk =
+            force || targetAngle === naturalFrontAngle
+              ? true
+              : isRoughAngleMatch(targetAngle, yaw, pitch);
+          const sizeOk =
+            force || targetAngle === naturalFrontAngle
+              ? true
+              : faceAreaRatio >= MIN_FACE_AREA_RATIO;
 
           const snapshot = await captureSnapshot();
           if (snapshot && snapshot.size >= MIN_CAPTURE_FILE_SIZE_BYTES) {
@@ -501,7 +492,7 @@ export function useFaceCapture({
           }
         }
 
-        if (i < BURST_CAPTURE_FRAME_COUNT - 1) {
+        if (i < requiredFrames - 1) {
           await waitMs(BURST_CAPTURE_GAP_MS);
         }
       }
@@ -634,7 +625,7 @@ export function useFaceCapture({
       const pose = estimateYawPitch(landmarks);
       const nearAngle = isRoughAngleMatch(angle, pose.yaw, pose.pitch);
 
-      if (faceAreaRatio < MIN_FACE_AREA_RATIO) {
+      if (angle !== naturalFrontAngle && faceAreaRatio < MIN_FACE_AREA_RATIO) {
         setFeedback({
           guidanceState: 'face_too_small',
           instruction: getAngleGuidance(angle),
@@ -657,7 +648,7 @@ export function useFaceCapture({
       setFeedback({
         guidanceState: nearAngle ? 'ready' : 'wrong_angle',
         instruction: getAngleGuidance(angle),
-        liveMessage: nearAngle ? `Capturing ${angle}...` : getAngleGuidance(angle),
+        liveMessage: nearAngle ? `Capturing ${angle === naturalFrontAngle ? 'natural front' : angle}...` : getAngleGuidance(angle),
         holdProgress: nearAngle ? 1 : 0,
         readiness: {
           faceDetected: true,
@@ -726,7 +717,7 @@ export function useFaceCapture({
       setFeedback((prev) => ({ ...prev, liveMessage: 'Capture failed. Try again.' }));
     }
     return ok;
-  }, [captureAngle, isAutoCapturing, streamActive, videoElement]);
+  }, [canSubmit, captureAngle, isAutoCapturing, streamActive, videoElement]);
 
   const clearSession = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -739,24 +730,24 @@ export function useFaceCapture({
   }, [storageKey]);
 
   const capturesByAngle = useMemo(() => {
-    return guidedAngles.reduce(
+    return captureAngles.reduce(
       (accumulator, angle) => {
         accumulator[angle] = capturedShots[angle].map((shot) => shot.blob);
         return accumulator;
       },
-      { front: [], left: [], right: [], up: [], down: [] } as VerificationCapturesByAngle
+      { front: [], left: [], right: [], up: [], down: [], natural_front: [] } as VerificationCapturesByAngle
     );
   }, [capturedShots]);
 
   const frameMetadataByAngle = useMemo(() => {
-    return guidedAngles.reduce(
+    return captureAngles.reduce(
       (accumulator, angle) => {
         accumulator[angle] = capturedShots[angle].map((shot) => ({
           capturedAt: shot.capturedAt,
         }));
         return accumulator;
       },
-      { front: [], left: [], right: [], up: [], down: [] } as VerificationFrameMetadataByAngle
+      { front: [], left: [], right: [], up: [], down: [], natural_front: [] } as VerificationFrameMetadataByAngle
     );
   }, [capturedShots]);
 

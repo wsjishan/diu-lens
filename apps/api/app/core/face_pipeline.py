@@ -10,6 +10,7 @@ Phase 7 scope:
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from threading import Lock
 from typing import Any
@@ -31,6 +32,8 @@ _PROBE_LABEL_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 _ANALYZER_LOCK = Lock()
 _ANALYZER: Any = None
 _ANALYZER_INIT_ERROR: str | None = None
+_INSIGHTFACE_MODEL_PACK = (os.getenv("INSIGHTFACE_MODEL_PACK", "antelopev2").strip() or "antelopev2")
+_INSIGHTFACE_ROOT = (os.getenv("INSIGHTFACE_ROOT", "~/.insightface").strip() or "~/.insightface")
 _MIN_DET_SCORE = 0.45
 _MIN_FACE_AREA_RATIO = 0.06
 _MIN_BLUR_VARIANCE = 22.0
@@ -45,6 +48,12 @@ _TOP_FRAMES_PER_ANGLE = 3
 _MIN_SELECTED_FRAMES_PER_ANGLE = 2
 _MIN_EMBEDDING_DISTANCE_FROM_TOP = 0.08
 _MIN_EMBEDDING_DISTANCE_BETWEEN_SELECTED = 0.04
+_NATURAL_FRONT_ANGLE = "natural_front"
+_STRICT_FRONT_ANGLE = "front"
+_MIN_SELECTED_FRAMES_PER_ANGLE_BY_ANGLE: dict[str, int] = {
+    angle: _MIN_SELECTED_FRAMES_PER_ANGLE for angle in ALLOWED_ANGLES
+}
+_MIN_SELECTED_FRAMES_PER_ANGLE_BY_ANGLE[_NATURAL_FRONT_ANGLE] = 1
 
 
 class FacePipelineError(Exception):
@@ -64,6 +73,20 @@ def _sanitize_probe_label(probe_label: str | None) -> str:
     normalized = _PROBE_LABEL_SANITIZE_PATTERN.sub("_", raw)
     sanitized = normalized.strip("._")
     return sanitized or "probe"
+
+
+def _resolve_model_name_candidates() -> list[str]:
+    configured = _INSIGHTFACE_MODEL_PACK.strip().strip("/")
+    if not configured:
+        configured = "antelopev2"
+
+    candidates = [configured]
+    if "/" not in configured:
+        root = Path(os.path.expanduser(_INSIGHTFACE_ROOT))
+        nested_dir = root / "models" / configured / configured
+        if nested_dir.exists() and nested_dir.is_dir():
+            candidates.append(f"{configured}/{configured}")
+    return candidates
 
 
 def _load_analyzer() -> Any:
@@ -89,18 +112,34 @@ def _load_analyzer() -> Any:
             )
             raise FacePipelineError(_ANALYZER_INIT_ERROR) from exc
 
-        try:
-            analyzer = FaceAnalysis(
-                name="buffalo_l",
-                providers=["CPUExecutionProvider"],
-            )
-            analyzer.prepare(ctx_id=-1, det_size=(640, 640))
-        except Exception as exc:  # noqa: BLE001
-            _ANALYZER_INIT_ERROR = f"Failed to initialize InsightFace model: {exc}"
-            raise FacePipelineError(_ANALYZER_INIT_ERROR) from exc
+        model_candidates = _resolve_model_name_candidates()
+        last_exc: Exception | None = None
+        for model_name in model_candidates:
+            try:
+                analyzer = FaceAnalysis(
+                    name=model_name,
+                    root=_INSIGHTFACE_ROOT,
+                    providers=["CPUExecutionProvider"],
+                )
+                analyzer.prepare(ctx_id=-1, det_size=(640, 640))
+                tasks = set(getattr(analyzer, "models", {}).keys())
+                missing = [task for task in ("detection", "recognition") if task not in tasks]
+                if missing:
+                    raise FacePipelineError(
+                        "InsightFace model loaded without required tasks. "
+                        f"model={model_name}, missing={missing}, loaded={sorted(tasks)}"
+                    )
+                _ANALYZER = analyzer
+                return _ANALYZER
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
 
-        _ANALYZER = analyzer
-        return _ANALYZER
+        _ANALYZER_INIT_ERROR = (
+            "Failed to initialize InsightFace model. "
+            f"pack={_INSIGHTFACE_MODEL_PACK}, root={_INSIGHTFACE_ROOT}, "
+            f"candidates={model_candidates}, last_error={last_exc}"
+        )
+        raise FacePipelineError(_ANALYZER_INIT_ERROR) from last_exc
 
 
 def _pick_main_face(faces: list[Any]) -> Any:
@@ -438,8 +477,11 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
     }
 
     source_images = list(source_bundle.get("source_images", []))
+    has_natural_front_source = False
     for row in source_images:
         angle = str(row.get("angle", "unknown"))
+        if angle == _NATURAL_FRONT_ANGLE:
+            has_natural_front_source = True
         image_rel_path = str(row.get("source_image", ""))
         file_name = Path(image_rel_path).name or "unknown"
         source_abs_path = storage.resolve_relative_path(image_rel_path)
@@ -546,6 +588,18 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
             )
             failure_reasons.add(reason)
 
+    minimum_required_by_angle: dict[str, int] = {
+        angle: int(
+            _MIN_SELECTED_FRAMES_PER_ANGLE_BY_ANGLE.get(
+                angle,
+                _MIN_SELECTED_FRAMES_PER_ANGLE,
+            )
+        )
+        for angle in ALLOWED_ANGLES
+    }
+    if not has_natural_front_source:
+        minimum_required_by_angle[_NATURAL_FRONT_ANGLE] = 0
+
     selection_by_angle: dict[str, list[dict[str, Any]]] = {}
     for angle in ALLOWED_ANGLES:
         candidates = list(candidate_by_angle.get(angle, []))
@@ -586,10 +640,13 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
                 }
             )
 
-        if selected_count < _MIN_SELECTED_FRAMES_PER_ANGLE:
+        min_selected_for_angle = int(
+            minimum_required_by_angle.get(angle, _MIN_SELECTED_FRAMES_PER_ANGLE)
+        )
+        if len(selected) < min_selected_for_angle:
             reason = (
                 f"insufficient_selected_frames_for_angle:{angle}"
-                f"(selected={selected_count},required={_MIN_SELECTED_FRAMES_PER_ANGLE})"
+                f"(selected={len(selected)},required={min_selected_for_angle})"
             )
             failure_reasons.add(reason)
 
@@ -631,7 +688,9 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
         angle
         for angle in ALLOWED_ANGLES
         if len([crop for crop in processed_crops if crop.get("angle") == angle])
-        < _MIN_SELECTED_FRAMES_PER_ANGLE
+        < int(
+            minimum_required_by_angle.get(angle, _MIN_SELECTED_FRAMES_PER_ANGLE)
+        )
     ]
     result = {
         "student_id": sanitized_student_id,
@@ -642,6 +701,21 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
             "strategy": "quality_plus_diversity",
             "min_embedding_distance_from_top": _MIN_EMBEDDING_DISTANCE_FROM_TOP,
             "min_embedding_distance_between_selected": _MIN_EMBEDDING_DISTANCE_BETWEEN_SELECTED,
+            "required_selected_frames_by_angle": {
+                angle: int(
+                    minimum_required_by_angle.get(
+                        angle,
+                        _MIN_SELECTED_FRAMES_PER_ANGLE,
+                    )
+                )
+                for angle in ALLOWED_ANGLES
+            },
+            "priority_minimums": {
+                _STRICT_FRONT_ANGLE: 1,
+                _NATURAL_FRONT_ANGLE: int(
+                    minimum_required_by_angle.get(_NATURAL_FRONT_ANGLE, 0)
+                ),
+            },
         },
         "top_frames_per_angle": _TOP_FRAMES_PER_ANGLE,
         "minimum_selected_frames_per_angle": _MIN_SELECTED_FRAMES_PER_ANGLE,

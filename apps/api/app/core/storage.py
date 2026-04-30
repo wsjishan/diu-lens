@@ -5,7 +5,11 @@ from typing import Any
 
 from fastapi import UploadFile
 
-from app.core.storage_service import ALLOWED_ANGLES, LocalStorageService
+from app.core.storage_service import (
+    ALLOWED_ANGLES,
+    REQUIRED_CAPTURE_ANGLES,
+    LocalStorageService,
+)
 
 
 ALLOWED_IMAGE_CONTENT_TYPES: dict[str, str] = {

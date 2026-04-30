@@ -6,10 +6,24 @@ from pathlib import Path
 from typing import Any, Protocol
 
 
-ALLOWED_ANGLES: tuple[str, ...] = ("front", "left", "right", "up", "down")
+ALLOWED_ANGLES: tuple[str, ...] = (
+    "front",
+    "left",
+    "right",
+    "up",
+    "down",
+    "natural_front",
+)
+REQUIRED_CAPTURE_ANGLES: tuple[str, ...] = (
+    "front",
+    "left",
+    "right",
+    "up",
+    "down",
+)
 _STUDENT_ID_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 _ANGLE_FILE_PATTERN = re.compile(
-    r"^(front|left|right|up|down)_(?P<index>\d+)\.(jpg|png|webp)$"
+    r"^(front|left|right|up|down|natural_front)_(?P<index>\d+)\.(jpg|png|webp)$"
 )
 
 

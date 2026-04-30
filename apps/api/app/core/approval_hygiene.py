@@ -11,7 +11,11 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.storage import ALLOWED_ANGLES, get_storage_service
+from app.core.storage import (
+    ALLOWED_ANGLES,
+    REQUIRED_CAPTURE_ANGLES,
+    get_storage_service,
+)
 from app.db.models import Enrollment, EnrollmentImage
 
 
@@ -159,11 +163,15 @@ def _load_current_enrollment_evidence(
             )
         )
 
-    missing_angles = [angle for angle in ALLOWED_ANGLES if counts_by_angle[angle] <= 0]
+    missing_angles = [
+        angle
+        for angle in REQUIRED_CAPTURE_ANGLES
+        if counts_by_angle[angle] <= 0
+    ]
     if missing_angles:
         raise ApprovalEvidenceIssue("required capture angles missing")
 
-    if len(evidence) < len(ALLOWED_ANGLES):
+    if len(evidence) < len(REQUIRED_CAPTURE_ANGLES):
         raise ApprovalEvidenceIssue("enrollment evidence incomplete")
 
     return evidence

@@ -1,4 +1,4 @@
-# DIU Lens Monorepo
+# DIU Lens
 
 DIU Lens is a full-stack app with:
 

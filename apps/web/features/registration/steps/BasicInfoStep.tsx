@@ -125,7 +125,7 @@ export function BasicInfoStep({
           variant="outline"
           onClick={onBack}
           disabled={isSubmitting}
-          className="landing-cta-outline h-11 w-full rounded-xl border-slate-300/80 bg-white/72 px-4 text-slate-700 hover:bg-slate-100 max-[639px]:h-[2.58rem] max-[639px]:rounded-[0.66rem] max-[639px]:text-[0.8rem] dark:border-white/12 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-900/85"
+          className="landing-cta-outline h-11 w-full rounded-xl border-slate-300/80 bg-white/72 px-4 text-sm text-slate-700 hover:bg-slate-100 dark:border-white/12 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-900/85"
         >
           <ArrowLeft className="size-4" />
           Back
@@ -139,7 +139,7 @@ export function BasicInfoStep({
             !values.phoneNumber.trim() ||
             !values.universityEmail.trim()
           }
-          className="landing-button-bg landing-cta h-11 w-full gap-2 px-5 text-white max-[639px]:h-[2.62rem] max-[639px]:rounded-[0.66rem] max-[639px]:text-[0.82rem]"
+          className="landing-button-bg landing-cta h-11 w-full gap-2 rounded-xl px-5 text-sm text-white"
         >
           {isSubmitting ? 'Continuing...' : 'Continue'}
           <ArrowRight className="size-4 transition-transform duration-150 group-hover/button:translate-x-0.5" />

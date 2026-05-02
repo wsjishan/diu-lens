@@ -26,7 +26,7 @@ export function SuccessStep({ onDone }: SuccessStepProps) {
       <Button
         type="button"
         onClick={onDone}
-        className="landing-button-bg landing-cta h-11 w-full px-8 text-white max-[639px]:h-[2.9rem] sm:w-auto sm:px-9"
+        className="landing-button-bg landing-cta h-11 w-full rounded-xl px-8 text-sm text-white"
       >
         Done
       </Button>

@@ -26,7 +26,7 @@ export function HomeOnboardingSection() {
               : 'lg:opacity-100'
           )}
         >
-          <HeroSection />
+          <HeroSection activeStep={activeStep} />
         </div>
 
         <div className="relative mx-auto flex w-full max-w-[22.75rem] justify-center sm:max-w-[27rem] md:mx-0 md:max-w-none md:justify-end lg:pr-1">

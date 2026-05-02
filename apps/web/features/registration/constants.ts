@@ -38,11 +38,6 @@ export const registrationStepMeta: RegistrationStepMeta[] = [
     label: 'Face Prep',
     title: 'Face Verification',
   },
-  {
-    id: 'success',
-    label: 'Complete',
-    title: 'Registration Complete',
-  },
 ];
 
 export const registrationPrepTips = [

@@ -40,10 +40,7 @@ export function CapturedShotStrip({
         Captured Shots
       </p>
 
-      <div
-        className="grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${angleOrder.length}, minmax(0, 1fr))` }}
-      >
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${angleOrder.length}, minmax(0, 1fr))` }}>
         {angleOrder.map((angle) => {
           const shots = capturedShots[angle];
           const shot = shots[shots.length - 1];
@@ -55,7 +52,7 @@ export function CapturedShotStrip({
             <div
               key={angle}
               className={cn(
-                'rounded-xl border p-1.5 transition-colors',
+                'rounded-3xl border p-1.5 transition-colors',
                 shot
                   ? 'border-slate-300 bg-white max-[639px]:border-[#385775] max-[639px]:bg-[#11263b]'
                   : active
@@ -72,7 +69,7 @@ export function CapturedShotStrip({
                   {angleLabel[angle]} {shots.length}/{requiredFrames}
                 </div>
 
-                <div className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-900/90 max-[639px]:border-[#2d4764]">
+                <div className="relative aspect-square overflow-hidden rounded-full border-2 border-slate-200 bg-slate-900/90 max-[639px]:border-[#2d4764]">
                   {shot ? (
                     <Image
                       src={shot.previewUrl}

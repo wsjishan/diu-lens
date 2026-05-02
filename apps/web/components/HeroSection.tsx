@@ -1,27 +1,34 @@
 'use client';
 
 import { Circle, CircleCheck, IdCard, ScanFace, UserRound } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const heroSteps = [
   {
     id: 1,
     label: 'Student ID check',
     description: 'Verify institutional identity',
-    active: true,
+    headline: 'Use your DIU student ID',
+    body: 'Start with your institutional ID to validate identity ownership.',
+    accent: 'Face ID verification',
     Icon: IdCard,
   },
   {
     id: 2,
     label: 'Basic information',
     description: 'Confirm profile details',
-    active: false,
+    headline: 'Confirm your profile details',
+    body: 'Provide name, phone, and university email before biometric capture.',
+    accent: 'Profile details',
     Icon: UserRound,
   },
   {
     id: 3,
     label: 'Face verification',
     description: 'Setup biometric access',
-    active: false,
+    headline: 'Complete face verification',
+    body: 'Capture guided face angles to finish biometric onboarding securely.',
+    accent: 'Biometric setup',
     Icon: ScanFace,
   },
 ] as const;
@@ -33,13 +40,32 @@ const mobileNavSteps = [
   { label: 'Complete', Icon: CircleCheck },
 ] as const;
 
-export function HeroSection() {
+type HeroSectionProps = {
+  activeStep?: number;
+};
+
+export function HeroSection({ activeStep = 0 }: HeroSectionProps) {
+  const heroStepIndex = Math.max(0, Math.min(activeStep, heroSteps.length - 1));
+  const currentHeroStep = heroSteps[heroStepIndex];
+
   return (
     <section className="space-y-4 text-left lg:space-y-[1.65rem]">
-      <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/45 bg-blue-50/65 px-3.5 py-1.5 text-[0.62rem] font-semibold tracking-[0.15em] text-blue-900 uppercase shadow-[0_0_20px_rgba(30,64,175,0.11)] backdrop-blur-sm dark:border-blue-300/35 dark:bg-[#0c1c3c]/70 dark:text-slate-300 dark:shadow-[0_0_22px_rgba(30,64,175,0.17)]">
-        <span className="inline-flex size-2 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(56,189,248,0.8)] dark:bg-sky-400" />
-        AI identity layer online
-      </div>
+      <AnimatePresence
+        mode="wait"
+        initial={false}
+      >
+        <motion.div
+          key={`hero-accent-${currentHeroStep.id}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1] }}
+          className="inline-flex items-center gap-2 rounded-full border border-blue-300/45 bg-blue-50/65 px-3.5 py-1.5 text-[0.62rem] font-semibold tracking-[0.15em] text-blue-900 uppercase shadow-[0_0_20px_rgba(30,64,175,0.11)] backdrop-blur-sm dark:border-blue-300/35 dark:bg-[#0c1c3c]/70 dark:text-slate-300 dark:shadow-[0_0_22px_rgba(30,64,175,0.17)]"
+        >
+          <span className="inline-flex size-2 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(56,189,248,0.8)] dark:bg-sky-400" />
+          {currentHeroStep.accent}
+        </motion.div>
+      </AnimatePresence>
 
       <div className="space-y-[0.8rem] lg:space-y-[1.125rem]">
         <h1 className="landing-text-primary max-w-[12.5ch] text-[2.55rem] leading-[1] font-semibold tracking-[-0.028em] lg:max-w-[10.1ch] lg:text-[4.08rem]">
@@ -51,14 +77,29 @@ export function HeroSection() {
           for DIU Campus
         </h1>
 
-        <p
-          id="how-it-works"
-          className="landing-text-secondary max-w-[26rem] text-[0.91rem] leading-[1.52] lg:max-w-[28.5rem] lg:text-[0.94rem]"
+        <AnimatePresence
+          mode="wait"
+          initial={false}
         >
-          Verify once and access DIU campus services without repeated
-          verification steps. Secure identity registration, AI-powered face
-          verification, Privacy-first data handling.
-        </p>
+          <motion.div
+            key={`hero-context-${currentHeroStep.id}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.24, ease: [0.2, 0.7, 0.2, 1] }}
+            className="space-y-2 rounded-xl border border-slate-200/65 bg-white/45 p-3.5 dark:border-white/10 dark:bg-slate-900/36"
+          >
+            <p className="landing-text-primary text-[0.9rem] font-semibold lg:text-[0.96rem]">
+              {currentHeroStep.headline}
+            </p>
+            <p
+              id="how-it-works"
+              className="landing-text-secondary max-w-[26rem] text-[0.86rem] leading-[1.5] lg:max-w-[28.5rem] lg:text-[0.91rem]"
+            >
+              {currentHeroStep.body}
+            </p>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <div
@@ -80,9 +121,11 @@ export function HeroSection() {
                 ) : null}
                 <span
                   className={
-                    item.active
+                    index === heroStepIndex
                       ? 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full bg-linear-to-b from-[#2f8dff] to-[#1a67e5] text-[0.86rem] font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.55)] ring-1 ring-blue-200/76 lg:size-[2.375rem] lg:text-[0.98rem]'
-                      : 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full border border-slate-300/76 bg-slate-100/78 text-[0.8rem] font-medium text-slate-600 dark:border-slate-400/43 dark:bg-[#192844]/62 dark:text-slate-300 lg:size-[2.375rem] lg:text-[0.93rem]'
+                      : index < heroStepIndex
+                        ? 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full bg-linear-to-b from-[#206bcf] to-[#1a5ec6] text-[0.86rem] font-semibold text-white shadow-[0_0_16px_rgba(37,99,235,0.32)] ring-1 ring-blue-200/55 lg:size-[2.375rem] lg:text-[0.98rem]'
+                        : 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full border border-slate-300/76 bg-slate-100/78 text-[0.8rem] font-medium text-slate-600 dark:border-slate-400/43 dark:bg-[#192844]/62 dark:text-slate-300 lg:size-[2.375rem] lg:text-[0.93rem]'
                   }
                 >
                   {item.id}
@@ -132,6 +175,11 @@ export function MobileHeroIntro() {
 export function MobileOnboardingStepper({
   activeIndex,
 }: MobileOnboardingStepperProps) {
+  const heroStepIndex = Math.max(
+    0,
+    Math.min(activeIndex, heroSteps.length - 1)
+  );
+
   return (
     <section
       aria-label="Registration flow steps"
@@ -154,7 +202,7 @@ export function MobileOnboardingStepper({
             ) : null}
             <span
               className={
-                index <= activeIndex
+                index <= heroStepIndex
                   ? 'relative z-10 inline-flex size-[1.7rem] shrink-0 items-center justify-center rounded-full border border-[#5eb2ff] bg-[#08213f] text-[#55aaff] shadow-[0_0_16px_rgba(64,157,255,0.3)]'
                   : 'relative z-10 inline-flex size-[1.7rem] shrink-0 items-center justify-center rounded-full border border-[#2e435d] bg-[#0a1829] text-[#53687f]'
               }
@@ -167,7 +215,7 @@ export function MobileOnboardingStepper({
             <div className="min-w-0 pt-[0.04rem]">
               <p
                 className={
-                  index <= activeIndex
+                  index <= heroStepIndex
                     ? 'text-[0.74rem] leading-none font-bold text-[#4fa3ff]'
                     : 'text-[0.74rem] leading-none font-semibold text-[#708397]'
                 }

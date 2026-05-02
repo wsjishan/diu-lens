@@ -17,9 +17,11 @@ export function RegistrationShell({
   className,
   children,
 }: RegistrationShellProps) {
+  const totalSteps = Math.max(steps.length, 1);
+  const normalizedActiveIndex = Math.max(0, Math.min(activeIndex, totalSteps - 1));
   const progressPercent = Math.max(
     0,
-    Math.min(100, (activeIndex / (steps.length - 1)) * 100)
+    Math.min(100, (normalizedActiveIndex / (totalSteps - 1 || 1)) * 100)
   );
 
   return (
@@ -39,7 +41,7 @@ export function RegistrationShell({
 
           <div className="space-y-1.5">
             <p className="landing-text-secondary text-[0.8rem]">
-              Step {activeIndex + 1} of 4
+              Step {normalizedActiveIndex + 1} of {totalSteps}
             </p>
             <div className="landing-progress-track h-[0.3125rem] w-full overflow-hidden rounded-full">
               <span
@@ -48,13 +50,16 @@ export function RegistrationShell({
                 aria-hidden="true"
               />
             </div>
-            <div className="grid grid-cols-4 gap-[0.45rem]">
+            <div
+              className="grid gap-[0.45rem]"
+              style={{ gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))` }}
+            >
               {steps.map((step, index) => (
                 <span
                   key={step.id}
                   className={cn(
                     'text-[0.72rem] whitespace-nowrap',
-                    index <= activeIndex
+                    index <= normalizedActiveIndex
                       ? 'landing-text-secondary'
                       : 'landing-text-muted'
                   )}

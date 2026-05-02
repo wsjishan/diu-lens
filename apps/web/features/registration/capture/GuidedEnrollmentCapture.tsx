@@ -9,9 +9,8 @@ import {
   getRequiredFramesForAngle,
 } from '@/features/registration/capture/constants';
 import { CameraPreview } from '@/features/registration/capture/CameraPreview';
-import { CaptureProgress } from '@/features/registration/capture/CaptureProgress';
-import { CapturedShotStrip } from '@/features/registration/capture/CapturedShotStrip';
 import { useFaceCapture } from '@/features/registration/capture/useFaceCapture';
+import { CircularProgressGuide } from '@/features/registration/verification/CircularProgressGuide';
 import { useCamera } from '@/features/registration/verification/useCamera';
 import { totalRequiredShots } from '@/features/registration/verification/constants';
 import type {
@@ -36,6 +35,18 @@ function getAngleLabel(angle: VerificationAngle) {
   if (angle === 'natural_front') return 'Natural Front';
   return angle.charAt(0).toUpperCase() + angle.slice(1);
 }
+
+const angleMarkerConfig: Array<{
+  angle: VerificationAngle;
+  label: string;
+  className: string;
+}> = [
+  { angle: 'up', label: 'UP', className: 'left-1/2 top-1 -translate-x-1/2 -translate-y-1/2' },
+  { angle: 'left', label: 'LEFT', className: 'left-1 top-1/2 -translate-x-1/2 -translate-y-1/2' },
+  { angle: 'front', label: 'FRONT', className: 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' },
+  { angle: 'right', label: 'RIGHT', className: 'right-1 top-1/2 translate-x-1/2 -translate-y-1/2' },
+  { angle: 'down', label: 'DOWN', className: 'left-1/2 bottom-1 -translate-x-1/2 translate-y-1/2' },
+];
 
 export function GuidedEnrollmentCapture({
   studentId,
@@ -71,10 +82,6 @@ export function GuidedEnrollmentCapture({
     state,
     capturesByAngle,
     frameMetadataByAngle,
-    firstMissingAngle,
-    retakeAngle,
-    focusAngle,
-    captureAnyway,
     clearSession,
   } = useFaceCapture({
     videoElement,
@@ -299,104 +306,80 @@ export function GuidedEnrollmentCapture({
 
   return (
     <section className="space-y-3 sm:space-y-4">
-      <div className="rounded-2xl border border-slate-200/75 bg-white/82 p-3 shadow-[0_18px_35px_-28px_rgba(15,23,42,0.42)] backdrop-blur-sm max-[639px]:rounded-[0.72rem] max-[639px]:border-[#1f3751]/85 max-[639px]:bg-[#091a2b]/88 max-[639px]:p-3 max-[639px]:shadow-[0_16px_34px_-18px_rgba(0,0,0,0.5)] sm:p-4">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-5">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold tracking-[0.03em] text-slate-500 uppercase max-[639px]:text-[#7f95ad]">
-                  Current angle
-                </p>
-                <h3 className="text-xl font-semibold tracking-tight text-slate-900 max-[639px]:text-[1.05rem] max-[639px]:text-[#d4e2f2]">
-                  {getAngleLabel(state.currentAngle)}
-                </h3>
-              </div>
-
-              <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 max-[639px]:border max-[639px]:border-[#2e4f72] max-[639px]:bg-[#0f2b49] max-[639px]:text-[#5db2ff]">
-                {state.capturedCount} / {captureAngles.length}
-              </div>
+      <div className="rounded-xl border border-slate-200/65 bg-white/45 p-4 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.32)] backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/36 max-[639px]:rounded-[0.75rem] max-[639px]:p-3 sm:p-5">
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="landing-text-muted text-xs font-semibold tracking-[0.04em] uppercase">
+                Face Check
+              </p>
+              <h3 className="landing-text-primary text-xl font-semibold tracking-tight max-[639px]:text-[1.05rem]">
+                {getAngleLabel(state.currentAngle)}
+              </h3>
             </div>
+            <div className="rounded-full border border-slate-200/80 bg-white/80 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-white/10 dark:bg-slate-900/55 dark:text-blue-300">
+              {state.capturedCount} / {captureAngles.length}
+            </div>
+          </div>
 
-            <p className="text-sm text-slate-600 max-[639px]:text-[0.72rem] max-[639px]:text-[#9db0c4]">
-              {state.feedback.instruction}
-            </p>
+          <div className="relative mx-auto w-full max-w-sm rounded-[2rem] border border-slate-200/70 bg-white/55 p-2 shadow-[0_14px_32px_-24px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-slate-900/40">
+            <div className="relative mx-auto w-full max-w-sm p-2">
+              <div className="pointer-events-none absolute inset-0">
+                <CircularProgressGuide
+                  totalSteps={captureAngles.length}
+                  currentStepIndex={Math.max(0, captureAngles.indexOf(state.currentAngle))}
+                />
+              </div>
 
-            <div className="relative mx-auto w-full max-w-sm">
               <CameraPreview
                 videoRef={mergedVideoRef}
                 streamActive={streamActive}
                 fallbackMessage={permissionBlocked ? statusText : undefined}
+                className="aspect-square rounded-full border-4 border-white bg-slate-900"
               />
 
-              <div className="pointer-events-none absolute inset-[9%] rounded-[28%] border-2 border-blue-300/80" />
-            </div>
+              <div className="pointer-events-none absolute inset-[10%] rounded-full border-2 border-white/90" />
 
-            {permissionBlocked ? (
-              <Button
-                type="button"
-                onClick={() => {
-                  resetPermission();
-                  void requestAccess();
-                }}
-                disabled={permissionState === 'requesting'}
-                className="landing-button-bg landing-cta h-11 w-full text-white max-[639px]:h-[2.56rem] max-[639px]:rounded-[0.48rem] max-[639px]:text-[0.78rem]"
-              >
-                <Camera className="size-4" />
-                {permissionButtonLabel}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void captureAnyway()}
-                disabled={isSubmittingCompletion || !state.modelReady || state.isAutoCapturing}
-                className="h-11 w-full max-[639px]:h-[2.56rem] max-[639px]:rounded-[0.48rem] max-[639px]:border-[#355172] max-[639px]:bg-[#0d2034] max-[639px]:text-[#c2d4e7] max-[639px]:hover:bg-[#132b44]"
-              >
-                Capture anyway
-              </Button>
-            )}
+              <div className="pointer-events-none absolute inset-0">
+                {angleMarkerConfig.map((marker) => {
+                  const isActive = state.currentAngle === marker.angle;
+                  return (
+                    <div
+                      key={marker.angle}
+                      className={cn(
+                        'absolute rounded-full border px-2 py-1 text-[10px] font-semibold tracking-[0.02em] transition-all',
+                        marker.className,
+                        isActive
+                          ? 'border-blue-500 bg-blue-500 text-white shadow-[0_0_18px_rgba(59,130,246,0.6)] animate-pulse'
+                          : 'border-slate-300 bg-white/90 text-slate-600 dark:border-white/15 dark:bg-slate-900/75 dark:text-slate-300'
+                      )}
+                    >
+                      {marker.label}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-3">
-            <CaptureProgress
-              capturedShots={state.capturedShots}
-              currentAngle={state.currentAngle}
-              capturedCount={state.capturedCount}
-            />
-
-            <div className="rounded-xl border border-slate-200/85 bg-slate-50/65 p-3 max-[639px]:border-[#2a4360] max-[639px]:bg-[#0f2337]/92">
-              <p className="text-xs font-semibold tracking-[0.03em] text-slate-500 uppercase max-[639px]:text-[#84a0bc]">
-                Live guidance
-              </p>
-              <p
-                className={cn(
-                  'mt-1 text-sm font-medium',
-                  permissionBlocked || completionErrorMessage || localErrorMessage
-                    ? 'text-amber-700 max-[639px]:text-amber-300'
-                    : 'text-slate-700 max-[639px]:text-[#d1e0ef]'
-                )}
-              >
-                {statusText}
-              </p>
-
-              {!permissionBlocked && !state.canSubmit ? (
-                <p className="mt-2 text-xs text-slate-500 max-[639px]:text-[#8fa3b9]">
-                  Next: {getAngleLabel(firstMissingAngle)}
-                </p>
-              ) : null}
-            </div>
-
-            <CapturedShotStrip
-              capturedShots={state.capturedShots}
-              currentAngle={state.currentAngle}
-              onRetake={retakeAngle}
-              onFocus={focusAngle}
-            />
-          </div>
+          {permissionBlocked ? (
+            <Button
+              type="button"
+              onClick={() => {
+                resetPermission();
+                void requestAccess();
+              }}
+              disabled={permissionState === 'requesting'}
+              className="landing-button-bg landing-cta h-11 w-full rounded-xl text-sm text-white"
+            >
+              <Camera className="size-4" />
+              {permissionButtonLabel}
+            </Button>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2.5 max-[639px]:rounded-[0.66rem] max-[639px]:border-[#1d3651] max-[639px]:bg-[#081827]/88">
+      <div className="flex items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white/72 px-3 py-2.5 dark:border-white/10 dark:bg-slate-900/45 max-[639px]:rounded-[0.66rem]">
         <Button
           type="button"
           onClick={() => void handleSubmit()}
@@ -406,7 +389,7 @@ export function GuidedEnrollmentCapture({
             !state.canSubmit ||
             isSubmittingCompletion
           }
-          className="landing-button-bg landing-cta min-w-38 text-white max-[639px]:h-[2.54rem] max-[639px]:rounded-[0.48rem] max-[639px]:text-[0.76rem]"
+          className="landing-button-bg landing-cta h-11 min-w-38 rounded-xl px-5 text-sm text-white"
         >
           {isSubmittingCompletion ? (
             <>

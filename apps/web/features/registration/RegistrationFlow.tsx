@@ -101,6 +101,20 @@ export function RegistrationFlow({
     return fallback;
   }, []);
 
+  const handleDone = useCallback(() => {
+    if (onDone) {
+      onDone();
+      return;
+    }
+
+    setValues(initialValues);
+    setBasicInfoError(null);
+    setVerificationError(null);
+    setIsSubmittingBasicInfo(false);
+    setIsCompletingRegistration(false);
+    setActiveStep(0);
+  }, [onDone]);
+
   const handleBasicInfoContinue = useCallback(async () => {
     if (isSubmittingBasicInfo) {
       return;
@@ -273,15 +287,15 @@ export function RegistrationFlow({
       );
     }
 
-    return <SuccessStep onDone={onDone} />;
+    return <SuccessStep onDone={handleDone} />;
   }, [
     activeStep,
     basicInfoError,
+    handleDone,
     handleVerificationComplete,
     handleBasicInfoContinue,
     isCompletingRegistration,
     isSubmittingBasicInfo,
-    onDone,
     verificationError,
     values,
   ]);

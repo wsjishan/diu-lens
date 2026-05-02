@@ -56,7 +56,7 @@ export function StudentIdStep({
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="landing-button-bg landing-cta w-full gap-1.5 px-5 text-[0.9rem] text-white"
+        className="landing-button-bg landing-cta h-11 w-full gap-1.5 rounded-xl px-5 text-sm text-white"
       >
         Continue
         <ArrowRight

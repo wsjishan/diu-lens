@@ -64,11 +64,13 @@ function parsePositiveFloat(value: string): number | null {
 function getCandidateConfidence(classification: RecognitionMatchCandidate['classification']): {
   label: string;
   className: string;
+  cardClassName: string;
 } {
   if (classification === 'strong_match') {
     return {
       label: 'Strong match',
       className: 'border-emerald-300/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200',
+      cardClassName: 'border-emerald-300/35 bg-emerald-500/5',
     };
   }
 
@@ -76,12 +78,14 @@ function getCandidateConfidence(classification: RecognitionMatchCandidate['class
     return {
       label: 'Possible match',
       className: 'border-amber-300/30 bg-amber-500/10 text-amber-700 dark:text-amber-200',
+      cardClassName: 'border-amber-300/35 bg-amber-500/5',
     };
   }
 
   return {
     label: 'Weak candidate',
     className: 'border-rose-300/30 bg-rose-500/10 text-rose-700 dark:text-rose-200',
+    cardClassName: 'border-rose-300/35 bg-rose-500/5',
   };
 }
 
@@ -94,7 +98,7 @@ function CandidateCard({ candidate, isTopCandidate }: { candidate: RecognitionMa
         'grid gap-3 rounded-xl border p-4 md:grid-cols-[auto_1fr] md:items-start',
         isTopCandidate
           ? 'border-primary/35 bg-primary/10'
-          : 'border-border bg-muted/30'
+          : confidence.cardClassName
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -327,12 +331,34 @@ export function RecognitionView() {
 
   const candidates = useMemo(() => results?.candidates ?? [], [results]);
   const weakCandidates = useMemo(() => results?.weak_candidates ?? [], [results]);
+  const allCandidates = useMemo(
+    () => [...candidates, ...weakCandidates].sort((a, b) => a.rank - b.rank),
+    [candidates, weakCandidates]
+  );
+  const strongCandidates = useMemo(
+    () => allCandidates.filter((candidate) => candidate.classification === 'strong_match'),
+    [allCandidates]
+  );
+  const possibleCandidates = useMemo(
+    () => allCandidates.filter((candidate) => candidate.classification === 'possible_match'),
+    [allCandidates]
+  );
+  const weakOrRejectedCandidates = useMemo(
+    () => allCandidates.filter((candidate) => candidate.classification === 'rejected'),
+    [allCandidates]
+  );
+  const topCandidateRank = useMemo(() => {
+    if (allCandidates.length === 0) {
+      return null;
+    }
+    return allCandidates[0].rank;
+  }, [allCandidates]);
   const confidenceCounts = useMemo(() => {
     let strong = 0;
     let possible = 0;
     let weak = 0;
 
-    for (const candidate of [...candidates, ...weakCandidates]) {
+    for (const candidate of allCandidates) {
       if (candidate.classification === 'strong_match') {
         strong += 1;
       } else if (candidate.classification === 'possible_match') {
@@ -343,7 +369,7 @@ export function RecognitionView() {
     }
 
     return { strong, possible, weak };
-  }, [candidates, weakCandidates]);
+  }, [allCandidates]);
 
   return (
     <div className="grid gap-6">
@@ -534,21 +560,21 @@ export function RecognitionView() {
               </div>
             ) : null}
 
-            {!isMatching && !errorMessage && hasSearched && !results?.match_found ? (
+            {!isMatching && !errorMessage && hasSearched && allCandidates.length === 0 ? (
               <div className="rounded-xl border border-border bg-muted/25 p-8 text-center text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">No reliable match found.</p>
                 <p className="mt-2">Try a clearer face image or search manually.</p>
               </div>
             ) : null}
 
-            {!isMatching && !errorMessage && hasSearched && results?.match_found && candidates.length > 0 ? (
+            {!isMatching && !errorMessage && hasSearched && allCandidates.length > 0 ? (
               <div className="space-y-4">
                 <div className="rounded-lg border border-border bg-muted/25 p-3 text-xs text-muted-foreground">
                   <p>
-                    Ranked candidates: <span className="text-foreground">{candidates.length}</span>
-                    {' '}| Strong: <span className="text-foreground">{confidenceCounts.strong}</span>
-                    {' '}| Possible: <span className="text-foreground">{confidenceCounts.possible}</span>
-                    {' '}| Weak: <span className="text-foreground">{confidenceCounts.weak}</span>
+                    Ranked candidates: <span className="text-foreground">{allCandidates.length}</span>
+                    {' '}| Strong: <span className="text-emerald-700 dark:text-emerald-200">{confidenceCounts.strong}</span>
+                    {' '}| Possible: <span className="text-amber-700 dark:text-amber-200">{confidenceCounts.possible}</span>
+                    {' '}| Weak: <span className="text-rose-700 dark:text-rose-200">{confidenceCounts.weak}</span>
                     {' '}
                     | Threshold used: <span className="text-foreground">{formatDistance(results?.threshold_used ?? 0)}</span>
                   </p>
@@ -557,33 +583,61 @@ export function RecognitionView() {
                   </p>
                 </div>
 
-                {candidates.length > 0 ? (
-                  <div className="grid gap-3">
-                    {candidates.map((candidate, index) => (
-                      <CandidateCard
-                        key={`${candidate.student_id}-${candidate.rank}-${index}`}
-                        candidate={candidate}
-                        isTopCandidate={index === 0}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-
-                {weakCandidates.length > 0 ? (
-                  <details className="rounded-xl border border-border bg-muted/20 p-3">
-                    <summary className="cursor-pointer text-xs text-muted-foreground">
-                      Show weak candidates for manual review ({weakCandidates.length})
-                    </summary>
-                    <div className="mt-2 grid gap-2 text-xs text-muted-foreground">
-                      {weakCandidates.map((candidate) => (
-                        <p key={`${candidate.student_id}-${candidate.rank}`}>
-                          Rank {candidate.rank} | Student ID: <span className="text-foreground">{candidate.student_id}</span>
-                          {' '}| Distance: <span className="text-foreground">{formatDistance(candidate.best_distance)}</span>
-                          {' '}| Label: <span className="text-foreground">Weak candidate</span>
-                        </p>
+                {strongCandidates.length > 0 ? (
+                  <section className="space-y-3 rounded-xl border border-emerald-300/30 bg-emerald-500/5 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-200">
+                      Strong matches ({strongCandidates.length})
+                    </p>
+                    <div className="grid gap-3">
+                      {strongCandidates.map((candidate, index) => (
+                        <CandidateCard
+                          key={`${candidate.student_id}-${candidate.rank}-${index}`}
+                          candidate={candidate}
+                          isTopCandidate={candidate.rank === topCandidateRank}
+                        />
                       ))}
                     </div>
-                  </details>
+                  </section>
+                ) : null}
+
+                {possibleCandidates.length > 0 ? (
+                  <section className="space-y-3 rounded-xl border border-amber-300/30 bg-amber-500/5 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-200">
+                      Possible matches ({possibleCandidates.length})
+                    </p>
+                    <div className="grid gap-3">
+                      {possibleCandidates.map((candidate, index) => (
+                        <CandidateCard
+                          key={`${candidate.student_id}-${candidate.rank}-${index}`}
+                          candidate={candidate}
+                          isTopCandidate={candidate.rank === topCandidateRank}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {weakOrRejectedCandidates.length > 0 ? (
+                  <section className="space-y-3 rounded-xl border border-rose-300/30 bg-rose-500/5 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-rose-700 dark:text-rose-200">
+                      Weak candidates ({weakOrRejectedCandidates.length})
+                    </p>
+                    <div className="grid gap-3">
+                      {weakOrRejectedCandidates.map((candidate, index) => (
+                        <CandidateCard
+                          key={`${candidate.student_id}-${candidate.rank}-${index}`}
+                          candidate={candidate}
+                          isTopCandidate={candidate.rank === topCandidateRank}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {!strongCandidates.length && !possibleCandidates.length && !weakOrRejectedCandidates.length ? (
+                  <div className="grid gap-3">
+                    <p className="text-sm text-muted-foreground">No candidates available in this result.</p>
+                  </div>
                 ) : null}
               </div>
             ) : null}

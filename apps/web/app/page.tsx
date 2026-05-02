@@ -11,20 +11,20 @@ export default function Home() {
       />
       <div
         aria-hidden="true"
-        className="landing-grid-overlay pointer-events-none absolute inset-0 max-[639px]:opacity-[0.44]"
+        className="landing-grid-overlay pointer-events-none absolute inset-0"
       />
       <div
         aria-hidden="true"
-        className="landing-glow-top-left pointer-events-none absolute inset-0 max-[639px]:opacity-[0.38]"
+        className="landing-glow-top-left pointer-events-none absolute inset-0"
       />
       <div
         aria-hidden="true"
-        className="landing-glow-bottom-right pointer-events-none absolute inset-0 max-[639px]:opacity-[0.33]"
+        className="landing-glow-bottom-right pointer-events-none absolute inset-0"
       />
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-4 pb-5 pt-5 max-[639px]:px-3 max-[639px]:pb-[4.3rem] max-[639px]:pt-3 sm:px-6 sm:pb-6 sm:pt-6 lg:px-11 lg:pb-8 lg:pt-8 xl:px-12">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-6 pb-6 pt-6 lg:px-11 lg:pb-8 lg:pt-8 xl:px-12">
         <Header />
-        <main className="flex flex-1 items-start py-5 max-[639px]:py-0.5 sm:items-center sm:py-7 lg:py-8">
+        <main className="flex flex-1 items-center py-7 lg:py-8">
           <HomeOnboardingSection />
         </main>
         <Footer />

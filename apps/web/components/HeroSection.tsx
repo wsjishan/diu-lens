@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Circle,
-  CircleCheck,
-  IdCard,
-  ScanFace,
-  UserRound,
-} from 'lucide-react';
+import { Circle, CircleCheck, IdCard, ScanFace, UserRound } from 'lucide-react';
 
 const heroSteps = [
   {
@@ -42,13 +36,13 @@ const mobileNavSteps = [
 export function HeroSection() {
   return (
     <section className="space-y-4 text-left lg:space-y-[1.65rem]">
-      <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/45 bg-blue-50/65 px-3 py-1.5 text-[0.56rem] font-semibold tracking-[0.13em] text-blue-900 uppercase shadow-[0_0_20px_rgba(30,64,175,0.11)] backdrop-blur-sm dark:border-blue-300/35 dark:bg-[#0c1c3c]/70 dark:text-slate-300 dark:shadow-[0_0_22px_rgba(30,64,175,0.17)] sm:gap-2 sm:px-3.5 sm:text-[0.62rem] sm:tracking-[0.15em]">
+      <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/45 bg-blue-50/65 px-3.5 py-1.5 text-[0.62rem] font-semibold tracking-[0.15em] text-blue-900 uppercase shadow-[0_0_20px_rgba(30,64,175,0.11)] backdrop-blur-sm dark:border-blue-300/35 dark:bg-[#0c1c3c]/70 dark:text-slate-300 dark:shadow-[0_0_22px_rgba(30,64,175,0.17)]">
         <span className="inline-flex size-2 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(56,189,248,0.8)] dark:bg-sky-400" />
         AI identity layer online
       </div>
 
       <div className="space-y-[0.8rem] lg:space-y-[1.125rem]">
-        <h1 className="landing-text-primary max-w-[10.8ch] text-[1.72rem] leading-[1] font-semibold tracking-[-0.028em] sm:max-w-[12.5ch] sm:text-[2.55rem] lg:max-w-[10.1ch] lg:text-[4.08rem]">
+        <h1 className="landing-text-primary max-w-[12.5ch] text-[2.55rem] leading-[1] font-semibold tracking-[-0.028em] lg:max-w-[10.1ch] lg:text-[4.08rem]">
           Smart{' '}
           <span className="bg-linear-to-r from-[#164eaf] via-[#2871d8] to-[#3c92ff] bg-clip-text text-transparent dark:from-[#ecf2ff] dark:via-[#98c6ff] dark:to-[#5ea7ff]">
             Identification
@@ -59,7 +53,7 @@ export function HeroSection() {
 
         <p
           id="how-it-works"
-          className="landing-text-secondary max-w-[19.75rem] text-[0.8rem] leading-[1.52] sm:max-w-[26rem] sm:text-[0.91rem] lg:max-w-[28.5rem] lg:text-[0.94rem]"
+          className="landing-text-secondary max-w-[26rem] text-[0.91rem] leading-[1.52] lg:max-w-[28.5rem] lg:text-[0.94rem]"
         >
           Verify once and access DIU campus services without repeated
           verification steps. Secure identity registration, AI-powered face
@@ -71,36 +65,30 @@ export function HeroSection() {
         id="for-students"
         className="pt-0.5"
       >
-        <ol className="flex flex-col gap-2.5 sm:grid sm:grid-cols-3 sm:gap-3 lg:max-w-[31.25rem]">
+        <ol className="grid grid-cols-3 gap-3 lg:max-w-[31.25rem]">
           {heroSteps.map((item, index, arr) => (
             <li
               key={item.id}
-              className="relative flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2 sm:text-left"
+              className="relative flex flex-col items-start gap-2 text-left"
             >
-              <div className="relative w-auto sm:w-full">
+              <div className="relative w-full">
                 {index < arr.length - 1 ? (
                   <span
                     aria-hidden="true"
-                    className="absolute left-[0.85rem] top-[1.45rem] h-4 w-px bg-linear-to-b from-blue-300/56 to-slate-500/26 sm:hidden"
-                  />
-                ) : null}
-                {index < arr.length - 1 ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute left-[1.95rem] right-1 top-1/2 hidden h-px -translate-y-1/2 bg-linear-to-r from-blue-300/56 to-slate-500/26 sm:block sm:left-[2.45rem] lg:left-[3.05rem]"
+                    className="absolute left-[2.45rem] right-1 top-1/2 h-px -translate-y-1/2 bg-linear-to-r from-blue-300/56 to-slate-500/26 lg:left-[3.05rem]"
                   />
                 ) : null}
                 <span
                   className={
                     item.active
-                      ? 'relative z-10 inline-flex size-[1.7rem] items-center justify-center rounded-full bg-linear-to-b from-[#2f8dff] to-[#1a67e5] text-[0.78rem] font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.55)] ring-1 ring-blue-200/76 sm:size-[1.95rem] sm:text-[0.86rem] lg:size-[2.375rem] lg:text-[0.98rem]'
-                      : 'relative z-10 inline-flex size-[1.7rem] items-center justify-center rounded-full border border-slate-300/76 bg-slate-100/78 text-[0.76rem] font-medium text-slate-600 dark:border-slate-400/43 dark:bg-[#192844]/62 dark:text-slate-300 sm:size-[1.95rem] sm:text-[0.8rem] lg:size-[2.375rem] lg:text-[0.93rem]'
+                      ? 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full bg-linear-to-b from-[#2f8dff] to-[#1a67e5] text-[0.86rem] font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.55)] ring-1 ring-blue-200/76 lg:size-[2.375rem] lg:text-[0.98rem]'
+                      : 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full border border-slate-300/76 bg-slate-100/78 text-[0.8rem] font-medium text-slate-600 dark:border-slate-400/43 dark:bg-[#192844]/62 dark:text-slate-300 lg:size-[2.375rem] lg:text-[0.93rem]'
                   }
                 >
                   {item.id}
                 </span>
               </div>
-              <span className="landing-text-secondary text-[0.74rem] leading-tight sm:text-[0.72rem] lg:text-[0.9rem]">
+              <span className="landing-text-secondary text-[0.72rem] leading-tight lg:text-[0.9rem]">
                 {item.label}
               </span>
             </li>
@@ -171,7 +159,10 @@ export function MobileOnboardingStepper({
                   : 'relative z-10 inline-flex size-[1.7rem] shrink-0 items-center justify-center rounded-full border border-[#2e435d] bg-[#0a1829] text-[#53687f]'
               }
             >
-              <item.Icon className="size-[0.87rem]" aria-hidden="true" />
+              <item.Icon
+                className="size-[0.87rem]"
+                aria-hidden="true"
+              />
             </span>
             <div className="min-w-0 pt-[0.04rem]">
               <p
@@ -221,9 +212,15 @@ export function MobileBottomStepper({
                   }
                 >
                   {index <= activeIndex ? (
-                    <item.Icon className="size-[0.92rem]" aria-hidden="true" />
+                    <item.Icon
+                      className="size-[0.92rem]"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <Circle className="size-[0.92rem]" aria-hidden="true" />
+                    <Circle
+                      className="size-[0.92rem]"
+                      aria-hidden="true"
+                    />
                   )}
                 </span>
                 <span className="text-center text-[0.47rem] leading-none font-bold tracking-[0.04em] uppercase">

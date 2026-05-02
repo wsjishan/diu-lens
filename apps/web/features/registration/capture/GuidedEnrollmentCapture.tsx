@@ -299,25 +299,27 @@ export function GuidedEnrollmentCapture({
 
   return (
     <section className="space-y-3 sm:space-y-4">
-      <div className="rounded-2xl border border-slate-200/75 bg-white/82 p-3 shadow-[0_18px_35px_-28px_rgba(15,23,42,0.42)] backdrop-blur-sm sm:p-4">
+      <div className="rounded-2xl border border-slate-200/75 bg-white/82 p-3 shadow-[0_18px_35px_-28px_rgba(15,23,42,0.42)] backdrop-blur-sm max-[639px]:rounded-[0.72rem] max-[639px]:border-[#1f3751]/85 max-[639px]:bg-[#091a2b]/88 max-[639px]:p-3 max-[639px]:shadow-[0_16px_34px_-18px_rgba(0,0,0,0.5)] sm:p-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-5">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-semibold tracking-[0.03em] text-slate-500 uppercase">
+                <p className="text-xs font-semibold tracking-[0.03em] text-slate-500 uppercase max-[639px]:text-[#7f95ad]">
                   Current angle
                 </p>
-                <h3 className="text-xl font-semibold tracking-tight text-slate-900">
+                <h3 className="text-xl font-semibold tracking-tight text-slate-900 max-[639px]:text-[1.05rem] max-[639px]:text-[#d4e2f2]">
                   {getAngleLabel(state.currentAngle)}
                 </h3>
               </div>
 
-              <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 max-[639px]:border max-[639px]:border-[#2e4f72] max-[639px]:bg-[#0f2b49] max-[639px]:text-[#5db2ff]">
                 {state.capturedCount} / {captureAngles.length}
               </div>
             </div>
 
-            <p className="text-sm text-slate-600">{state.feedback.instruction}</p>
+            <p className="text-sm text-slate-600 max-[639px]:text-[0.72rem] max-[639px]:text-[#9db0c4]">
+              {state.feedback.instruction}
+            </p>
 
             <div className="relative mx-auto w-full max-w-sm">
               <CameraPreview
@@ -337,7 +339,7 @@ export function GuidedEnrollmentCapture({
                   void requestAccess();
                 }}
                 disabled={permissionState === 'requesting'}
-                className="landing-button-bg landing-cta h-11 w-full text-white"
+                className="landing-button-bg landing-cta h-11 w-full text-white max-[639px]:h-[2.56rem] max-[639px]:rounded-[0.48rem] max-[639px]:text-[0.78rem]"
               >
                 <Camera className="size-4" />
                 {permissionButtonLabel}
@@ -348,7 +350,7 @@ export function GuidedEnrollmentCapture({
                 variant="outline"
                 onClick={() => void captureAnyway()}
                 disabled={isSubmittingCompletion || !state.modelReady || state.isAutoCapturing}
-                className="h-11 w-full"
+                className="h-11 w-full max-[639px]:h-[2.56rem] max-[639px]:rounded-[0.48rem] max-[639px]:border-[#355172] max-[639px]:bg-[#0d2034] max-[639px]:text-[#c2d4e7] max-[639px]:hover:bg-[#132b44]"
               >
                 Capture anyway
               </Button>
@@ -362,22 +364,26 @@ export function GuidedEnrollmentCapture({
               capturedCount={state.capturedCount}
             />
 
-            <div className="rounded-xl border border-slate-200/85 bg-slate-50/65 p-3">
-              <p className="text-xs font-semibold tracking-[0.03em] text-slate-500 uppercase">
+            <div className="rounded-xl border border-slate-200/85 bg-slate-50/65 p-3 max-[639px]:border-[#2a4360] max-[639px]:bg-[#0f2337]/92">
+              <p className="text-xs font-semibold tracking-[0.03em] text-slate-500 uppercase max-[639px]:text-[#84a0bc]">
                 Live guidance
               </p>
               <p
                 className={cn(
                   'mt-1 text-sm font-medium',
                   permissionBlocked || completionErrorMessage || localErrorMessage
-                    ? 'text-amber-700'
-                    : 'text-slate-700'
+                    ? 'text-amber-700 max-[639px]:text-amber-300'
+                    : 'text-slate-700 max-[639px]:text-[#d1e0ef]'
                 )}
               >
                 {statusText}
               </p>
 
-              {!permissionBlocked && !state.canSubmit ? <p className="mt-2 text-xs text-slate-500">Next: {getAngleLabel(firstMissingAngle)}</p> : null}
+              {!permissionBlocked && !state.canSubmit ? (
+                <p className="mt-2 text-xs text-slate-500 max-[639px]:text-[#8fa3b9]">
+                  Next: {getAngleLabel(firstMissingAngle)}
+                </p>
+              ) : null}
             </div>
 
             <CapturedShotStrip
@@ -390,7 +396,7 @@ export function GuidedEnrollmentCapture({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2.5">
+      <div className="flex items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2.5 max-[639px]:rounded-[0.66rem] max-[639px]:border-[#1d3651] max-[639px]:bg-[#081827]/88">
         <Button
           type="button"
           onClick={() => void handleSubmit()}
@@ -400,7 +406,7 @@ export function GuidedEnrollmentCapture({
             !state.canSubmit ||
             isSubmittingCompletion
           }
-          className="landing-button-bg landing-cta min-w-38 text-white"
+          className="landing-button-bg landing-cta min-w-38 text-white max-[639px]:h-[2.54rem] max-[639px]:rounded-[0.48rem] max-[639px]:text-[0.76rem]"
         >
           {isSubmittingCompletion ? (
             <>

@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, IdCard } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,10 +18,10 @@ export function StudentIdStep({
   return (
     <div className="space-y-4 max-[639px]:space-y-2.5 sm:space-y-5">
       <header className="space-y-2 max-[639px]:space-y-1">
-        <h3 className="landing-text-primary text-[1.3rem] leading-[1.1] font-semibold tracking-[-0.016em] max-[639px]:text-[0.84rem] max-[639px]:leading-[1.2] max-[639px]:font-medium sm:text-[1.68rem]">
+        <h3 className="landing-text-primary text-[1.3rem] leading-[1.1] font-semibold tracking-[-0.016em] max-[639px]:text-[1rem] max-[639px]:leading-[1.2] sm:text-[1.68rem]">
           Check Registration Status
         </h3>
-        <p className="landing-text-secondary max-w-[29ch] text-[0.8rem] leading-[1.45] max-[639px]:max-w-[27ch] max-[639px]:text-[0.66rem] max-[639px]:leading-[1.32] sm:text-[0.86rem]">
+        <p className="landing-text-secondary max-w-[29ch] text-[0.8rem] leading-[1.45] max-[639px]:hidden sm:text-[0.86rem]">
           Enter your student ID to continue with DIU Lens.
         </p>
       </header>
@@ -33,24 +33,30 @@ export function StudentIdStep({
         >
           Student ID
         </Label>
-        <Input
-          id="student-id"
-          name="student-id"
-          placeholder="e.g. 221-15-0001"
-          autoComplete="off"
-          inputMode="numeric"
-          value={studentId}
-          onChange={(event) => onStudentIdChange(event.target.value)}
-          className="landing-form-input"
-          required
-        />
+        <div className="relative">
+          <IdCard
+            className="pointer-events-none absolute left-3 top-1/2 hidden size-[0.86rem] -translate-y-1/2 text-[#859bb3] max-[639px]:block"
+            aria-hidden="true"
+          />
+          <Input
+            id="student-id"
+            name="student-id"
+            placeholder="e.g. 221-15-0001"
+            autoComplete="off"
+            inputMode="numeric"
+            value={studentId}
+            onChange={(event) => onStudentIdChange(event.target.value)}
+            className="landing-form-input landing-form-input-with-icon"
+            required
+          />
+        </div>
       </div>
 
       <Button
         type="button"
         onClick={onContinue}
         disabled={!studentId}
-        className="landing-button-bg landing-cta w-full gap-1.5 px-5 text-[0.9rem] text-white max-[639px]:h-[2.62rem] max-[639px]:text-[0.8rem]"
+        className="landing-button-bg landing-cta w-full gap-1.5 px-5 text-[0.9rem] text-white max-[639px]:h-[2.62rem] max-[639px]:text-[0.85rem]"
       >
         Continue
         <ArrowRight

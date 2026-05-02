@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import {
   HeroSection,
+  MobileBottomStepper,
   MobileHeroIntro,
   MobileOnboardingStepper,
 } from '@/components/HeroSection';
@@ -21,7 +22,7 @@ export function HomeOnboardingSection() {
         className="landing-card-spotlight pointer-events-none absolute right-[-8%] top-1/2 hidden h-[26.5rem] w-[34rem] -translate-y-1/2 rounded-full blur-3xl lg:block"
       />
 
-      <div className="mx-auto flex w-full max-w-[22.75rem] flex-col pt-1.5 pb-5 sm:hidden">
+      <div className="mx-auto flex w-full max-w-[17rem] flex-col gap-4.5 px-0 pb-7 pt-3.5 sm:hidden">
         <div
           className={cn(
             'w-full transition-all duration-400 ease-out',
@@ -31,14 +32,16 @@ export function HomeOnboardingSection() {
           <MobileHeroIntro />
         </div>
 
-        <div className="mt-1.5 w-full">
+        <div className="w-full pt-1.5">
           <RegistrationCard onStepIndexChange={setActiveStep} />
         </div>
 
-        <div className="mt-4 w-full px-0.5">
-          <MobileOnboardingStepper />
+        <div className="w-full pt-2.5">
+          <MobileOnboardingStepper activeIndex={activeStep} />
         </div>
       </div>
+
+      <MobileBottomStepper activeIndex={activeStep} />
 
       <div className="hidden w-full grid-cols-1 gap-8 sm:grid md:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] md:items-center md:gap-10 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:gap-[4rem]">
         <div

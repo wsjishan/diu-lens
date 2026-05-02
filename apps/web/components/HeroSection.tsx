@@ -1,7 +1,42 @@
+'use client';
+
+import {
+  Circle,
+  CircleCheck,
+  IdCard,
+  ScanFace,
+  UserRound,
+} from 'lucide-react';
+
 const heroSteps = [
-  { id: 1, label: 'Student ID check', active: true },
-  { id: 2, label: 'Basic information', active: false },
-  { id: 3, label: 'Face verification', active: false },
+  {
+    id: 1,
+    label: 'Student ID check',
+    description: 'Verify institutional identity',
+    active: true,
+    Icon: IdCard,
+  },
+  {
+    id: 2,
+    label: 'Basic information',
+    description: 'Confirm profile details',
+    active: false,
+    Icon: UserRound,
+  },
+  {
+    id: 3,
+    label: 'Face verification',
+    description: 'Setup biometric access',
+    active: false,
+    Icon: ScanFace,
+  },
+] as const;
+
+const mobileNavSteps = [
+  { label: 'ID Check', Icon: IdCard },
+  { label: 'Basic Info', Icon: UserRound },
+  { label: 'Face Prep', Icon: ScanFace },
+  { label: 'Complete', Icon: CircleCheck },
 ] as const;
 
 export function HeroSection() {
@@ -76,72 +111,129 @@ export function HeroSection() {
   );
 }
 
+type MobileOnboardingStepperProps = {
+  activeIndex: number;
+};
+
 export function MobileHeroIntro() {
   return (
-    <section className="space-y-2.5">
-      <div className="inline-flex items-center gap-1 rounded-full border border-blue-300/34 bg-blue-50/52 px-2.5 py-[0.2rem] text-[0.44rem] font-semibold tracking-[0.1em] text-blue-900 uppercase shadow-[0_0_10px_rgba(30,64,175,0.06)] dark:border-blue-300/25 dark:bg-[#0c1c3c]/52 dark:text-slate-300">
-        <span className="inline-flex size-1.5 rounded-full bg-sky-500 dark:bg-sky-400" />
+    <section className="space-y-4 text-center">
+      <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-[#1d4266]/76 bg-[#102644]/72 px-2.5 py-[0.31rem] text-[0.47rem] font-bold tracking-[0.11em] text-[#b7cce5] uppercase shadow-[0_0_14px_rgba(71,154,255,0.14)]">
+        <span className="inline-flex size-1.5 rounded-full bg-[#67b7ff] shadow-[0_0_8px_rgba(96,181,255,0.72)]" />
         AI identity layer online
       </div>
 
-      <div className="space-y-1.5">
-        <h1 className="landing-text-primary max-w-[12.2ch] text-[2.02rem] leading-[0.94] font-semibold tracking-[-0.025em]">
-          Smart{' '}
-          <span className="bg-linear-to-r from-[#164eaf] via-[#2871d8] to-[#3c92ff] bg-clip-text text-transparent dark:from-[#ecf2ff] dark:via-[#98c6ff] dark:to-[#5ea7ff]">
-            Identification
-          </span>
+      <div className="space-y-3">
+        <h1 className="mx-auto max-w-[11.3ch] text-[2.03rem] leading-[1.2] font-bold tracking-[-0.01em] text-[#d8e9ff]">
+          Smart
           <br />
-          for DIU Campus
+          Identification
+          <br />
+          <span className="text-[#4fa3ff]">for DIU Campus</span>
         </h1>
 
-        <p
-          id="how-it-works"
-          className="landing-text-secondary max-w-[29ch] text-[0.7rem] leading-[1.34]"
-        >
-          Verify once and access DIU campus services without repeated
-          verification steps. Secure identity registration, AI-powered face
-          verification, Privacy-first data handling.
+        <p className="mx-auto max-w-[30ch] text-[0.76rem] leading-[1.54] text-[#aebfd3]">
+          Verify your identity once to securely access campus services,
+          examination halls, and automated registration systems.
         </p>
       </div>
     </section>
   );
 }
 
-export function MobileOnboardingStepper() {
+export function MobileOnboardingStepper({
+  activeIndex,
+}: MobileOnboardingStepperProps) {
   return (
     <section
-      id="for-students"
       aria-label="Registration flow steps"
-      className="rounded-[0.78rem] border border-slate-300/52 bg-white/32 px-2.5 py-2 dark:border-blue-200/18 dark:bg-[#0e1f3a]/34"
+      className="mx-auto w-full"
     >
-      <p className="landing-text-muted text-[0.56rem] font-medium tracking-[0.08em] uppercase">
-        Registration flow
+      <p className="text-[1.09rem] leading-none font-bold tracking-[-0.01em] text-[#c5d5e9]">
+        Registration Flow
       </p>
-      <ol className="mt-1.5 space-y-1.5">
+      <ol className="mt-4 space-y-3.5">
         {heroSteps.map((item, index, arr) => (
           <li
             key={item.id}
-            className="relative flex items-center gap-2.5"
+            className="relative flex min-w-0 items-start gap-3"
           >
             {index < arr.length - 1 ? (
               <span
                 aria-hidden="true"
-                className="absolute left-[0.26rem] top-[0.7rem] h-[0.9rem] w-px bg-linear-to-b from-blue-300/38 via-blue-300/48 to-slate-400/20"
+                className="absolute left-[0.85rem] top-[1.64rem] h-[1.78rem] w-px bg-[#2a4260]"
               />
             ) : null}
             <span
               className={
-                item.active
-                  ? 'relative z-10 inline-flex size-[0.58rem] items-center justify-center rounded-full bg-[#1a67e5] ring-2 ring-blue-200/56 dark:ring-blue-200/24'
-                  : 'relative z-10 inline-flex size-[0.58rem] items-center justify-center rounded-full border border-slate-300/70 bg-slate-100/62 dark:border-slate-500/35 dark:bg-[#1a2742]/52'
+                index <= activeIndex
+                  ? 'relative z-10 inline-flex size-[1.7rem] shrink-0 items-center justify-center rounded-full border border-[#5eb2ff] bg-[#08213f] text-[#55aaff] shadow-[0_0_16px_rgba(64,157,255,0.3)]'
+                  : 'relative z-10 inline-flex size-[1.7rem] shrink-0 items-center justify-center rounded-full border border-[#2e435d] bg-[#0a1829] text-[#53687f]'
               }
-            />
-            <span className="landing-text-secondary text-[0.67rem] leading-none">
-              {item.label}
+            >
+              <item.Icon className="size-[0.87rem]" aria-hidden="true" />
             </span>
+            <div className="min-w-0 pt-[0.04rem]">
+              <p
+                className={
+                  index <= activeIndex
+                    ? 'text-[0.74rem] leading-none font-bold text-[#4fa3ff]'
+                    : 'text-[0.74rem] leading-none font-semibold text-[#708397]'
+                }
+              >
+                {item.label}
+              </p>
+              <p className="mt-1 text-[0.59rem] leading-none text-[#718296]">
+                {item.description}
+              </p>
+            </div>
           </li>
         ))}
       </ol>
     </section>
+  );
+}
+
+export function MobileBottomStepper({
+  activeIndex,
+}: MobileOnboardingStepperProps) {
+  return (
+    <nav
+      aria-label="Registration progress"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[#102742]/90 bg-[#06111f]/94 px-3.5 pb-[max(0.3rem,env(safe-area-inset-bottom))] pt-[0.5rem] shadow-[0_-12px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:hidden"
+    >
+      <div className="mx-auto max-w-[17rem]">
+        <ol className="grid grid-cols-4 gap-1">
+          {mobileNavSteps.map((item, index) => (
+            <li key={item.label}>
+              <div
+                className={
+                  index <= activeIndex
+                    ? 'flex flex-col items-center gap-1 text-[#4fa3ff]'
+                    : 'flex flex-col items-center gap-1 text-[#43566c]'
+                }
+              >
+                <span
+                  className={
+                    index <= activeIndex
+                      ? 'inline-flex size-[1.64rem] items-center justify-center rounded-full bg-[#0d2848] shadow-[0_0_14px_rgba(70,155,255,0.34)]'
+                      : 'inline-flex size-[1.64rem] items-center justify-center rounded-full'
+                  }
+                >
+                  {index <= activeIndex ? (
+                    <item.Icon className="size-[0.92rem]" aria-hidden="true" />
+                  ) : (
+                    <Circle className="size-[0.92rem]" aria-hidden="true" />
+                  )}
+                </span>
+                <span className="text-center text-[0.47rem] leading-none font-bold tracking-[0.04em] uppercase">
+                  {item.label}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </nav>
   );
 }

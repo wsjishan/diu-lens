@@ -287,6 +287,60 @@
   }
 }
 
+@media (max-width: 639px) {
+  html.dark {
+    --landing-page-gradient:
+      radial-gradient(
+        circle at 50% 16%,
+        rgba(27, 86, 146, 0.28),
+        transparent 34%
+      ),
+      linear-gradient(180deg, #061323 0%, #06101d 42%, #05101b 100%);
+    --landing-grid-line: rgba(58, 116, 177, 0.05);
+    --landing-vignette: linear-gradient(
+      180deg,
+      rgba(2, 8, 18, 0.16),
+      rgba(2, 8, 18, 0.44)
+    );
+    --landing-glow-top-left: radial-gradient(
+      circle at 50% 0%,
+      rgba(36, 109, 182, 0.2),
+      transparent 42%
+    );
+    --landing-glow-bottom-right: radial-gradient(
+      circle at 90% 96%,
+      rgba(22, 71, 122, 0.13),
+      transparent 42%
+    );
+    --landing-card-bg: linear-gradient(
+      180deg,
+      rgba(11, 27, 44, 0.96) 0%,
+      rgba(9, 22, 38, 0.97) 100%
+    );
+    --landing-card-border: rgba(34, 63, 92, 0.72);
+    --landing-card-shadow:
+      0 15px 30px -18px rgba(0, 0, 0, 0.46),
+      0 0 14px rgba(40, 121, 214, 0.06),
+      inset 0 1px 0 rgba(160, 197, 235, 0.05);
+    --landing-text-primary: #cbd9eb;
+    --landing-text-secondary: #93a7bd;
+    --landing-text-muted: #60758b;
+    --landing-input-bg: rgba(26, 43, 62, 0.95);
+    --landing-input-border: rgba(60, 82, 106, 0.84);
+    --landing-input-placeholder: rgba(132, 151, 170, 0.95);
+    --landing-input-text: #d9e7f7;
+    --landing-focus-ring: rgba(79, 163, 255, 0.24);
+    --landing-button-bg: linear-gradient(180deg, #60adff 0%, #56a4fb 100%);
+    --landing-button-shadow:
+      0 10px 20px -14px rgba(71, 157, 255, 0.48),
+      inset 0 1px 0 rgba(212, 233, 255, 0.2);
+    --landing-card-blur: 16px;
+    --landing-input-inset-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(75, 113, 151, 0.16);
+  }
+}
+
 @layer utilities {
   .landing-page {
     background-image: var(--landing-page-gradient);
@@ -505,7 +559,7 @@
   @media (max-width: 639px) {
     .landing-grid-overlay {
       background-size: 50px 50px;
-      opacity: 0.19;
+      opacity: 0.13;
     }
 
     .landing-vignette {
@@ -522,29 +576,33 @@
 
     .landing-card-surface {
       box-shadow:
-        0 13px 24px -20px rgba(30, 64, 175, 0.24),
-        0 5px 12px -11px rgba(15, 23, 42, 0.12),
-        inset 0 1px 0 rgba(255, 255, 255, 0.94);
+        0 15px 30px -18px rgba(0, 0, 0, 0.46),
+        0 0 14px rgba(40, 121, 214, 0.06),
+        inset 0 1px 0 rgba(160, 197, 235, 0.05);
     }
 
     .landing-form-input {
       height: 2.62rem;
-      border-radius: 0.64rem;
-      font-size: 0.8rem;
+      border-radius: 0.42rem;
+      font-size: 0.74rem;
       line-height: 1.1rem;
-      padding-left: 0.8rem;
-      padding-right: 0.8rem;
+      padding-left: 0.78rem;
+      padding-right: 0.78rem;
+    }
+
+    .landing-form-input-with-icon {
+      padding-left: 2rem;
     }
 
     .landing-cta {
       height: 2.62rem;
-      border-radius: 0.64rem;
+      border-radius: 0.42rem;
       font-size: 0.8rem;
     }
 
     .landing-cta-outline {
-      height: 2.58rem;
-      border-radius: 0.64rem;
+      height: 2.54rem;
+      border-radius: 0.42rem;
     }
   }
 }

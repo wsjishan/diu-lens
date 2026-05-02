@@ -16,7 +16,7 @@ export function CameraPreview({
   return (
     <div
       className={cn(
-        'relative aspect-[3/4] w-full overflow-hidden rounded-[1.25rem] border border-slate-300/70 bg-slate-950/95 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.85)]',
+        'relative aspect-[3/4] w-full overflow-hidden rounded-[1.25rem] border border-slate-300/70 bg-slate-950/95 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.85)] max-[639px]:rounded-[0.76rem] max-[639px]:border-[#2e4b6a]',
         className
       )}
     >

@@ -39,7 +39,16 @@ function getSystemTheme(): ResolvedTheme {
 function getStoredTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
   const storedTheme = localStorage.getItem(STORAGE_KEY);
-  return storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'system';
+  if (storedTheme === 'light' || storedTheme === 'dark') {
+    return storedTheme;
+  }
+
+  // Keep mobile onboarding in dark mode by default until the user explicitly picks a theme.
+  if (window.matchMedia('(max-width: 639px)').matches) {
+    return 'dark';
+  }
+
+  return 'system';
 }
 
 function emitThemeChange() {

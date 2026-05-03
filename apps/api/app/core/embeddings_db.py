@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -18,6 +19,7 @@ class FaceEmbeddingPersistenceError(Exception):
 
 
 EMBEDDING_DIMENSION = 512
+logger = logging.getLogger(__name__)
 
 
 def _normalize_embedding_vector(vector: list[float]) -> list[float]:
@@ -52,9 +54,10 @@ def persist_face_embeddings(
     """
     if not processed_crops:
         return {"deactivated_count": 0, "inserted_count": 0}
-    print(
-        f"[embeddings] persist start student_id={student_id} "
-        f"processed_crops={len(processed_crops)}"
+    logger.info(
+        "[embeddings] persist start student_id=%s processed_crops=%s",
+        student_id,
+        len(processed_crops),
     )
 
     session_factory = get_session_factory()
@@ -115,10 +118,11 @@ def persist_face_embeddings(
                 )
 
             db.commit()
-            print(
-                "[embeddings] persist end "
-                f"student_id={student_id} inserted_count={inserted_count} "
-                f"deactivated_count={deactivated_count}"
+            logger.info(
+                "[embeddings] persist end student_id=%s inserted_count=%s deactivated_count=%s",
+                student_id,
+                inserted_count,
+                deactivated_count,
             )
             return {
                 "deactivated_count": deactivated_count,

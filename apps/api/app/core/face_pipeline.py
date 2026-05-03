@@ -10,7 +10,6 @@ Phase 7 scope:
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from threading import Lock
 from typing import Any
@@ -25,6 +24,7 @@ from app.core.enrollment_db import (
     EnrollmentPersistenceError,
     get_processing_source_images,
 )
+from app.core.config import settings
 from app.core.storage_service import ALLOWED_ANGLES, StorageService
 _STUDENT_ID_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 _PROBE_LABEL_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
@@ -32,8 +32,8 @@ _PROBE_LABEL_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9_-]+")
 _ANALYZER_LOCK = Lock()
 _ANALYZER: Any = None
 _ANALYZER_INIT_ERROR: str | None = None
-_INSIGHTFACE_MODEL_PACK = (os.getenv("INSIGHTFACE_MODEL_PACK", "antelopev2").strip() or "antelopev2")
-_INSIGHTFACE_ROOT = (os.getenv("INSIGHTFACE_ROOT", "~/.insightface").strip() or "~/.insightface")
+_INSIGHTFACE_MODEL_PACK = settings.insightface_model_pack
+_INSIGHTFACE_ROOT = settings.insightface_root
 _MIN_DET_SCORE = 0.45
 _MIN_FACE_AREA_RATIO = 0.06
 _MIN_BLUR_VARIANCE = 22.0
@@ -82,7 +82,7 @@ def _resolve_model_name_candidates() -> list[str]:
 
     candidates = [configured]
     if "/" not in configured:
-        root = Path(os.path.expanduser(_INSIGHTFACE_ROOT))
+        root = Path(_INSIGHTFACE_ROOT).expanduser()
         nested_dir = root / "models" / configured / configured
         if nested_dir.exists() and nested_dir.is_dir():
             candidates.append(f"{configured}/{configured}")

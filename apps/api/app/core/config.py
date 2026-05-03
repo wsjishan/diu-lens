@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-
-load_dotenv()
+_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=_ENV_PATH)
 
 
 def _parse_origins(raw_origins: str) -> list[str]:
@@ -33,23 +34,8 @@ def _require_positive_int(name: str, hint: str | None = None) -> int:
     return value
 
 
-def _get_positive_int(name: str, default: int) -> int:
-    raw = os.getenv(name, "").strip()
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise RuntimeError(f"{name} must be an integer value.") from exc
-    if value <= 0:
-        raise RuntimeError(f"{name} must be greater than 0.")
-    return value
-
-
-def _get_positive_float(name: str, default: float) -> float:
-    raw = os.getenv(name, "").strip()
-    if not raw:
-        return default
+def _require_positive_float(name: str, hint: str | None = None) -> float:
+    raw = _require_env(name, hint)
     try:
         value = float(raw)
     except ValueError as exc:
@@ -72,6 +58,11 @@ def _require_postgresql_url() -> str:
     return database_url
 
 
+def _get_env(name: str, default: str) -> str:
+    value = os.getenv(name, "").strip()
+    return value or default
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -79,42 +70,68 @@ class Settings:
     environment: str
     allowed_origins: list[str]
     database_url: str
-    secret_key: str
+    jwt_secret: str
     algorithm: str
     access_token_expire_minutes: int
     face_match_distance_threshold: float
     face_match_top_k: int
     face_match_candidate_pool_limit: int
+    insightface_model_pack: str
+    insightface_root: str
     storage_path: str
 
 
-settings = Settings(
-    app_name=os.getenv("APP_NAME", "DIU Lens API"),
-    version=os.getenv("APP_VERSION", "0.1.0"),
-    environment=os.getenv("APP_ENV", "development").strip().lower() or "development",
-    allowed_origins=_parse_origins(
-        os.getenv(
-            "ALLOWED_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000",
+_environment = _get_env("APP_ENV", "development").lower()
+_database_url = os.getenv("DATABASE_URL", "").strip()
+_jwt_secret = os.getenv("JWT_SECRET", "").strip()
+_storage_path = os.getenv("STORAGE_PATH", "").strip()
+
+if _environment == "production":
+    missing = [
+        name
+        for name, value in (
+            ("DATABASE_URL", _database_url),
+            ("JWT_SECRET", _jwt_secret),
+            ("STORAGE_PATH", _storage_path),
         )
+        if not value
+    ]
+    if missing:
+        joined = ", ".join(missing)
+        raise RuntimeError(
+            f"Missing required environment variable(s) for production: {joined}."
+        )
+
+
+settings = Settings(
+    app_name=_require_env("APP_NAME"),
+    version=_require_env("APP_VERSION"),
+    environment=_environment,
+    allowed_origins=_parse_origins(
+        _require_env("ALLOWED_ORIGINS")
     ),
     database_url=_require_postgresql_url(),
-    secret_key=_require_env("SECRET_KEY", "Set a long random secret."),
-    algorithm=_require_env("ALGORITHM", "Use 'HS256' unless you have a different JWT setup."),
+    jwt_secret=_require_env("JWT_SECRET", "Set a long random secret."),
+    algorithm=_require_env("ALGORITHM"),
     access_token_expire_minutes=_require_positive_int(
         "ACCESS_TOKEN_EXPIRE_MINUTES",
         "Set a positive integer like 60.",
     ),
     # Calibrated default for ArcFace cosine distance with multi-angle enrollment.
     # Keep configurable via FACE_MATCH_DISTANCE_THRESHOLD for production tuning.
-    face_match_distance_threshold=_get_positive_float(
+    face_match_distance_threshold=_require_positive_float(
         "FACE_MATCH_DISTANCE_THRESHOLD",
-        0.38,
+        "Set a positive float like 0.38.",
     ),
-    face_match_top_k=_get_positive_int("FACE_MATCH_TOP_K", 5),
-    face_match_candidate_pool_limit=_get_positive_int(
+    face_match_top_k=_require_positive_int(
+        "FACE_MATCH_TOP_K",
+        "Set a positive integer like 5.",
+    ),
+    face_match_candidate_pool_limit=_require_positive_int(
         "FACE_MATCH_CANDIDATE_POOL_LIMIT",
-        200,
+        "Set a positive integer like 200.",
     ),
-    storage_path=os.getenv("STORAGE_PATH", "./storage").strip() or "./storage",
+    insightface_model_pack=_require_env("INSIGHTFACE_MODEL_PACK"),
+    insightface_root=_require_env("INSIGHTFACE_ROOT"),
+    storage_path=_require_env("STORAGE_PATH"),
 )

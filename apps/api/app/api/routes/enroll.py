@@ -869,6 +869,12 @@ async def enroll(request: Request) -> EnrollmentResponse:
             event_type=event_type,
             event_message=event_message,
         )
+        logger.info(
+            "[enrollment] created student_id=%s mode=%s status=%s",
+            payload.student_id,
+            mode,
+            entry.get("status", "unknown"),
+        )
     except StudentAlreadyRegisteredError:
         return EnrollmentResponse(
             success=False,
@@ -916,6 +922,14 @@ async def enroll_verification(request: Request) -> EnrollmentResponse:
                 "[verification] uploaded bytes=%s student_id=%s",
                 total_uploaded_bytes,
                 payload.student_id,
+            )
+            total_uploaded_files = sum(
+                len(uploaded_images.get(angle, [])) for angle in ALLOWED_ANGLES
+            )
+            logger.info(
+                "[verification] upload received student_id=%s files=%s",
+                payload.student_id,
+                total_uploaded_files,
             )
             logger.info(
                 "[verification-timing] multipart breakdown form_parse_file_access_ms=%s metadata_parse_ms=%s integrity_validation_ms=%s save_files_ms=%s multipart_total_ms=%s",

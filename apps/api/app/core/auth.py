@@ -41,7 +41,7 @@ def create_access_token(*, admin_id: int, email: str, role: str) -> str:
         "role": role,
         "exp": expire_at,
     }
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.algorithm)
 
 
 def _unauthorized() -> HTTPException:
@@ -85,7 +85,7 @@ def get_current_admin_user(
         raise _unauthorized()
 
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.algorithm])
         subject = payload.get("sub")
     except JWTError as exc:
         raise _unauthorized() from exc

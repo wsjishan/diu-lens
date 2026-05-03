@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import logging
 from statistics import mean
 from typing import Any
 
@@ -26,6 +27,7 @@ class FaceMatchingError(Exception):
 STRICT_BEST_DISTANCE_MAX = 0.20
 STRICT_TOP_AVG_DISTANCE_MAX = 0.35
 STRICT_SUPPORT_COUNT_MIN = 3
+logger = logging.getLogger(__name__)
 
 
 def _encode_mirrored_probe(image_bytes: bytes) -> bytes | None:
@@ -166,9 +168,10 @@ def search_face_matches(
     candidate_pool_limit: int,
 ) -> list[dict[str, Any]]:
     """Return nearest embedding rows for approved, active enrollment records."""
-    print(
-        "[recognition] search start "
-        f"candidate_pool_limit={candidate_pool_limit} query_embedding_dim={len(query_embedding)}"
+    logger.info(
+        "[recognition] search start candidate_pool_limit=%s query_embedding_dim=%s",
+        candidate_pool_limit,
+        len(query_embedding),
     )
     if len(query_embedding) != EMBEDDING_DIMENSION:
         raise FaceMatchingError(
@@ -209,7 +212,7 @@ def search_face_matches(
             rows = db.execute(stmt).mappings().all()
         except SQLAlchemyError as exc:
             raise FaceMatchingError("Failed to search face embeddings.") from exc
-    print(f"[recognition] search end rows={len(rows)}")
+    logger.info("[recognition] search end rows=%s", len(rows))
 
     return [
         {

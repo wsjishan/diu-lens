@@ -52,6 +52,10 @@ def persist_face_embeddings(
     """
     if not processed_crops:
         return {"deactivated_count": 0, "inserted_count": 0}
+    print(
+        f"[embeddings] persist start student_id={student_id} "
+        f"processed_crops={len(processed_crops)}"
+    )
 
     session_factory = get_session_factory()
     with session_factory() as db:
@@ -111,6 +115,11 @@ def persist_face_embeddings(
                 )
 
             db.commit()
+            print(
+                "[embeddings] persist end "
+                f"student_id={student_id} inserted_count={inserted_count} "
+                f"deactivated_count={deactivated_count}"
+            )
             return {
                 "deactivated_count": deactivated_count,
                 "inserted_count": inserted_count,

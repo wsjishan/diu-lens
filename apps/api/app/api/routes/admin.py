@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from sqlalchemy import func, select
 
 from app.core.auth import bearer_scheme, require_admin, require_super_admin
 from app.core.enrollment_db import (
@@ -20,6 +21,9 @@ from app.core.embeddings_db import (
 )
 from app.core.face_pipeline import FacePipelineError, process_student_images
 from app.core.storage import get_storage_service
+from app.db.models.enrollment_images import EnrollmentImage
+from app.db.models.enrollments import Enrollment
+from app.db.session import get_session_factory
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -29,7 +33,40 @@ class RejectEnrollmentRequest(BaseModel):
     reason: str | None = None
 
 
+@router.get("/enrollments")
+async def list_admin_enrollments(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, object]:
+    require_admin(credentials)
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        rows = db.execute(
+            select(
+                Enrollment.student_id,
+                Enrollment.status,
+                Enrollment.created_at,
+                func.count(EnrollmentImage.id).label("total_images"),
+            )
+            .outerjoin(EnrollmentImage, EnrollmentImage.enrollment_id == Enrollment.id)
+            .group_by(Enrollment.id)
+            .order_by(Enrollment.created_at.desc())
+        ).all()
+
+    return {
+        "enrollments": [
+            {
+                "student_id": str(student_id),
+                "status": str(status),
+                "created_at": created_at.isoformat() if created_at is not None else None,
+                "total_images": int(total_images or 0),
+            }
+            for student_id, status, created_at, total_images in rows
+        ]
+    }
+
+
 def _run_student_processing(student_id: str) -> dict[str, object]:
+    print(f"[processing] start student_id={student_id}")
     try:
         assert_enrollment_processable(student_id)
     except EnrollmentNotFoundError as exc:
@@ -66,9 +103,14 @@ def _run_student_processing(student_id: str) -> dict[str, object]:
         embeddings_generated_count = int(result.get("embeddings_generated_count", 0))
         processing_passed = bool(result.get("processing_passed", False))
         if processing_passed and embeddings_generated_count > 0:
-            persist_face_embeddings(
+            persisted = persist_face_embeddings(
                 student_id=student_id,
                 processed_crops=list(result.get("processed_crops", [])),
+            )
+            print(
+                "[processing] embeddings_saved "
+                f"student_id={student_id} inserted_count={int(persisted.get('inserted_count', 0))} "
+                f"deactivated_count={int(persisted.get('deactivated_count', 0))}"
             )
         elif processing_passed and embeddings_generated_count <= 0:
             processing_passed = False
@@ -96,6 +138,7 @@ def _run_student_processing(student_id: str) -> dict[str, object]:
             "processing_result": result,
         }
     except FacePipelineError as exc:
+        print(f"[processing] end student_id={student_id} success=false reason={exc}")
         record_processing_completed_in_db(
             student_id,
             processed_images_count=0,
@@ -110,6 +153,7 @@ def _run_student_processing(student_id: str) -> dict[str, object]:
             "processing_error": str(exc),
         }
     except (EnrollmentPersistenceError, FaceEmbeddingPersistenceError, RuntimeError) as exc:
+        print(f"[processing] end student_id={student_id} success=false reason={exc}")
         record_processing_completed_in_db(
             student_id,
             processed_images_count=0,
@@ -124,6 +168,7 @@ def _run_student_processing(student_id: str) -> dict[str, object]:
             "processing_error": str(exc),
         }
     except OSError:
+        print("[processing] end student_id=%s success=false reason=io_error" % student_id)
         record_processing_completed_in_db(
             student_id,
             processed_images_count=0,
@@ -137,6 +182,8 @@ def _run_student_processing(student_id: str) -> dict[str, object]:
             "embeddings_generated_count": 0,
             "processing_error": "Failed to write processed outputs.",
         }
+    finally:
+        print(f"[processing] end student_id={student_id}")
 
 
 @router.post("/enrollments/{student_id}/approve")

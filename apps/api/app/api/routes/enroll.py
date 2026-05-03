@@ -34,6 +34,9 @@ from app.core.storage import (
 
 MIN_IMAGES_PER_ANGLE = 2
 MAX_IMAGES_PER_ANGLE = 5
+REQUIRED_IMAGES_PER_ANGLE = 3
+EXPECTED_REQUIRED_ANGLES: tuple[str, ...] = REQUIRED_CAPTURE_ANGLES
+EXPECTED_TOTAL_SHOTS = len(EXPECTED_REQUIRED_ANGLES) * REQUIRED_IMAGES_PER_ANGLE
 EYES_VISIBLE_VALUES: tuple[str, ...] = ("passed", "failed", "not_yet_implemented")
 ENROLLMENT_STATUSES: tuple[str, ...] = (
     "pending",
@@ -128,7 +131,9 @@ def _extract_multipart_files(
     if not hasattr(form_data, "keys") or not hasattr(form_data, "getlist"):
         raise _bad_request("Invalid multipart form data.")
 
-    files_by_angle: dict[str, list[UploadFile]] = {angle: [] for angle in ALLOWED_ANGLES}
+    files_by_angle: dict[str, list[UploadFile]] = {
+        angle: [] for angle in EXPECTED_REQUIRED_ANGLES
+    }
 
     for key in form_data.keys():
         if key == "metadata":
@@ -144,7 +149,7 @@ def _extract_multipart_files(
         if not angle_files:
             continue
 
-        if key not in ALLOWED_ANGLES:
+        if key not in EXPECTED_REQUIRED_ANGLES:
             raise _bad_request(f"Unsupported angle field in files: {key}")
 
         files_by_angle[key].extend(angle_files)
@@ -161,25 +166,9 @@ def _validate_final_multipart_metadata(payload: EnrollmentRequest) -> None:
             "verification_completed must be true for final multipart enrollment"
         )
 
-    min_total_shots = len(REQUIRED_CAPTURE_ANGLES) * MIN_IMAGES_PER_ANGLE
-    max_total_shots = len(ALLOWED_ANGLES) * MAX_IMAGES_PER_ANGLE
-
-    if (
-        payload.total_required_shots < min_total_shots
-        or payload.total_required_shots > max_total_shots
-    ):
+    if payload.total_required_shots != EXPECTED_TOTAL_SHOTS:
         raise _bad_request(
-            "total_required_shots must be between "
-            f"{min_total_shots} and {max_total_shots}"
-        )
-
-    if (
-        payload.total_accepted_shots < min_total_shots
-        or payload.total_accepted_shots > max_total_shots
-    ):
-        raise _bad_request(
-            "total_accepted_shots must be between "
-            f"{min_total_shots} and {max_total_shots}"
+            f"total_required_shots must be exactly {EXPECTED_TOTAL_SHOTS}"
         )
 
     angle_names = [summary.angle for summary in payload.angles]
@@ -191,40 +180,31 @@ def _validate_final_multipart_metadata(payload: EnrollmentRequest) -> None:
         raise _bad_request(f"Duplicate angle summaries are not allowed: {joined}")
 
     provided_angles = set(angle_names)
-    required_angles = set(REQUIRED_CAPTURE_ANGLES)
+    required_angles = set(EXPECTED_REQUIRED_ANGLES)
 
     missing_angles = sorted(required_angles - provided_angles)
     if missing_angles:
-        joined = ", ".join(missing_angles)
-        raise _bad_request(f"Missing required angles: {joined}")
+        raise _bad_request(f"Missing angle: {missing_angles[0]}")
 
-    extra_angles = sorted(provided_angles - set(ALLOWED_ANGLES))
+    extra_angles = sorted(provided_angles - required_angles)
     if extra_angles:
-        joined = ", ".join(extra_angles)
-        raise _bad_request(f"Unexpected angles in metadata: {joined}")
+        raise _bad_request(f"Unknown angle in metadata: {extra_angles[0]}")
+
+    if len(payload.angles) != len(EXPECTED_REQUIRED_ANGLES):
+        raise _bad_request(
+            f"Metadata must include exactly {len(EXPECTED_REQUIRED_ANGLES)} angle summaries."
+        )
 
     for summary in payload.angles:
-        if (
-            summary.required_shots < MIN_IMAGES_PER_ANGLE
-            or summary.required_shots > MAX_IMAGES_PER_ANGLE
-        ):
+        if summary.required_shots != REQUIRED_IMAGES_PER_ANGLE:
             raise _bad_request(
-                "required_shots must be between "
-                f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE} "
-                f"for angle: {summary.angle}"
+                f"Invalid required_shots for angle: {summary.angle}. "
+                f"Expected {REQUIRED_IMAGES_PER_ANGLE}."
             )
-        if (
-            summary.accepted_shots < MIN_IMAGES_PER_ANGLE
-            or summary.accepted_shots > MAX_IMAGES_PER_ANGLE
-        ):
+        if summary.accepted_shots != REQUIRED_IMAGES_PER_ANGLE:
             raise _bad_request(
-                "accepted_shots must be between "
-                f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE} "
-                f"for angle: {summary.angle}"
-            )
-        if summary.accepted_shots < summary.required_shots:
-            raise _bad_request(
-                f"accepted_shots must be >= required_shots for angle: {summary.angle}"
+                f"Invalid accepted_shots for angle: {summary.angle}. "
+                f"Expected {REQUIRED_IMAGES_PER_ANGLE}."
             )
 
 
@@ -236,36 +216,42 @@ def _validate_file_counts(
         summary.angle: int(summary.accepted_shots) for summary in payload.angles
     }
     expected_angles = set(expected_by_angle)
-    for angle in REQUIRED_CAPTURE_ANGLES:
+    for angle in EXPECTED_REQUIRED_ANGLES:
         if angle not in expected_angles:
             raise _bad_request(f"Missing required angle metadata: {angle}")
 
+    uploaded_angles = {angle for angle, files in files_by_angle.items() if files}
+    if uploaded_angles != set(EXPECTED_REQUIRED_ANGLES):
+        missing_upload_angles = sorted(set(EXPECTED_REQUIRED_ANGLES) - uploaded_angles)
+        if missing_upload_angles:
+            raise _bad_request(f"Missing angle: {missing_upload_angles[0]}")
+        unknown_upload_angles = sorted(uploaded_angles - set(EXPECTED_REQUIRED_ANGLES))
+        if unknown_upload_angles:
+            raise _bad_request(f"Unknown angle in upload files: {unknown_upload_angles[0]}")
+
     for angle, expected_count in expected_by_angle.items():
         file_count = len(files_by_angle.get(str(angle), []))
-        if file_count < MIN_IMAGES_PER_ANGLE or file_count > MAX_IMAGES_PER_ANGLE:
-            raise _bad_request(
-                "Image count for angle must be between "
-                f"{MIN_IMAGES_PER_ANGLE} and {MAX_IMAGES_PER_ANGLE}: {angle}"
-            )
+        if file_count != REQUIRED_IMAGES_PER_ANGLE:
+            raise _bad_request(f"Invalid image count for angle: {angle}")
         if file_count != expected_count:
             raise _bad_request(
                 f"Metadata/upload count mismatch for angle {angle}: "
                 f"metadata={expected_count}, uploaded={file_count}"
             )
 
-    for angle in ALLOWED_ANGLES:
-        if angle in expected_angles:
-            continue
-        if files_by_angle.get(angle):
-            raise _bad_request(
-                f"Uploaded files for angle '{angle}' are missing metadata summary."
-            )
+    actual_uploaded_count = sum(len(files_by_angle.get(angle, [])) for angle in EXPECTED_REQUIRED_ANGLES)
+    if payload.total_accepted_shots != actual_uploaded_count:
+        raise _bad_request(
+            "total_accepted_shots does not match uploaded image count."
+        )
 
 
 def _capture_timestamps_by_angle(
     payload: EnrollmentRequest,
 ) -> dict[str, list[int | None]]:
-    mapping: dict[str, list[int | None]] = {angle: [] for angle in ALLOWED_ANGLES}
+    mapping: dict[str, list[int | None]] = {
+        angle: [] for angle in EXPECTED_REQUIRED_ANGLES
+    }
     for entry in payload.frame_metadata_by_angle:
         angle = str(entry.angle)
         if angle not in mapping:
@@ -360,10 +346,10 @@ async def _validate_files(
     image_reports: list[dict[str, object]] = []
     total_uploaded_bytes = 0
     quality_by_angle: dict[str, list[dict[str, object]]] = {
-        angle: [] for angle in ALLOWED_ANGLES
+        angle: [] for angle in EXPECTED_REQUIRED_ANGLES
     }
 
-    for angle in ALLOWED_ANGLES:
+    for angle in EXPECTED_REQUIRED_ANGLES:
         for index, upload in enumerate(files_by_angle.get(angle, [])):
             content_type = (upload.content_type or "").lower()
             if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
@@ -449,12 +435,25 @@ async def _validate_files(
             "[guided-sanity] validation_failed details=%s",
             failure_details,
         )
+        specific_message = "Image validation failed."
+        if failure_details:
+            first_failure = failure_details[0]
+            reason = str(first_failure.get("reason", "unknown"))
+            angle = str(first_failure.get("angle", "unknown"))
+            if reason.startswith("invalid_image_data"):
+                specific_message = f"Corrupted image for angle: {angle}"
+            elif reason.startswith("image_too_small"):
+                specific_message = f"Image too small for angle: {angle}"
+            elif reason.startswith("missing_image_data"):
+                specific_message = f"Uploaded file is empty for angle: {angle}"
+            else:
+                specific_message = f"Image validation failed for angle: {angle}"
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "sanity_failed",
                 "status": "failed",
-                "message": "Image sanity validation failed for uploaded enrollment images.",
+                "message": specific_message,
                 "details": failure_details,
                 "validation": summary,
             },

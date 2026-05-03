@@ -166,6 +166,10 @@ def search_face_matches(
     candidate_pool_limit: int,
 ) -> list[dict[str, Any]]:
     """Return nearest embedding rows for approved, active enrollment records."""
+    print(
+        "[recognition] search start "
+        f"candidate_pool_limit={candidate_pool_limit} query_embedding_dim={len(query_embedding)}"
+    )
     if len(query_embedding) != EMBEDDING_DIMENSION:
         raise FaceMatchingError(
             f"Invalid query embedding length: {len(query_embedding)}."
@@ -193,7 +197,7 @@ def search_face_matches(
         .outerjoin(Student, Student.student_id == FaceEmbedding.student_id)
         .where(
             FaceEmbedding.is_active.is_(True),
-            Enrollment.status == "approved",
+            Enrollment.status.in_(["approved", "processed"]),
         )
         .order_by(distance_expr.asc(), FaceEmbedding.id.asc())
         .limit(candidate_pool_limit)
@@ -205,6 +209,7 @@ def search_face_matches(
             rows = db.execute(stmt).mappings().all()
         except SQLAlchemyError as exc:
             raise FaceMatchingError("Failed to search face embeddings.") from exc
+    print(f"[recognition] search end rows={len(rows)}")
 
     return [
         {

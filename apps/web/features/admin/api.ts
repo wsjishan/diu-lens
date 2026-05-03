@@ -1,8 +1,7 @@
 import { AdminUser, EnrollmentRecord } from '@/features/admin/auth/types';
 
 const GENERIC_ADMIN_ERROR = 'Unable to complete the request right now. Please try again.';
-const ENROLLMENTS_ENDPOINT =
-  process.env.NEXT_PUBLIC_ADMIN_ENROLLMENTS_ENDPOINT?.trim() || '/debug/enrollments';
+const ENROLLMENTS_ENDPOINT = '/admin/enrollments';
 
 export class AdminApiAuthError extends Error {
   constructor(message = 'Your session has expired. Please sign in again.') {

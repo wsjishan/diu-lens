@@ -85,6 +85,7 @@ class Settings:
     face_match_distance_threshold: float
     face_match_top_k: int
     face_match_candidate_pool_limit: int
+    storage_path: str
 
 
 settings = Settings(
@@ -115,4 +116,5 @@ settings = Settings(
         "FACE_MATCH_CANDIDATE_POOL_LIMIT",
         200,
     ),
+    storage_path=os.getenv("STORAGE_PATH", "./storage").strip() or "./storage",
 )

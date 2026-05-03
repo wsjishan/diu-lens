@@ -159,8 +159,9 @@ def _load_active_embeddings(student_id: str) -> tuple[list[EmbeddingRow], str]:
     if rows:
         return rows, "database_active_embeddings"
 
-    processing_result = (
-        Path("storage") / "processed" / student_id / "processing_result.json"
+    storage = get_storage_service()
+    processing_result = storage.resolve_relative_path(
+        f"processed/{student_id}/processing_result.json"
     )
     if processing_result.exists():
         parsed = json.loads(processing_result.read_text(encoding="utf-8"))
@@ -186,7 +187,7 @@ def _load_active_embeddings(student_id: str) -> tuple[list[EmbeddingRow], str]:
 
 
 def _relative_to_storage(path: Path) -> str:
-    storage_root = Path("storage").resolve()
+    storage_root = get_storage_service().resolve_relative_path("").resolve()
     try:
         return path.resolve().relative_to(storage_root).as_posix()
     except Exception:
@@ -194,8 +195,9 @@ def _relative_to_storage(path: Path) -> str:
 
 
 def _collect_enrollment_images(student_id: str) -> tuple[list[str], list[str]]:
-    uploads_root = Path("storage") / "uploads" / student_id
-    processed_root = Path("storage") / "processed" / student_id
+    storage = get_storage_service()
+    uploads_root = storage.resolve_relative_path(f"uploads/{student_id}")
+    processed_root = storage.resolve_relative_path(f"processed/{student_id}")
 
     source_images = sorted(
         _relative_to_storage(path)
@@ -222,7 +224,7 @@ def _compression_impact(
     per_image: list[dict[str, Any]] = []
 
     for rel_path in source_images:
-        abs_path = Path("storage") / rel_path
+        abs_path = get_storage_service().resolve_relative_path(rel_path)
         image = cv2.imread(str(abs_path))
         if image is None:
             continue
@@ -354,13 +356,13 @@ def build_report(student_id: str, probe_image_path: Path) -> dict[str, Any]:
 
     source_quality = []
     for rel in source_images:
-        abs_path = Path("storage") / rel
+        abs_path = get_storage_service().resolve_relative_path(rel)
         angle = Path(rel).parent.name
         source_quality.append(_audit_image_quality(abs_path, angle_label=angle))
 
     crop_quality = []
     for rel in crop_images:
-        abs_path = Path("storage") / rel
+        abs_path = get_storage_service().resolve_relative_path(rel)
         angle = Path(rel).parent.name
         crop_quality.append(
             _audit_image_quality(
@@ -450,7 +452,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Optional output JSON file path. Defaults to storage/processed/reports/<student_id>/...",
+        help="Optional output JSON file path. Defaults to <STORAGE_PATH>/processed/reports/<student_id>/...",
     )
     args = parser.parse_args()
 
@@ -465,13 +467,9 @@ def main() -> None:
         output_path = Path(args.output).expanduser().resolve()
     else:
         stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        output_path = (
-            Path("storage")
-            / "processed"
-            / "reports"
-            / student_id
-            / f"recognition_accuracy_{stamp}.json"
-        ).resolve()
+        output_path = get_storage_service().resolve_relative_path(
+            f"processed/reports/{student_id}/recognition_accuracy_{stamp}.json"
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

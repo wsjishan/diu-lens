@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Protocol
+
+from app.core.config import settings
 
 
 ALLOWED_ANGLES: tuple[str, ...] = (
@@ -80,8 +83,12 @@ class StorageService(Protocol):
 
 class LocalStorageService:
     def __init__(self, base_dir: Path | None = None) -> None:
-        resolved_base = base_dir or Path(__file__).resolve().parents[2]
-        self._storage_dir = resolved_base / "storage"
+        resolved_storage = (
+            base_dir.expanduser().resolve()
+            if base_dir is not None
+            else Path(settings.storage_path).expanduser().resolve()
+        )
+        self._storage_dir = resolved_storage
         self._uploads_dir = self._storage_dir / "uploads"
         self._processed_dir = self._storage_dir / "processed"
         self._enrollments_file = self._storage_dir / "enrollments.json"
@@ -145,7 +152,7 @@ class LocalStorageService:
 
         sanitized_student_id = self.sanitize_student_id(student_id)
         angle_dir = self._uploads_dir / sanitized_student_id / angle
-        angle_dir.mkdir(parents=True, exist_ok=True)
+        os.makedirs(angle_dir, exist_ok=True)
 
         next_index = self._next_image_index(angle_dir)
         filename = f"{angle}_{next_index}{extension}"
@@ -168,7 +175,7 @@ class LocalStorageService:
         sanitized_student_id = self.sanitize_student_id(student_id)
         source_name = Path(source_rel_path).stem
         student_dir = self._processed_dir / sanitized_student_id / angle
-        student_dir.mkdir(parents=True, exist_ok=True)
+        os.makedirs(student_dir, exist_ok=True)
         filename = f"{source_name}_crop.jpg"
         destination = student_dir / filename
         destination.write_bytes(image_bytes)
@@ -182,7 +189,7 @@ class LocalStorageService:
         payload: dict[str, Any],
     ) -> str:
         destination = self.resolve_relative_path(relative_path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
+        os.makedirs(destination.parent, exist_ok=True)
         destination.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -259,8 +266,8 @@ class LocalStorageService:
         return relative_paths
 
     def _ensure_enrollments_file(self) -> None:
-        self._storage_dir.mkdir(parents=True, exist_ok=True)
-        self._uploads_dir.mkdir(parents=True, exist_ok=True)
+        os.makedirs(self._storage_dir, exist_ok=True)
+        os.makedirs(self._uploads_dir, exist_ok=True)
         if not self._enrollments_file.exists():
             self._enrollments_file.write_text("[]", encoding="utf-8")
 

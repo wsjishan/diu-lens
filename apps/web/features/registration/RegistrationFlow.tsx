@@ -116,7 +116,9 @@ export function RegistrationFlow({
   }, [onDone]);
 
   const handleBasicInfoContinue = useCallback(async () => {
+    console.log('[registration] handleBasicInfoContinue called');
     if (isSubmittingBasicInfo) {
+      console.log('[registration] submission blocked: request already in flight');
       return;
     }
 
@@ -125,6 +127,7 @@ export function RegistrationFlow({
     const universityEmail = values.universityEmail.trim();
 
     if (!fullName || !phoneNumber || !universityEmail) {
+      console.log('[registration] submission blocked: missing required basic info fields');
       setBasicInfoError(GENERIC_ENROLLMENT_ERROR);
       return;
     }
@@ -133,6 +136,7 @@ export function RegistrationFlow({
     setIsSubmittingBasicInfo(true);
 
     try {
+      console.log('[registration] calling submitEnrollment');
       const result = await submitEnrollment({
         student_id: values.studentId,
         full_name: fullName,

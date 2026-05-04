@@ -244,7 +244,7 @@ async function submitEnrollmentRequest(
       };
     }
 
-    console.log('[enroll] request payload', normalizedPayload);
+    console.log('🚀 sending enroll request', normalizedPayload);
 
     const response = await request('/enroll', {
       method: 'POST',
@@ -254,10 +254,11 @@ async function submitEnrollmentRequest(
       },
       body: JSON.stringify(normalizedPayload),
     });
+    console.log('✅ response received', response);
 
     return await parseEnrollmentResponse(response, errorMessage);
   } catch (error) {
-    console.error('[enroll] request failed', error);
+    console.error('❌ enroll failed', error);
     throw error;
   }
 }

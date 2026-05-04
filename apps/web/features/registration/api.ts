@@ -220,18 +220,39 @@ export async function submitEnrollmentCompletion(
 }
 
 async function submitEnrollmentRequest(
-  payload: EnrollmentPayload | EnrollmentCompletionPayload,
+  payload: EnrollmentPayload,
   errorMessage: string
 ) {
   try {
-    console.log('[enroll] request payload', payload);
+    const normalizedPayload: EnrollmentPayload = {
+      student_id: payload.student_id.trim(),
+      full_name: payload.full_name.trim(),
+      phone: payload.phone.trim(),
+      university_email: payload.university_email.trim(),
+    };
+
+    if (
+      !normalizedPayload.student_id ||
+      !normalizedPayload.full_name ||
+      !normalizedPayload.phone ||
+      !normalizedPayload.university_email
+    ) {
+      console.error('[enroll] invalid payload', normalizedPayload);
+      return {
+        success: false,
+        message: 'Missing required fields for enrollment submission.',
+      };
+    }
+
+    console.log('[enroll] request payload', normalizedPayload);
 
     const response = await request('/enroll', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(normalizedPayload),
     });
 
     return await parseEnrollmentResponse(response, errorMessage);
@@ -422,6 +443,12 @@ async function parseEnrollmentResponse(
   }
 
   if (isEnrollmentResponse(parsedData)) {
+    if (!response.ok) {
+      console.error(`[${logPrefix}] non-OK response`, {
+        status: response.status,
+        body: parsedData,
+      });
+    }
     if (response.status >= 500) {
       throw new Error(parsedData.message || errorMessage);
     }
@@ -439,6 +466,10 @@ async function parseEnrollmentResponse(
   }
 
   if (!response.ok) {
+    console.error(`[${logPrefix}] non-OK response`, {
+      status: response.status,
+      body: parsedData,
+    });
     return {
       success: false,
       message: derivedMessage,

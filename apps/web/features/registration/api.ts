@@ -7,6 +7,7 @@ import {
   captureAngles,
   getRequiredFramesForAngle,
 } from '@/features/registration/capture/constants';
+import { request } from '@/lib/api';
 
 const GENERIC_ENROLLMENT_ERROR =
   'Unable to continue right now. Please try again.';
@@ -49,16 +50,6 @@ type EnrollmentResponse = {
 };
 
 export type EnrollmentSubmissionResult = EnrollmentResponse;
-
-function getApiBaseUrl() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-
-  if (!apiBaseUrl) {
-    throw new Error(GENERIC_ENROLLMENT_ERROR);
-  }
-
-  return apiBaseUrl.replace(/\/+$/, '');
-}
 
 function isEnrollmentResponse(value: unknown): value is EnrollmentResponse {
   if (!value || typeof value !== 'object') {
@@ -235,7 +226,7 @@ async function submitEnrollmentRequest(
   try {
     console.log('[enroll] request payload', payload);
 
-    const response = await fetch(`${getApiBaseUrl()}/enroll`, {
+    const response = await request('/enroll', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -384,7 +375,7 @@ async function submitEnrollmentCompletionRequest(
     });
 
     logTiming('fetch request started');
-    const response = await fetch(`${getApiBaseUrl()}/enroll/verification`, {
+    const response = await request('/enroll/verification', {
       method: 'POST',
       body: formData,
     });

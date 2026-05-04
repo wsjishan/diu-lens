@@ -1,4 +1,5 @@
 import { AdminUser, EnrollmentRecord } from '@/features/admin/auth/types';
+import { request } from '@/lib/api';
 
 const GENERIC_ADMIN_ERROR = 'Unable to complete the request right now. Please try again.';
 const ENROLLMENTS_ENDPOINT = '/admin/enrollments';
@@ -85,16 +86,6 @@ type RequestOptions = {
   token?: string;
   treat401AsAuthError?: boolean;
 };
-
-function getApiBaseUrl() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-
-  if (!apiBaseUrl) {
-    throw new Error('NEXT_PUBLIC_API_BASE_URL is not configured.');
-  }
-
-  return apiBaseUrl.replace(/\/+$/, '');
-}
 
 function getMessageFromPayload(payload: JsonPayload): string {
   if (!payload) {
@@ -319,7 +310,7 @@ async function requestJson(
   let response: Response;
 
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
+    response = await request(path, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
@@ -537,7 +528,7 @@ export async function matchRecognitionProbe(
 
   let response: Response;
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
+    response = await request(path, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -567,4 +558,18 @@ export async function matchRecognitionProbe(
   }
 
   return parseRecognitionResponse(payload);
+}
+
+export async function checkApiHealth(): Promise<boolean> {
+  try {
+    const response = await request('/health', {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('[admin-api] health check failed', error);
+    return false;
+  }
 }

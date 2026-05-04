@@ -22,6 +22,12 @@ def create_app() -> FastAPI:
     logger = logging.getLogger(__name__)
     app = FastAPI(title=settings.app_name, version=settings.version)
 
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        print("➡️", request.method, request.url)
+        response = await call_next(request)
+        return response
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[

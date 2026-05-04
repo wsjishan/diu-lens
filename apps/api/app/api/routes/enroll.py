@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Literal, cast
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Body, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.enrollment_db import (
@@ -832,18 +832,14 @@ async def _handle_multipart_enrollment(
 
 
 @router.post("/enroll", response_model=EnrollmentResponse)
-async def enroll(request: Request) -> EnrollmentResponse:
-    content_type = request.headers.get("content-type", "").lower()
-    if "application/json" not in content_type:
-        raise HTTPException(
-            status_code=415,
-            detail={"message": "Unsupported content type for /enroll. Use JSON."},
-        )
-
+async def enroll(payload: EnrollmentRequest = Body(...)) -> EnrollmentResponse:
+    print("🔥 enroll called")
+    print("Payload:", payload.model_dump())
     mode = "basic"
     event_type = "basic_info_uploaded"
     event_message = "Basic enrollment info submitted."
-    payload, uploaded_images, validation_summary = await _handle_json_enrollment(request)
+    uploaded_images = empty_uploaded_images()
+    validation_summary = _default_validation_summary()
 
     try:
         if student_exists_in_db(payload.student_id):

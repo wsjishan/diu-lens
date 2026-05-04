@@ -3,9 +3,9 @@ import logging
 from fastapi import FastAPI
 from fastapi import HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.responses import JSONResponse
 
-from app.api import api_router
 from app.core.config import settings
 
 
@@ -24,14 +24,15 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "https://diulens.app",
-            "https://www.diulens.app",
-        ],
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.options("/{rest_of_path:path}")
+    async def preflight_handler(rest_of_path: str):
+        return Response(status_code=200)
 
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         return response
 
+    from app.api import api_router
     app.include_router(api_router)
 
     @app.exception_handler(HTTPException)

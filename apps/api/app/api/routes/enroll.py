@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Literal, cast
 
-from fastapi import APIRouter, Body, HTTPException, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.enrollment_db import (
@@ -38,6 +39,12 @@ REQUIRED_IMAGES_PER_ANGLE = 3
 EXPECTED_REQUIRED_ANGLES: tuple[str, ...] = REQUIRED_CAPTURE_ANGLES
 EXPECTED_TOTAL_SHOTS = len(EXPECTED_REQUIRED_ANGLES) * REQUIRED_IMAGES_PER_ANGLE
 EYES_VISIBLE_VALUES: tuple[str, ...] = ("passed", "failed", "not_yet_implemented")
+REQUIRED_ENROLLMENT_FIELDS: tuple[str, ...] = (
+    "student_id",
+    "full_name",
+    "phone",
+    "university_email",
+)
 ENROLLMENT_STATUSES: tuple[str, ...] = (
     "pending",
     "uploaded",
@@ -104,6 +111,36 @@ logger = logging.getLogger(__name__)
 
 def _bad_request(message: str) -> HTTPException:
     return HTTPException(status_code=400, detail={"message": message})
+
+
+def _json_result(
+    *,
+    status_code: int,
+    success: bool,
+    message: str,
+    **extra: object,
+) -> JSONResponse:
+    payload: dict[str, object] = {
+        "success": success,
+        "message": message,
+    }
+    payload.update(extra)
+    return JSONResponse(status_code=status_code, content=payload)
+
+
+def _missing_required_fields(raw_payload: object) -> list[str]:
+    if not isinstance(raw_payload, dict):
+        return list(REQUIRED_ENROLLMENT_FIELDS)
+
+    missing: list[str] = []
+    for field in REQUIRED_ENROLLMENT_FIELDS:
+        value = raw_payload.get(field)
+        if value is None:
+            missing.append(field)
+            continue
+        if isinstance(value, str) and not value.strip():
+            missing.append(field)
+    return missing
 
 
 def _parse_enrollment_payload(raw_payload: object) -> EnrollmentRequest:
@@ -831,61 +868,112 @@ async def _handle_multipart_enrollment(
     )
 
 
-@router.post("/enroll", response_model=EnrollmentResponse)
-async def enroll(payload: EnrollmentRequest = Body(...)) -> EnrollmentResponse:
-    print("🔥 enroll called")
-    print("Payload:", payload.model_dump())
+@router.post("/enroll")
+async def enroll(request: Request) -> JSONResponse:
     mode = "basic"
     event_type = "basic_info_uploaded"
     event_message = "Basic enrollment info submitted."
-    uploaded_images = empty_uploaded_images()
-    validation_summary = _default_validation_summary()
 
     try:
-        if student_exists_in_db(payload.student_id):
-            return EnrollmentResponse(
+        try:
+            raw_payload = await request.json()
+        except json.JSONDecodeError:
+            return _json_result(
+                status_code=422,
+                success=False,
+                message="Invalid JSON payload.",
+            )
+
+        logger.info("[enrollment] incoming payload=%s", raw_payload)
+
+        missing_fields = _missing_required_fields(raw_payload)
+        if missing_fields:
+            return _json_result(
+                status_code=422,
+                success=False,
+                message=f"Missing required field(s): {', '.join(missing_fields)}",
+                missing_fields=missing_fields,
+            )
+
+        try:
+            payload = EnrollmentRequest.model_validate(raw_payload)
+        except ValidationError as exc:
+            logger.warning(
+                "[enrollment] payload validation failed errors=%s",
+                exc.errors(),
+            )
+            return _json_result(
+                status_code=422,
+                success=False,
+                message="Invalid enrollment payload.",
+                errors=exc.errors(),
+            )
+
+        try:
+            if student_exists_in_db(payload.student_id):
+                return _json_result(
+                    status_code=200,
+                    success=False,
+                    message="You are already registered",
+                )
+        except EnrollmentPersistenceError:
+            logger.exception(
+                "[enrollment] failed while checking existing enrollment student_id=%s",
+                payload.student_id,
+            )
+
+        entry = _build_enrollment_entry(
+            payload=payload,
+            uploaded_images=empty_uploaded_images(),
+            validation_summary=_default_validation_summary(),
+            frame_metadata_by_path={},
+            status_override="pending" if mode == "basic" else None,
+        )
+
+        try:
+            _persist_enrollment_metadata(
+                entry,
+                mode=mode,
+                event_type=event_type,
+                event_message=event_message,
+            )
+            logger.info(
+                "[enrollment] created student_id=%s mode=%s status=%s",
+                payload.student_id,
+                mode,
+                entry.get("status", "unknown"),
+            )
+        except StudentAlreadyRegisteredError:
+            return _json_result(
+                status_code=200,
                 success=False,
                 message="You are already registered",
             )
-    except EnrollmentPersistenceError:
-        pass
+        except (OSError, EnrollmentPersistenceError) as exc:
+            logger.exception(
+                "[enrollment] failed to persist metadata student_id=%s",
+                payload.student_id,
+            )
+            return _json_result(
+                status_code=500,
+                success=False,
+                message="Failed to save enrollment metadata.",
+                error=str(exc),
+            )
 
-    entry = _build_enrollment_entry(
-        payload=payload,
-        uploaded_images=uploaded_images,
-        validation_summary=validation_summary,
-        frame_metadata_by_path={},
-        status_override="pending" if mode == "basic" else None,
-    )
-
-    try:
-        _persist_enrollment_metadata(
-            entry,
-            mode=mode,
-            event_type=event_type,
-            event_message=event_message,
+        return _json_result(
+            status_code=200,
+            success=True,
+            message="Enrollment saved successfully",
         )
-        logger.info(
-            "[enrollment] created student_id=%s mode=%s status=%s",
-            payload.student_id,
-            mode,
-            entry.get("status", "unknown"),
-        )
-    except StudentAlreadyRegisteredError:
-        return EnrollmentResponse(
-            success=False,
-            message="You are already registered",
-        )
-    except (OSError, EnrollmentPersistenceError) as exc:
-        raise HTTPException(
+    except Exception as exc:
+        logger.exception("[enrollment] unhandled exception in /enroll")
+        return _json_result(
             status_code=500,
-            detail="Failed to save enrollment metadata.",
-        ) from exc
-
-    return EnrollmentResponse(
-        success=True,
-        message="Enrollment saved successfully",
-    )
+            success=False,
+            message="Internal server error during enrollment.",
+            error=str(exc),
+        )
 
 
 @router.post("/enroll/verification", response_model=EnrollmentResponse)

@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.api import api_router
@@ -21,19 +21,30 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title=settings.app_name, version=settings.version)
 
-    # Custom CORS middleware
-
-    @app.middleware("http")
-    async def cors_fix(request: Request, call_next):
-        response = await call_next(request)
+    def _apply_cors_headers(response: Response) -> Response:
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "*"
         response.headers["Access-Control-Allow-Headers"] = "*"
         return response
 
-    @app.options("/{path:path}")
-    async def options_handler(path: str):
-        return JSONResponse(status_code=200, content={})
+    @app.middleware("http")
+    async def cors_fix(request: Request, call_next):
+        if request.method == "OPTIONS":
+            return _apply_cors_headers(JSONResponse(status_code=200, content={}))
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception(
+                "Unhandled exception in middleware path=%s method=%s",
+                request.url.path,
+                request.method,
+            )
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
+        return _apply_cors_headers(response)
 
     app.include_router(api_router)
 

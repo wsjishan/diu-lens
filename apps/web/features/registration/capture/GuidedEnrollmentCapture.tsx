@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   captureAngles,
+  guidedAngles,
   getRequiredFramesForAngle,
 } from '@/features/registration/capture/constants';
 import { CameraPreview } from '@/features/registration/capture/CameraPreview';
@@ -248,6 +249,23 @@ export function GuidedEnrollmentCapture({
       studentId,
       capturedCount: state.capturedCount,
     });
+    const invalidGuidedAngle = guidedAngles.find((angle) => {
+      const captures = capturesByAngle[angle] ?? [];
+      if (captures.length < getRequiredFramesForAngle(angle)) {
+        return true;
+      }
+      return captures.some((capture) => capture.size <= 0);
+    });
+    if (invalidGuidedAngle) {
+      console.warn('[verification] invalid guided captures', {
+        studentId,
+        angle: invalidGuidedAngle,
+      });
+      setLocalErrorMessage(
+        'One or more guided shots are missing or empty. Please retake the affected angle.'
+      );
+      return;
+    }
     const captureSummary = captureAngles.map((angle) => {
       const captures = capturesByAngle[angle] ?? [];
       const sizes = captures.map((capture) => capture.size);
@@ -266,14 +284,15 @@ export function GuidedEnrollmentCapture({
     });
 
     try {
+      const uploadAngles = guidedAngles;
       const summary: VerificationCompletionSummary = {
         verificationCompleted: true,
         totalRequiredShots,
-        totalAcceptedShots: captureAngles.reduce(
+        totalAcceptedShots: uploadAngles.reduce(
           (total, angle) => total + capturesByAngle[angle].length,
           0
         ),
-        angles: captureAngles.map((angle) => ({
+        angles: uploadAngles.map((angle) => ({
           angle,
           acceptedShots: capturesByAngle[angle].length,
           requiredShots: getRequiredFramesForAngle(angle),

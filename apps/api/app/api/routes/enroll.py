@@ -168,9 +168,13 @@ def _extract_multipart_files(
     if not hasattr(form_data, "keys") or not hasattr(form_data, "getlist"):
         raise _bad_request("Invalid multipart form data.")
 
+    form_keys = list(form_data.keys())
+    logger.info("[verification] multipart keys=%s", form_keys)
+
     files_by_angle: dict[str, list[UploadFile]] = {
         angle: [] for angle in EXPECTED_REQUIRED_ANGLES
     }
+    rejected_fields: list[str] = []
 
     for key in form_data.keys():
         if key == "metadata":
@@ -187,12 +191,28 @@ def _extract_multipart_files(
             continue
 
         if key not in EXPECTED_REQUIRED_ANGLES:
-            raise _bad_request(f"Unsupported angle field in files: {key}")
+            rejected_fields.append(key)
+            continue
 
         files_by_angle[key].extend(angle_files)
 
+    if rejected_fields:
+        logger.warning(
+            "[verification] rejected multipart fields=%s allowed=%s",
+            sorted(rejected_fields),
+            EXPECTED_REQUIRED_ANGLES,
+        )
+        rejected_sample = sorted(rejected_fields)[0]
+        raise _bad_request(
+            "Unsupported angle field in files: "
+            f"{rejected_sample}. Expected: {', '.join(EXPECTED_REQUIRED_ANGLES)}."
+        )
+
     if not any(files_by_angle.values()):
         raise _bad_request("No verification image files were provided.")
+
+    parsed_angles = sorted(angle for angle, files in files_by_angle.items() if files)
+    logger.info("[verification] parsed angle fields=%s", parsed_angles)
 
     return files_by_angle
 
@@ -394,6 +414,14 @@ async def _validate_files(
 
             sample = await upload.read(MAX_UPLOAD_IMAGE_SIZE_BYTES + 1)
             await upload.seek(0)
+
+            logger.info(
+                "[verification-upload] angle=%s file=%s size_bytes=%s content_type=%s",
+                angle,
+                upload.filename or "unknown",
+                len(sample),
+                content_type,
+            )
 
             if not sample:
                 raise _bad_request(f"Uploaded file is empty for angle: {angle}")
@@ -762,9 +790,15 @@ async def _handle_multipart_enrollment(
     request: Request,
 ) -> tuple[EnrollmentRequest, dict[str, list[str]], dict[str, object], dict[str, float]]:
     multipart_started_at = perf_counter()
-    form_data = await request.form()
-    after_form_parse_at = perf_counter()
-    payload = _parse_multipart_metadata(form_data.get("metadata"))
+    try:
+        form_data = await request.form()
+        after_form_parse_at = perf_counter()
+        payload = _parse_multipart_metadata(form_data.get("metadata"))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("[verification] failed to parse multipart form data")
+        raise _bad_request(f"Invalid multipart payload: {exc}") from exc
     after_metadata_parse_at = perf_counter()
 
     files_by_angle = _extract_multipart_files(form_data)

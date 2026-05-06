@@ -17,7 +17,6 @@ const GENERIC_REGISTRATION_COMPLETION_ERROR =
 const MIN_CAPTURE_FILE_SIZE_BYTES = 10 * 1024;
 const ALLOWED_CAPTURE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png']);
 const REQUIRED_VERIFICATION_ANGLES: VerificationAngle[] = [...guidedAngles];
-const MAX_CAPTURES_PER_ANGLE = 5;
 
 export type EnrollmentPayload = {
   student_id: string;
@@ -356,16 +355,10 @@ async function submitEnrollmentCompletionRequest(
         };
       }
 
-      if (captures.length < requiredFramesForAngle) {
+      if (captures.length !== requiredFramesForAngle) {
         return {
           success: false,
-          message: `Expected at least ${requiredFramesForAngle} captured files for angle: ${angle}. Please retake this angle.`,
-        };
-      }
-      if (captures.length > MAX_CAPTURES_PER_ANGLE) {
-        return {
-          success: false,
-          message: `Too many captured files for angle: ${angle}. Maximum is ${MAX_CAPTURES_PER_ANGLE}.`,
+          message: `Expected exactly ${requiredFramesForAngle} captured files for angle: ${angle}. Please retake this angle.`,
         };
       }
 
@@ -489,10 +482,16 @@ async function submitEnrollmentCompletionRequest(
     });
 
     logTiming('fetch request started');
-    const response = await request('/enroll/verification', {
+    const requestOptions: RequestInit = {
       method: 'POST',
       body: formData,
+    };
+    console.log('[verification] request init', {
+      headers: requestOptions.headers ?? null,
+      isFormData: formData instanceof FormData,
+      formEntryCount: formEntries.length,
     });
+    const response = await request('/enroll/verification', requestOptions);
     logTiming('response headers received', {
       status: response.status,
       ok: response.ok,

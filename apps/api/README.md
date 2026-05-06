@@ -31,10 +31,18 @@ DATABASE_URL=postgresql+psycopg://<user>:<password>@localhost:5432/diu_lens
 Auth settings are also required:
 
 ```bash
-SECRET_KEY=replace_with_a_long_random_secret
+JWT_SECRET=replace_with_a_long_random_secret
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 APP_ENV=development
+```
+
+Frontend origins are configured as a comma-separated list. Local development
+automatically allows `http://localhost:3000` and `http://127.0.0.1:3000`;
+production must include the deployed frontend domains explicitly.
+
+```bash
+ALLOWED_ORIGINS=https://app.example.com,https://www.example.com
 ```
 
 Optional face matching settings:

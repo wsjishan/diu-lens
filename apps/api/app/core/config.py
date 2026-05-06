@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 _ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=_ENV_PATH)
 
+_LOCAL_FRONTEND_ORIGINS = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+)
+
 
 def _parse_origins(raw_origins: str) -> list[str]:
     origins = [origin.strip() for origin in raw_origins.split(",")]
@@ -63,6 +68,21 @@ def _get_env(name: str, default: str) -> str:
     return value or default
 
 
+def _get_allowed_origins(environment: str) -> list[str]:
+    origins = _parse_origins(os.getenv("ALLOWED_ORIGINS", ""))
+    if environment == "development":
+        origins = [*origins, *_LOCAL_FRONTEND_ORIGINS]
+
+    unique_origins = list(dict.fromkeys(origins))
+    if unique_origins:
+        return unique_origins
+
+    raise RuntimeError(
+        "ALLOWED_ORIGINS is required. Set comma-separated frontend origins, "
+        "for example: 'https://app.example.com,https://www.example.com'."
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -107,9 +127,7 @@ settings = Settings(
     app_name=_require_env("APP_NAME"),
     version=_require_env("APP_VERSION"),
     environment=_environment,
-    allowed_origins=_parse_origins(
-        _require_env("ALLOWED_ORIGINS")
-    ),
+    allowed_origins=_get_allowed_origins(_environment),
     database_url=_require_postgresql_url(),
     jwt_secret=_require_env("JWT_SECRET", "Set a long random secret."),
     algorithm=_require_env("ALGORITHM"),

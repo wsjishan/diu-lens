@@ -1,6 +1,7 @@
 import logging
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import api_router
@@ -22,6 +23,14 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title=settings.app_name, version=settings.version)
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     @app.on_event("startup")
     def create_tables() -> None:
         try:
@@ -30,31 +39,6 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("Critical startup failure during database initialization")
             raise
-
-    def _apply_cors_headers(response: Response) -> Response:
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        return response
-
-    @app.middleware("http")
-    async def cors_fix(request: Request, call_next):
-        if request.method == "OPTIONS":
-            return _apply_cors_headers(JSONResponse(status_code=200, content={}))
-
-        try:
-            response = await call_next(request)
-        except Exception:
-            logger.exception(
-                "Unhandled exception in middleware path=%s method=%s",
-                request.url.path,
-                request.method,
-            )
-            response = JSONResponse(
-                status_code=500,
-                content={"detail": "Internal server error"},
-            )
-        return _apply_cors_headers(response)
 
     app.include_router(api_router)
 

@@ -10,11 +10,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 # Ensure app settings import succeeds in tests.
+os.environ.setdefault("APP_NAME", "DIU Lens API")
+os.environ.setdefault("APP_VERSION", "0.1.0")
+os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/diu_lens")
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("JWT_SECRET", "test-secret-key")
 os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 os.environ.setdefault("APP_ENV", "development")
+os.environ.setdefault("FACE_MATCH_DISTANCE_THRESHOLD", "0.38")
+os.environ.setdefault("FACE_MATCH_TOP_K", "5")
+os.environ.setdefault("FACE_MATCH_CANDIDATE_POOL_LIMIT", "200")
+os.environ.setdefault("INSIGHTFACE_MODEL_PACK", "buffalo_l")
+os.environ.setdefault("INSIGHTFACE_ROOT", "/tmp/diu-lens-insightface")
+os.environ.setdefault("STORAGE_PATH", "/tmp/diu-lens-storage")
 
 
 import app.core.auth as auth_module

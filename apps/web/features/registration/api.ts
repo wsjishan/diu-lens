@@ -427,6 +427,12 @@ async function submitEnrollmentCompletionRequest(
           capture instanceof File
             ? capture
             : new File([capture], fileName, { type: normalizedType });
+        if (fileToAppend.size <= 0) {
+          return {
+            success: false,
+            message: `Captured file is empty for angle: ${angle}. Please retake this shot.`,
+          };
+        }
         formData.append(angle, fileToAppend, fileName);
         console.log('[verification] appended file', {
           angle,

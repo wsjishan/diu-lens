@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from threading import Lock
 from typing import Any
 
@@ -18,6 +19,8 @@ ALLOWED_IMAGE_CONTENT_TYPES: dict[str, str] = {
     "image/webp": ".webp",
 }
 MAX_UPLOAD_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+
+logger = logging.getLogger(__name__)
 
 _STORAGE_LOCK = Lock()
 _STORAGE_SERVICE = LocalStorageService()
@@ -91,6 +94,14 @@ async def save_uploaded_images(
                 if len(file_bytes) > MAX_UPLOAD_IMAGE_SIZE_BYTES:
                     raise ValueError(f"File too large for angle: {angle}")
 
+                logger.info(
+                    "[storage-upload] angle=%s file=%s size_bytes=%s content_type=%s",
+                    angle,
+                    upload.filename or "unknown",
+                    len(file_bytes),
+                    content_type,
+                )
+
                 relative_path = storage.save_raw_upload(
                     student_id=student_id,
                     angle=angle,
@@ -100,6 +111,7 @@ async def save_uploaded_images(
                 saved_relative_paths.append(relative_path)
                 uploaded_images[angle].append(relative_path)
     except Exception:
+        logger.exception("[storage-upload] failed student_id=%s", student_id)
         for relative_path in saved_relative_paths:
             try:
                 storage.remove_relative_file(relative_path)

@@ -135,8 +135,14 @@ function blobToDataUrl(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') resolve(reader.result);
-      else reject('Failed to convert capture to data URL');
+      if (typeof reader.result === 'string') {
+        console.log('[capture] data url created', {
+          size: blob.size,
+          type: blob.type,
+          length: reader.result.length,
+        });
+        resolve(reader.result);
+      } else reject('Failed to convert capture to data URL');
     };
     reader.onerror = () => reject('Failed to read captured blob');
     reader.readAsDataURL(blob);

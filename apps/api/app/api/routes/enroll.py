@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 from collections import Counter
 from datetime import datetime, timezone
 from time import perf_counter
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.core.enrollment_db import (
     EnrollmentNotFoundError,
+    EnrollmentInvalidStateError,
     EnrollmentPersistenceError,
     EnrollmentRecordInput,
     persist_enrollment_to_db,
@@ -18,6 +20,7 @@ from app.core.enrollment_db import (
     student_exists_in_db,
     StudentAlreadyRegisteredError,
 )
+from app.core.config import settings
 from app.core.image_validation import (
     build_validation_summary,
     extract_image_quality_metadata,
@@ -797,7 +800,11 @@ async def _handle_multipart_enrollment(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("[verification] failed to parse multipart form data")
+        logger.exception(
+            "[verification] failed to parse multipart form data error=%r traceback=%s",
+            exc,
+            traceback.format_exc(),
+        )
         raise _bad_request(f"Invalid multipart payload: {exc}") from exc
     after_metadata_parse_at = perf_counter()
 
@@ -859,7 +866,10 @@ async def _handle_multipart_enrollment(
             )
         except (OSError, EnrollmentPersistenceError):
             # Validation response should still be returned even if persistence fallback fails.
-            pass
+            logger.exception(
+                "[verification] failed to persist validation failure student_id=%s",
+                payload.student_id,
+            )
         raise exc
 
     try:
@@ -875,6 +885,10 @@ async def _handle_multipart_enrollment(
     except ValueError as exc:
         raise _bad_request(str(exc)) from exc
     except OSError as exc:
+        logger.exception(
+            "[verification] storage write failed student_id=%s",
+            payload.student_id,
+        )
         raise HTTPException(
             status_code=500,
             detail="Failed to save uploaded verification images.",
@@ -1096,6 +1110,16 @@ async def enroll_verification(request: Request) -> EnrollmentResponse:
                 success=False,
                 message="No pending enrollment found. Submit basic info first.",
             )
+        except EnrollmentInvalidStateError as exc:
+            logger.warning(
+                "[verification] invalid enrollment state student_id=%s status_error=%s",
+                payload.student_id,
+                str(exc),
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={"message": str(exc)},
+            ) from exc
         except (OSError, EnrollmentPersistenceError) as exc:
             logger.exception(
                 "[verification] failed to persist enrollment verification for student_id=%s",
@@ -1112,6 +1136,23 @@ async def enroll_verification(request: Request) -> EnrollmentResponse:
         return EnrollmentResponse(
             success=True,
             message="Verification images uploaded successfully",
+        )
+    except Exception as exc:
+        logger.exception(
+            "[verification] unhandled exception error=%r traceback=%s",
+            exc,
+            traceback.format_exc(),
+        )
+        detail: dict[str, object] = {
+            "message": "Internal server error during verification.",
+            "error_type": type(exc).__name__,
+        }
+        if settings.environment == "development":
+            detail["error"] = repr(exc)
+            detail["traceback"] = traceback.format_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "detail": detail},
         )
     finally:
         elapsed_ms = round((perf_counter() - request_started_at) * 1000, 2)

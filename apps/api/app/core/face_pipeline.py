@@ -10,6 +10,7 @@ Phase 7 scope:
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from threading import Lock
 from typing import Any
@@ -34,6 +35,7 @@ _ANALYZER: Any = None
 _ANALYZER_INIT_ERROR: str | None = None
 _INSIGHTFACE_MODEL_PACK = settings.insightface_model_pack
 _INSIGHTFACE_ROOT = settings.insightface_root
+logger = logging.getLogger(__name__)
 _MIN_DET_SCORE = 0.45
 _MIN_FACE_AREA_RATIO = 0.06
 _MIN_BLUR_VARIANCE = 22.0
@@ -489,6 +491,10 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
         try:
             image = cv2.imread(str(source_abs_path))
             if image is None:
+                logger.warning(
+                    "[face-pipeline] cv2.imread returned None path=%s",
+                    source_abs_path,
+                )
                 raise FacePipelineError("Failed to read image from disk.")
 
             faces = analyzer.get(image)
@@ -516,6 +522,12 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
                 brightness=brightness,
             )
             if extreme_rejection is not None:
+                logger.info(
+                    "[face-pipeline] extreme rejection angle=%s file=%s reason=%s",
+                    angle,
+                    file_name,
+                    extreme_rejection,
+                )
                 skipped_images.append(
                     {
                         "angle": angle,
@@ -567,6 +579,12 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
             )
         except FacePipelineError as exc:
             reason = str(exc)
+            logger.warning(
+                "[face-pipeline] processing failed angle=%s file=%s reason=%s",
+                angle,
+                file_name,
+                reason,
+            )
             failed_images.append(
                 {
                     "angle": angle,
@@ -578,6 +596,11 @@ def process_student_images(student_id: str, storage: StorageService) -> dict[str
             failure_reasons.add(reason)
         except Exception as exc:  # noqa: BLE001
             reason = f"Unexpected processing error: {exc}"
+            logger.exception(
+                "[face-pipeline] unexpected error angle=%s file=%s",
+                angle,
+                file_name,
+            )
             failed_images.append(
                 {
                     "angle": angle,
@@ -746,9 +769,18 @@ def extract_query_face_features(
     if not image_bytes:
         raise FacePipelineError("Probe image is empty.")
 
-    np_buffer = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(np_buffer, cv2.IMREAD_COLOR)
+    try:
+        np_buffer = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(np_buffer, cv2.IMREAD_COLOR)
+    except cv2.error as exc:
+        logger.exception("[face-probe] OpenCV decode failed size=%s", len(image_bytes))
+        raise FacePipelineError("Failed to decode probe image.") from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("[face-probe] decode failed size=%s", len(image_bytes))
+        raise FacePipelineError("Failed to decode probe image.") from exc
+
     if image is None:
+        logger.warning("[face-probe] decode returned None size=%s", len(image_bytes))
         raise FacePipelineError("Failed to decode probe image.")
 
     analyzer = _load_analyzer()

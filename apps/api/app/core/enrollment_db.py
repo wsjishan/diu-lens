@@ -632,10 +632,13 @@ def persist_enrollment_verification_to_db(payload: EnrollmentRecordInput) -> Non
             if enrollment is None:
                 raise EnrollmentNotFoundError("No existing enrollment found for this student")
 
-            if enrollment.status in {"approved", "rejected", "reset"}:
-                raise EnrollmentPersistenceError(
-                    f"Enrollment cannot be updated in current status: {enrollment.status}"
+            if enrollment.status == "approved":
+                raise EnrollmentInvalidStateError(
+                    "Enrollment cannot be updated in current status: approved"
                 )
+            if enrollment.status in {"rejected", "reset"}:
+                # Allow re-verification flows to reuse the existing enrollment row.
+                enrollment.status = "pending"
 
             student.full_name = payload.full_name
             student.phone = payload.phone

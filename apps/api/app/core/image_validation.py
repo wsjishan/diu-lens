@@ -158,24 +158,41 @@ def extract_image_quality_metadata(
     if not image_bytes:
         return metadata
 
-    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-    if image is None:
+    try:
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    except cv2.error as exc:
+        logger.exception("[image-metadata] OpenCV decode failed size=%s", len(image_bytes))
+        return metadata
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("[image-metadata] decode failed size=%s", len(image_bytes))
         return metadata
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    metadata["blur_score"] = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    metadata["brightness"] = float(gray.mean())
+    if image is None:
+        logger.warning("[image-metadata] decode returned None size=%s", len(image_bytes))
+        return metadata
+
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        metadata["blur_score"] = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        metadata["brightness"] = float(gray.mean())
+    except cv2.error:
+        logger.exception("[image-metadata] OpenCV grayscale conversion failed")
+        return metadata
 
     if _FACE_CASCADE.empty():
         return metadata
 
-    faces = _FACE_CASCADE.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(config.min_face_size, config.min_face_size),
-    )
+    try:
+        faces = _FACE_CASCADE.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(config.min_face_size, config.min_face_size),
+        )
+    except cv2.error:
+        logger.exception("[image-metadata] OpenCV face detection failed")
+        return metadata
     if len(faces) <= 0:
         metadata["detection_confidence"] = 0.0
         return metadata
@@ -213,9 +230,39 @@ def validate_uploaded_image_integrity(
         report["blocker"] = _reason_code(failure_reasons[0])
         return report
 
-    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    try:
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    except cv2.error:
+        logger.exception(
+            "[guided-sanity] OpenCV decode failed file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
+        failure_reasons.append("invalid_image_data")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "[guided-sanity] decode failed file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
+        failure_reasons.append("invalid_image_data")
+        report["failure_reasons"] = failure_reasons
+        report["blocker"] = _reason_code(failure_reasons[0])
+        return report
+
     if image is None:
+        logger.warning(
+            "[guided-sanity] decode returned None file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
         failure_reasons.append("invalid_image_data")
         report["failure_reasons"] = failure_reasons
         report["blocker"] = _reason_code(failure_reasons[0])
@@ -256,9 +303,35 @@ def validate_uploaded_image_sanity(
         _append_reason(report, reason="missing_image_data", blocking=True)
         return _finalize_guided_sanity_report(report)
 
-    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    try:
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    except cv2.error:
+        logger.exception(
+            "[guided-sanity] OpenCV decode failed file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
+        _append_reason(report, reason="invalid_image_data", blocking=True)
+        return _finalize_guided_sanity_report(report)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "[guided-sanity] decode failed file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
+        _append_reason(report, reason="invalid_image_data", blocking=True)
+        return _finalize_guided_sanity_report(report)
+
     if image is None:
+        logger.warning(
+            "[guided-sanity] decode returned None file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
         _append_reason(report, reason="invalid_image_data", blocking=True)
         return _finalize_guided_sanity_report(report)
 
@@ -292,13 +365,22 @@ def validate_uploaded_image_sanity(
         )
         return _finalize_guided_sanity_report(report)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    faces = _FACE_CASCADE.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(config.min_face_size, config.min_face_size),
-    )
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = _FACE_CASCADE.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(config.min_face_size, config.min_face_size),
+        )
+    except cv2.error:
+        logger.exception(
+            "[guided-sanity] OpenCV face detection failed file=%s angle=%s",
+            file_name,
+            angle,
+        )
+        _append_reason(report, reason="face_detector_failed", blocking=True)
+        return _finalize_guided_sanity_report(report)
 
     face_count = len(faces)
     report["face_count"] = face_count
@@ -338,9 +420,37 @@ def validate_uploaded_image(
     report = _default_report(file_name=file_name, angle=angle)
     failure_reasons: list[str] = []
 
-    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    try:
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    except cv2.error:
+        logger.exception(
+            "[quality-check] OpenCV decode failed file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
+        failure_reasons.append("invalid_image_data")
+        report["failure_reasons"] = failure_reasons
+        return report
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "[quality-check] decode failed file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
+        failure_reasons.append("invalid_image_data")
+        report["failure_reasons"] = failure_reasons
+        return report
+
     if image is None:
+        logger.warning(
+            "[quality-check] decode returned None file=%s angle=%s size=%s",
+            file_name,
+            angle,
+            len(image_bytes),
+        )
         failure_reasons.append("invalid_image_data")
         report["failure_reasons"] = failure_reasons
         return report
@@ -353,7 +463,17 @@ def validate_uploaded_image(
             f"image_too_small(min:{config.min_width}x{config.min_height},got:{width}x{height})"
         )
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    except cv2.error:
+        logger.exception(
+            "[quality-check] OpenCV grayscale conversion failed file=%s angle=%s",
+            file_name,
+            angle,
+        )
+        failure_reasons.append("image_processing_failed")
+        report["failure_reasons"] = failure_reasons
+        return report
 
     blur_variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
     blur_ok = blur_variance >= config.min_blur_variance
@@ -376,12 +496,22 @@ def validate_uploaded_image(
         report["failure_reasons"] = failure_reasons
         return report
 
-    faces = _FACE_CASCADE.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(config.min_face_size, config.min_face_size),
-    )
+    try:
+        faces = _FACE_CASCADE.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(config.min_face_size, config.min_face_size),
+        )
+    except cv2.error:
+        logger.exception(
+            "[quality-check] OpenCV face detection failed file=%s angle=%s",
+            file_name,
+            angle,
+        )
+        failure_reasons.append("face_detector_failed")
+        report["failure_reasons"] = failure_reasons
+        return report
     face_detected = len(faces) > 0
     report["face_detected"] = face_detected
     if not face_detected:

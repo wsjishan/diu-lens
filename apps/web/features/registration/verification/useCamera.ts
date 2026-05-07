@@ -16,6 +16,52 @@ const mediaConstraints: MediaStreamConstraints = {
 const MIN_CAPTURE_DIMENSION_PX = 100;
 const MAX_UPLOAD_WIDTH_PX = 640;
 const CAPTURE_JPEG_QUALITY = 0.75;
+const MAX_TO_DATA_URL_LENGTH = 10 * 1024 * 1024;
+
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex < 0) return null;
+
+  const header = dataUrl.slice(0, commaIndex);
+  const content = dataUrl.slice(commaIndex + 1);
+  const mimeMatch = header.match(/^data:(.*?);base64$/);
+  if (!mimeMatch) return null;
+
+  try {
+    const bytes = atob(content);
+    const array = new Uint8Array(bytes.length);
+    for (let index = 0; index < bytes.length; index += 1) {
+      array[index] = bytes.charCodeAt(index);
+    }
+    return new Blob([array], { type: mimeMatch[1] || 'image/jpeg' });
+  } catch {
+    return null;
+  }
+}
+
+async function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number
+): Promise<{ blob: Blob | null; dataUrlLength: number | null }> {
+  if (canvas.toBlob) {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((result) => resolve(result), type, quality);
+    });
+    return { blob, dataUrlLength: null };
+  }
+
+  try {
+    const dataUrl = canvas.toDataURL(type, quality);
+    const dataUrlLength = dataUrl.length;
+    if (dataUrlLength > MAX_TO_DATA_URL_LENGTH) {
+      return { blob: null, dataUrlLength };
+    }
+    return { blob: dataUrlToBlob(dataUrl), dataUrlLength };
+  } catch {
+    return { blob: null, dataUrlLength: null };
+  }
+}
 
 function stopMediaTracks(stream: MediaStream | null) {
   if (!stream) {
@@ -180,6 +226,10 @@ export function useCamera(): CameraHookResult {
     const sourceCanvas = document.createElement('canvas');
     sourceCanvas.width = videoElement.videoWidth;
     sourceCanvas.height = videoElement.videoHeight;
+    console.log('[capture] source canvas size', {
+      width: sourceCanvas.width,
+      height: sourceCanvas.height,
+    });
 
     const sourceContext = sourceCanvas.getContext('2d');
     if (!sourceContext) {
@@ -204,6 +254,11 @@ export function useCamera(): CameraHookResult {
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = targetWidth;
     exportCanvas.height = targetHeight;
+    console.log('[capture] export canvas size', {
+      width: exportCanvas.width,
+      height: exportCanvas.height,
+      resized: shouldResize,
+    });
 
     const exportContext = exportCanvas.getContext('2d');
     if (!exportContext) {
@@ -223,18 +278,28 @@ export function useCamera(): CameraHookResult {
       return null;
     }
 
-    return await new Promise<Blob | null>((resolve) => {
-      exportCanvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            console.error('[capture] canvas.toBlob returned null');
-          }
-          resolve(blob);
-        },
-        'image/jpeg',
-        CAPTURE_JPEG_QUALITY
-      );
+    const { blob, dataUrlLength } = await canvasToBlob(
+      exportCanvas,
+      'image/jpeg',
+      CAPTURE_JPEG_QUALITY
+    );
+
+    if (!blob) {
+      console.error('[capture] canvasToBlob failed', {
+        dataUrlLength,
+        width: exportCanvas.width,
+        height: exportCanvas.height,
+      });
+      return null;
+    }
+
+    console.log('[capture] blob created', {
+      size: blob.size,
+      type: blob.type,
+      dataUrlLength,
     });
+
+    return blob;
   }, []);
 
   useEffect(() => {

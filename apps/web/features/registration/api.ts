@@ -90,30 +90,30 @@ function toMessageFromUnknown(value: unknown): string | null {
   return null;
 }
 
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex < 0) return null;
+
+  const header = dataUrl.slice(0, commaIndex);
+  const content = dataUrl.slice(commaIndex + 1);
+  const mimeMatch = header.match(/^data:(.*?);base64$/);
+  if (!mimeMatch) return null;
+
+  try {
+    const bytes = atob(content);
+    const array = new Uint8Array(bytes.length);
+    for (let index = 0; index < bytes.length; index += 1) {
+      array[index] = bytes.charCodeAt(index);
+    }
+    return new Blob([array], { type: mimeMatch[1] || 'image/jpeg' });
+  } catch {
+    return null;
+  }
+}
+
 function toValidationReasonMessage(value: unknown): string | null {
   if (!value || typeof value !== 'object') {
     return null;
-  }
-
-  function dataUrlToBlob(dataUrl: string): Blob | null {
-    const commaIndex = dataUrl.indexOf(',');
-    if (commaIndex < 0) return null;
-
-    const header = dataUrl.slice(0, commaIndex);
-    const content = dataUrl.slice(commaIndex + 1);
-    const mimeMatch = header.match(/^data:(.*?);base64$/);
-    if (!mimeMatch) return null;
-
-    try {
-      const bytes = atob(content);
-      const array = new Uint8Array(bytes.length);
-      for (let index = 0; index < bytes.length; index += 1) {
-        array[index] = bytes.charCodeAt(index);
-      }
-      return new Blob([array], { type: mimeMatch[1] || 'image/jpeg' });
-    } catch {
-      return null;
-    }
   }
 
   const record = value as Record<string, unknown>;

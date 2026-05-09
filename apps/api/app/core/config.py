@@ -55,7 +55,21 @@ def _require_positive_float(name: str, hint: str | None = None) -> float:
     return value
 
 
+from urllib.parse import quote
+
 def _require_postgresql_url() -> str:
+    # Build URL dynamically if raw components are provided
+    db_host = os.getenv("DB_HOST", "").strip()
+    db_password = os.getenv("DB_PASSWORD", "")
+    
+    if db_host and db_password:
+        db_user = os.getenv("DB_USER", "postgres").strip()
+        db_port = os.getenv("DB_PORT", "5432").strip()
+        db_name = os.getenv("DB_NAME", "diu_lens").strip()
+        
+        encoded_password = quote(db_password)
+        return f"postgresql+psycopg://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}"
+
     database_url = _require_env(
         "DATABASE_URL",
         "Set a PostgreSQL DSN, for example: "

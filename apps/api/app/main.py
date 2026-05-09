@@ -13,6 +13,7 @@ from app.api import api_router
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.db.bootstrap import initialize_database
+from app.db.session import check_database_connection
 
 
 def _configure_logging() -> None:
@@ -133,3 +134,4 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+

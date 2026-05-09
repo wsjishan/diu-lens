@@ -36,12 +36,21 @@ def get_db_session() -> Generator[Session, None, None]:
         db.close()
 
 
+from sqlalchemy.exc import OperationalError
+
 def check_database_connection() -> tuple[bool, str | None]:
     """Return connectivity status and optional diagnostic message."""
     try:
         engine = get_engine()
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
+    except OperationalError as exc:
+        error_str = str(exc).lower()
+        if "password authentication failed" in error_str:
+            return False, "FATAL: Database authentication failed. Check DB_PASSWORD and DB_USER."
+        elif "connection refused" in error_str:
+            return False, "FATAL: Database connection refused. Is the DB running and accessible?"
+        return False, f"Operational database error: {exc}"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
 

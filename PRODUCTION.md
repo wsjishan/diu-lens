@@ -21,6 +21,13 @@
 - [ ] **Monitoring**: Healthcheck endpoints (`/health`) monitored by external service.
 - [ ] **Stability**: Error handling in frontend catches API 500s and auth failures.
 
+## Operational Protections
+- [ ] **Log Rotation**: Configure Docker daemon to use local logging driver with size limits (`max-size: "10m"`, `max-file: "3"`).
+- [ ] **Disk Monitoring**: Set up alerts for disk usage on the host machine, particularly the volume holding `/app/storage`.
+- [ ] **Backups**: Schedule `scripts/backup.sh` via cron (e.g., daily) to backup the database and storage to an off-site location (e.g. S3).
+- [ ] **Container Restarts**: Ensure `docker-compose.production.yml` uses `restart: always` for all services.
+- [ ] **Healthchecks**: Validate that Docker healthchecks are correctly identifying failure states and restarting dependent containers.
+
 ## Known Issues
 - Initial face processing is CPU-intensive; consider moving to a background worker if load increases.
 - Storage path must be a persistent volume in Docker environments.

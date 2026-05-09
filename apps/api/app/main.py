@@ -11,6 +11,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api import api_router
 from app.core.config import settings
+from app.core.face_pipeline import validate_insightface_runtime
 from app.core.limiter import limiter
 from app.db.bootstrap import initialize_database
 from app.db.session import check_database_connection
@@ -65,6 +66,20 @@ def create_app() -> FastAPI:
             logger.info("Validating storage path: %s", settings.storage_path)
             _validate_storage_path()
             logger.info("Storage path validated successfully.")
+
+            if settings.biometric_startup_validation:
+                logger.info(
+                    "Validating InsightFace runtime: pack=%s root=%s",
+                    settings.insightface_model_pack,
+                    settings.insightface_root,
+                )
+                biometric_report = validate_insightface_runtime()
+                logger.info(
+                    "InsightFace runtime validated: model_dir=%s providers=%s embedding_dim=%s",
+                    biometric_report.get("model_dir"),
+                    biometric_report.get("recognition_providers"),
+                    biometric_report.get("embedding_dim"),
+                )
             
             logger.info("Testing database connection...")
             initialize_database()
@@ -77,7 +92,7 @@ def create_app() -> FastAPI:
             )
             logger.info("API active bind address and port should be inferred from uvicorn logs or your configured reverse proxy.")
         except Exception:
-            logger.exception("Critical startup failure during database initialization")
+            logger.exception("Critical startup failure")
             raise
 
     app.include_router(api_router)
@@ -134,4 +149,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

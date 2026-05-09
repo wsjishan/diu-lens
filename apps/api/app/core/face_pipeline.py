@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
+import platform
 import re
 from threading import Lock
 from typing import Any
@@ -87,9 +89,19 @@ def _resolve_model_name_candidates() -> list[str]:
     if "/" not in configured:
         root = Path(_INSIGHTFACE_ROOT).expanduser()
         nested_dir = root / "models" / configured / configured
+        # Some InsightFace packs, notably antelopev2, extract into
+        # models/<pack>/<pack> on first download. Include this candidate even
+        # before the directory exists so a fresh production cache can recover
+        # in the same initialization attempt.
+        candidates.append(f"{configured}/{configured}")
         if nested_dir.exists() and nested_dir.is_dir():
-            candidates.append(f"{configured}/{configured}")
-    return candidates
+            deeper_candidates = [
+                f"{configured}/{configured}/{child.name}"
+                for child in sorted(nested_dir.iterdir())
+                if child.is_dir()
+            ]
+            candidates.extend(deeper_candidates)
+    return list(dict.fromkeys(candidates))
 
 
 def _load_analyzer() -> Any:
@@ -117,6 +129,7 @@ def _load_analyzer() -> Any:
 
         model_candidates = _resolve_model_name_candidates()
         last_exc: Exception | None = None
+        errors: list[str] = []
         for model_name in model_candidates:
             try:
                 analyzer = FaceAnalysis(
@@ -133,16 +146,162 @@ def _load_analyzer() -> Any:
                         f"model={model_name}, missing={missing}, loaded={sorted(tasks)}"
                     )
                 _ANALYZER = analyzer
+                logger.info(
+                    "[face-pipeline] InsightFace initialized model=%s root=%s tasks=%s",
+                    model_name,
+                    _INSIGHTFACE_ROOT,
+                    sorted(tasks),
+                )
                 return _ANALYZER
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
+                errors.append(f"{model_name}: {type(exc).__name__}: {exc}")
+                logger.warning(
+                    "[face-pipeline] InsightFace initialization candidate failed "
+                    "model=%s root=%s error=%r",
+                    model_name,
+                    _INSIGHTFACE_ROOT,
+                    exc,
+                )
 
         _ANALYZER_INIT_ERROR = (
             "Failed to initialize InsightFace model. "
             f"pack={_INSIGHTFACE_MODEL_PACK}, root={_INSIGHTFACE_ROOT}, "
-            f"candidates={model_candidates}, last_error={last_exc}"
+            f"candidates={model_candidates}, errors={errors}, last_error={last_exc}"
         )
         raise FacePipelineError(_ANALYZER_INIT_ERROR) from last_exc
+
+
+def _read_cpu_flags() -> list[str]:
+    cpuinfo = Path("/proc/cpuinfo")
+    if not cpuinfo.exists():
+        return []
+    try:
+        for line in cpuinfo.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.lower().startswith(("flags", "features")) and ":" in line:
+                return sorted(set(line.split(":", 1)[1].strip().split()))
+    except OSError:
+        return []
+    return []
+
+
+def validate_insightface_runtime() -> dict[str, Any]:
+    """Fail-fast validation for production biometric runtime readiness."""
+    root = Path(_INSIGHTFACE_ROOT).expanduser().resolve()
+    root_writable = False
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        probe_file = root / ".write_test"
+        probe_file.write_text("ok", encoding="utf-8")
+        probe_file.unlink(missing_ok=True)
+        root_writable = True
+    except OSError as exc:
+        if not root.exists():
+            raise FacePipelineError(
+                f"INSIGHTFACE_ROOT cannot be created and does not exist: {root}"
+            ) from exc
+        logger.warning(
+            "[face-pipeline] INSIGHTFACE_ROOT is not writable; existing prebaked "
+            "models must be present root=%s error=%r",
+            root,
+            exc,
+        )
+
+    try:
+        import insightface
+        import onnxruntime as ort
+    except Exception as exc:  # noqa: BLE001
+        raise FacePipelineError(
+            "InsightFace runtime imports failed. Install insightface and onnxruntime. "
+            f"Details: {exc}"
+        ) from exc
+
+    available_providers = list(ort.get_available_providers())
+    if "CPUExecutionProvider" not in available_providers:
+        raise FacePipelineError(
+            "onnxruntime CPUExecutionProvider is unavailable. "
+            f"available_providers={available_providers}"
+        )
+
+    analyzer = _load_analyzer()
+    models = getattr(analyzer, "models", {})
+    tasks = sorted(models.keys())
+    model_dir = Path(str(getattr(analyzer, "model_dir", ""))).expanduser()
+    model_files = sorted(path.name for path in model_dir.glob("*.onnx"))
+    if not model_files:
+        raise FacePipelineError(f"InsightFace model directory has no ONNX files: {model_dir}")
+
+    detection_model = models.get("detection")
+    recognition_model = models.get("recognition")
+    if detection_model is None or recognition_model is None:
+        raise FacePipelineError(
+            "InsightFace model is missing required detection or recognition task. "
+            f"tasks={tasks}"
+        )
+
+    detection_session = getattr(detection_model, "session", None)
+    recognition_session = getattr(recognition_model, "session", None)
+    detection_providers = (
+        list(detection_session.get_providers()) if detection_session is not None else []
+    )
+    recognition_providers = (
+        list(recognition_session.get_providers()) if recognition_session is not None else []
+    )
+
+    if "CPUExecutionProvider" not in detection_providers:
+        raise FacePipelineError(
+            "InsightFace detection model did not initialize CPUExecutionProvider. "
+            f"providers={detection_providers}"
+        )
+    if "CPUExecutionProvider" not in recognition_providers:
+        raise FacePipelineError(
+            "InsightFace recognition model did not initialize CPUExecutionProvider. "
+            f"providers={recognition_providers}"
+        )
+
+    synthetic_crop = np.zeros((112, 112, 3), dtype=np.uint8)
+    try:
+        embedding_raw = recognition_model.get_feat(synthetic_crop)
+    except Exception as exc:  # noqa: BLE001
+        raise FacePipelineError(
+            f"InsightFace recognition embedding smoke test failed: {exc}"
+        ) from exc
+
+    embedding = np.asarray(embedding_raw, dtype=np.float32).flatten()
+    if embedding.size != 512:
+        raise FacePipelineError(
+            f"InsightFace recognition embedding dimension mismatch: {embedding.size}"
+        )
+
+    try:
+        blank_detection = analyzer.get(np.zeros((640, 640, 3), dtype=np.uint8))
+    except Exception as exc:  # noqa: BLE001
+        raise FacePipelineError(
+            f"InsightFace detection smoke test failed: {exc}"
+        ) from exc
+
+    report = {
+        "pack": _INSIGHTFACE_MODEL_PACK,
+        "root": str(root),
+        "root_writable": root_writable,
+        "model_dir": str(model_dir),
+        "model_files": model_files,
+        "tasks": tasks,
+        "insightface_version": getattr(insightface, "__version__", "unknown"),
+        "onnxruntime_version": getattr(ort, "__version__", "unknown"),
+        "available_providers": available_providers,
+        "detection_providers": detection_providers,
+        "recognition_providers": recognition_providers,
+        "embedding_dim": int(embedding.size),
+        "blank_detection_faces": len(blank_detection),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "cpu_flags": _read_cpu_flags(),
+        "home": os.getenv("HOME"),
+    }
+    logger.info("[face-pipeline] InsightFace runtime validation passed: %s", report)
+    return report
 
 
 def _pick_main_face(faces: list[Any]) -> Any:

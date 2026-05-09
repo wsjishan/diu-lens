@@ -55,6 +55,17 @@ def _require_positive_float(name: str, hint: str | None = None) -> float:
     return value
 
 
+def _get_bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"{name} must be a boolean value.")
+
+
 from urllib.parse import quote
 
 def _require_postgresql_url() -> str:
@@ -119,6 +130,7 @@ class Settings:
     face_match_candidate_pool_limit: int
     insightface_model_pack: str
     insightface_root: str
+    biometric_startup_validation: bool
     storage_path: str
     bootstrap_admin_email: str | None
     bootstrap_admin_password: str | None
@@ -131,10 +143,13 @@ _jwt_secret = os.getenv("JWT_SECRET", "").strip()
 _storage_path = os.getenv("STORAGE_PATH", "").strip()
 
 if _environment == "production":
+    has_database_config = bool(_database_url) or bool(
+        os.getenv("DB_HOST", "").strip() and os.getenv("DB_PASSWORD", "")
+    )
     missing = [
         name
         for name, value in (
-            ("DATABASE_URL", _database_url),
+            ("DATABASE_URL or DB_HOST/DB_PASSWORD", has_database_config),
             ("JWT_SECRET", _jwt_secret),
             ("STORAGE_PATH", _storage_path),
         )
@@ -174,6 +189,10 @@ settings = Settings(
     ),
     insightface_model_pack=_require_env("INSIGHTFACE_MODEL_PACK"),
     insightface_root=_require_env("INSIGHTFACE_ROOT"),
+    biometric_startup_validation=_get_bool_env(
+        "BIOMETRIC_STARTUP_VALIDATION",
+        _environment == "production",
+    ),
     storage_path=_require_env("STORAGE_PATH"),
     bootstrap_admin_email=os.getenv("BOOTSTRAP_ADMIN_EMAIL"),
     bootstrap_admin_password=os.getenv("BOOTSTRAP_ADMIN_PASSWORD"),

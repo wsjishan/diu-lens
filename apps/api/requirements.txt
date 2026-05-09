@@ -4,10 +4,11 @@ gunicorn
 pydantic
 python-dotenv
 python-multipart
-opencv-python
-numpy
-onnxruntime
-insightface
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+onnxruntime==1.17.3
+cython==3.0.12
+insightface==0.7.3
 SQLAlchemy
 alembic
 psycopg[binary]

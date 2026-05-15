@@ -61,6 +61,7 @@ class EnrollmentAdminActionResult:
     success: bool
     message: str
     debug_details: dict[str, Any] | None = None
+    was_updated: bool = False
 
 
 @dataclass(frozen=True)
@@ -379,10 +380,12 @@ def approve_enrollment(student_id: str) -> EnrollmentAdminActionResult:
         return EnrollmentAdminActionResult(
             success=True,
             message="Enrollment approved successfully",
+            was_updated=True,
         )
     return EnrollmentAdminActionResult(
         success=True,
         message="Enrollment is already approved",
+        was_updated=False,
     )
 
 
@@ -470,7 +473,13 @@ def mark_enrollment_as_processing(student_id: str) -> None:
     session_factory = get_session_factory()
     with session_factory() as db:
         try:
-            enrollment = _latest_enrollment_for_student(db, student_id)
+            enrollment = db.scalar(
+                select(Enrollment)
+                .where(Enrollment.student_id == student_id)
+                .order_by(Enrollment.id.desc())
+                .limit(1)
+                .with_for_update()
+            )
             if enrollment is not None and enrollment.status in {"approved_pending_processing", "failed_processing"}:
                 enrollment.status = "processing"
                 db.commit()

@@ -82,10 +82,14 @@ async def approve_enrollment_admin(
     if not result.success:
         return payload
 
-    process_student_enrollment_task.delay(student_id)
-    
-    payload["processing_attempted"] = True
-    payload["message"] = "Enrollment approved and queued for background processing."
+    if result.was_updated:
+        process_student_enrollment_task.delay(student_id)
+        payload["processing_attempted"] = True
+        payload["message"] = "Enrollment approved and queued for background processing."
+    else:
+        payload["processing_attempted"] = False
+        payload["message"] = "Enrollment was already approved."
+        
     return payload
 
 

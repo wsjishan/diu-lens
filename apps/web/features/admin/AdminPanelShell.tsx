@@ -3,7 +3,13 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { FolderCheck, LogOut, ScanFace, ShieldCheck, UserCircle2 } from 'lucide-react';
+import {
+  FolderCheck,
+  LogOut,
+  ScanFace,
+  ShieldCheck,
+  UserCircle2,
+} from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/features/admin/auth/AdminAuthContext';
@@ -60,11 +66,17 @@ export function AdminPanelShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-[1680px]">
-        <aside className="hidden w-72 shrink-0 border-r border-border/70 bg-card/80 p-6 backdrop-blur-xl lg:flex lg:flex-col lg:gap-8">
+        <aside className="hidden w-72 shrink-0 border-r border-border/60 bg-card/70 p-6 backdrop-blur-xl lg:flex lg:flex-col lg:gap-8">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-primary/80">DIU Lens</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Admin Console</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Enrollment moderation and recognition tools.</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-primary/80">
+              DIU Lens
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+              Admin Console
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Enrollment moderation and recognition tools.
+            </p>
           </div>
 
           <nav className="space-y-2">
@@ -78,7 +90,7 @@ export function AdminPanelShell({ children }: { children: ReactNode }) {
                   className={cn(
                     'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors',
                     isActive
-                      ? 'border-primary/30 bg-primary/12 text-primary'
+                      ? 'border-primary/25 bg-primary/10 text-primary'
                       : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground'
                   )}
                 >
@@ -91,18 +103,26 @@ export function AdminPanelShell({ children }: { children: ReactNode }) {
 
           <div className="mt-auto rounded-xl border border-border/70 bg-muted/40 p-4 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Signed In</p>
-            <p className="mt-1 text-foreground">{admin?.full_name || 'Admin User'}</p>
+            <p className="mt-1 text-foreground">
+              {admin?.full_name || 'Admin User'}
+            </p>
             <p className="text-xs">{admin?.email || '-'}</p>
-            <p className="mt-2 text-xs uppercase tracking-wide text-primary">{roleLabel}</p>
+            <p className="mt-2 text-xs uppercase tracking-wide text-primary">
+              {roleLabel}
+            </p>
           </div>
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-border/70 bg-card/85 px-4 py-3 backdrop-blur-xl sm:px-6">
+          <header className="sticky top-0 z-30 border-b border-border/60 bg-card/78 px-4 py-3 backdrop-blur-xl sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-primary/75">Administration</p>
-                <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{pageTitle}</h1>
+                <p className="text-xs uppercase tracking-[0.24em] text-primary/70">
+                  Administration
+                </p>
+                <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                  {pageTitle}
+                </h1>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
@@ -111,7 +131,7 @@ export function AdminPanelShell({ children }: { children: ReactNode }) {
                   <UserCircle2 className="size-3.5" />
                   {admin?.email || 'admin'}
                 </span>
-                <span className="rounded-full border border-primary/30 bg-primary/12 px-2.5 py-1 text-xs font-medium text-primary">
+                <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                   {roleLabel}
                 </span>
                 <Button
@@ -136,7 +156,7 @@ export function AdminPanelShell({ children }: { children: ReactNode }) {
                     className={cn(
                       'inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs',
                       isActive
-                        ? 'border-primary/30 bg-primary/12 text-primary'
+                        ? 'border-primary/25 bg-primary/10 text-primary'
                         : 'border-border bg-muted/35 text-muted-foreground'
                     )}
                   >

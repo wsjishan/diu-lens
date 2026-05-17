@@ -52,24 +52,24 @@
 }
 
 :root {
-  --background: oklch(0.99 0.005 230);
+  --background: oklch(0.993 0.002 235);
   --foreground: oklch(0.24 0.02 250);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.24 0.02 250);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.24 0.02 250);
-  --primary: oklch(0.48 0.11 210);
+  --primary: oklch(0.47 0.09 215);
   --primary-foreground: oklch(0.99 0.005 230);
-  --secondary: oklch(0.95 0.01 230);
+  --secondary: oklch(0.955 0.006 230);
   --secondary-foreground: oklch(0.24 0.02 250);
-  --muted: oklch(0.97 0.01 230);
+  --muted: oklch(0.972 0.006 230);
   --muted-foreground: oklch(0.5 0.02 245);
-  --accent: oklch(0.94 0.02 195);
+  --accent: oklch(0.945 0.015 205);
   --accent-foreground: oklch(0.24 0.02 250);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.89 0.01 235);
-  --input: oklch(0.89 0.01 235);
-  --ring: oklch(0.6 0.07 210);
+  --border: oklch(0.9 0.006 235);
+  --input: oklch(0.9 0.006 235);
+  --ring: oklch(0.6 0.06 215);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -87,95 +87,95 @@
   --landing-page-gradient:
     radial-gradient(
       circle at 18% 10%,
-      rgba(125, 211, 252, 0.22),
-      transparent 36%
+      rgba(125, 211, 252, 0.08),
+      transparent 42%
     ),
-    linear-gradient(128deg, #e8eef8 0%, #e3ecf8 46%, #eef5ff 100%);
-  --landing-grid-line: rgba(71, 85, 105, 0.085);
+    linear-gradient(128deg, #f7f9fc 0%, #f3f6fa 48%, #fbfcfe 100%);
+  --landing-grid-line: rgba(71, 85, 105, 0.048);
   --landing-vignette: radial-gradient(
     circle at 50% 50%,
     transparent 44%,
-    rgba(15, 23, 42, 0.09) 100%
+    rgba(15, 23, 42, 0.035) 100%
   );
   --landing-glow-top-left: radial-gradient(
     circle at 3% -3%,
-    rgba(147, 197, 253, 0.38),
-    rgba(59, 130, 246, 0.12) 23%,
-    transparent 47%
+    rgba(147, 197, 253, 0.12),
+    rgba(59, 130, 246, 0.045) 24%,
+    transparent 56%
   );
   --landing-glow-bottom-right: radial-gradient(
     circle at 99% 99%,
-    rgba(147, 197, 253, 0.33),
-    rgba(59, 130, 246, 0.09) 24%,
-    transparent 49%
+    rgba(147, 197, 253, 0.11),
+    rgba(59, 130, 246, 0.035) 26%,
+    transparent 58%
   );
   --landing-card-bg: linear-gradient(
     150deg,
-    rgba(254, 255, 255, 0.98) 0%,
-    rgba(247, 251, 255, 0.96) 52%,
-    rgba(241, 247, 255, 0.94) 100%
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(251, 253, 255, 0.94) 52%,
+    rgba(248, 250, 253, 0.92) 100%
   );
-  --landing-card-border: rgba(148, 163, 184, 0.4);
+  --landing-card-border: rgba(148, 163, 184, 0.26);
   --landing-card-shadow:
-    0 28px 54px -34px rgba(30, 64, 175, 0.28),
-    0 10px 24px -16px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+    0 22px 42px -34px rgba(30, 64, 175, 0.14),
+    0 9px 20px -17px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --landing-text-primary: #0f172a;
   --landing-text-secondary: #33465e;
   --landing-text-muted: #556b87;
   --landing-accent: #3b82f6;
-  --landing-accent-hover: #60a5fa;
+  --landing-accent-hover: #5b9ef4;
   --landing-progress-inactive: rgba(148, 163, 184, 0.26);
   --landing-progress-active: linear-gradient(
     90deg,
-    #1d4ed8 0%,
-    #2563eb 55%,
-    #60a5fa 100%
+    #1f56d4 0%,
+    #2b6adf 55%,
+    #6aa7f5 100%
   );
-  --landing-input-bg: rgba(250, 253, 255, 0.95);
-  --landing-input-border: rgba(148, 163, 184, 0.56);
+  --landing-input-bg: rgba(252, 254, 255, 0.95);
+  --landing-input-border: rgba(148, 163, 184, 0.48);
   --landing-input-placeholder: rgba(100, 116, 139, 0.88);
-  --landing-focus-ring: rgba(59, 130, 246, 0.24);
+  --landing-focus-ring: rgba(59, 130, 246, 0.18);
   --landing-input-text: #0f172a;
   --landing-button-bg: linear-gradient(
     90deg,
-    #1760d9 0%,
-    #2384ff 52%,
-    #3296ff 100%
+    #1b62cf 0%,
+    #2c79e9 52%,
+    #5b9ff5 100%
   );
   --landing-button-shadow:
-    0 12px 24px -14px rgba(37, 99, 235, 0.46),
-    inset 0 1px 0 rgba(186, 230, 253, 0.46);
+    0 10px 22px -14px rgba(37, 99, 235, 0.3),
+    inset 0 1px 0 rgba(186, 230, 253, 0.32);
   --landing-card-blur: 7px;
   --landing-input-inset-shadow:
     inset 0 1px 2px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(148, 163, 184, 0.18);
   --landing-card-spotlight: radial-gradient(
     circle at 52% 50%,
-    rgba(56, 189, 248, 0.19),
-    rgba(37, 99, 235, 0.12) 28%,
-    transparent 66%
+    rgba(56, 189, 248, 0.08),
+    rgba(37, 99, 235, 0.05) 30%,
+    transparent 72%
   );
 }
 
 .dark {
-  --background: oklch(0.18 0.02 258);
+  --background: oklch(0.155 0.013 258);
   --foreground: oklch(0.96 0.01 260);
-  --card: oklch(0.235 0.02 258);
+  --card: oklch(0.22 0.017 258);
   --card-foreground: oklch(0.96 0.01 260);
-  --popover: oklch(0.235 0.02 258);
+  --popover: oklch(0.22 0.017 258);
   --popover-foreground: oklch(0.96 0.01 260);
-  --primary: oklch(0.75 0.14 252);
+  --primary: oklch(0.74 0.12 250);
   --primary-foreground: oklch(0.19 0.02 258);
-  --secondary: oklch(0.29 0.02 258);
+  --secondary: oklch(0.28 0.018 258);
   --secondary-foreground: oklch(0.93 0.01 260);
-  --muted: oklch(0.275 0.015 258);
+  --muted: oklch(0.265 0.012 258);
   --muted-foreground: oklch(0.72 0.01 260);
-  --accent: oklch(0.33 0.05 240);
+  --accent: oklch(0.32 0.04 242);
   --accent-foreground: oklch(0.95 0.01 260);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.43 0.02 255 / 45%);
-  --input: oklch(0.33 0.02 255 / 60%);
-  --ring: oklch(0.72 0.14 248);
+  --border: oklch(0.4 0.018 255 / 45%);
+  --input: oklch(0.3 0.018 255 / 60%);
+  --ring: oklch(0.7 0.12 248);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -192,74 +192,74 @@
   --landing-page-gradient:
     radial-gradient(
       circle at 10% -10%,
-      rgba(56, 189, 248, 0.22),
-      transparent 37%
+      rgba(56, 189, 248, 0.09),
+      transparent 45%
     ),
-    linear-gradient(124deg, #050c1b 0%, #09182f 46%, #071427 100%);
-  --landing-grid-line: rgba(80, 124, 176, 0.115);
+    linear-gradient(124deg, #040914 0%, #071321 48%, #050d19 100%);
+  --landing-grid-line: rgba(80, 124, 176, 0.065);
   --landing-vignette: radial-gradient(
     circle at 50% 50%,
     transparent 40%,
-    rgba(2, 6, 23, 0.54) 100%
+    rgba(2, 6, 23, 0.42) 100%
   );
   --landing-glow-top-left: radial-gradient(
     circle at 2% -7%,
-    rgba(125, 211, 252, 0.5),
-    rgba(59, 130, 246, 0.2) 24%,
-    transparent 52%
+    rgba(125, 211, 252, 0.18),
+    rgba(59, 130, 246, 0.075) 25%,
+    transparent 60%
   );
   --landing-glow-bottom-right: radial-gradient(
     circle at 100% 100%,
-    rgba(125, 211, 252, 0.34),
-    rgba(59, 130, 246, 0.14) 24%,
-    transparent 49%
+    rgba(125, 211, 252, 0.12),
+    rgba(59, 130, 246, 0.045) 25%,
+    transparent 60%
   );
   --landing-card-bg: linear-gradient(
     140deg,
-    rgba(22, 43, 75, 0.8) 0%,
-    rgba(16, 34, 63, 0.7) 42%,
-    rgba(24, 36, 68, 0.75) 72%,
-    rgba(36, 35, 70, 0.78) 100%
+    rgba(15, 30, 52, 0.76) 0%,
+    rgba(12, 25, 44, 0.7) 44%,
+    rgba(17, 29, 52, 0.72) 72%,
+    rgba(24, 26, 50, 0.74) 100%
   );
-  --landing-card-border: rgba(191, 219, 254, 0.25);
+  --landing-card-border: rgba(191, 219, 254, 0.14);
   --landing-card-shadow:
-    0 32px 66px -36px rgba(15, 23, 42, 0.72),
-    0 12px 26px -18px rgba(59, 130, 246, 0.18),
-    inset 0 1px 0 rgba(226, 232, 240, 0.18);
+    0 26px 56px -36px rgba(2, 6, 23, 0.66),
+    0 10px 22px -18px rgba(59, 130, 246, 0.08),
+    inset 0 1px 0 rgba(226, 232, 240, 0.1);
   --landing-text-primary: #f8fafc;
   --landing-text-secondary: #c8d6e9;
   --landing-text-muted: #a5b8cf;
   --landing-accent: #3b82f6;
-  --landing-accent-hover: #60a5fa;
+  --landing-accent-hover: #5b9ef4;
   --landing-progress-inactive: rgba(148, 163, 184, 0.26);
   --landing-progress-active: linear-gradient(
     90deg,
-    #1d4ed8 0%,
-    #2563eb 55%,
-    #60a5fa 100%
+    #1f56d4 0%,
+    #2b6adf 55%,
+    #6aa7f5 100%
   );
-  --landing-input-bg: rgba(8, 24, 49, 0.62);
-  --landing-input-border: rgba(148, 163, 184, 0.48);
-  --landing-input-placeholder: rgba(148, 163, 184, 0.92);
+  --landing-input-bg: rgba(7, 20, 38, 0.62);
+  --landing-input-border: rgba(148, 163, 184, 0.42);
+  --landing-input-placeholder: rgba(148, 163, 184, 0.84);
   --landing-focus-ring: rgba(96, 165, 250, 0.28);
-  --landing-input-text: #dbeafe;
+  --landing-input-text: #d7e6f8;
   --landing-button-bg: linear-gradient(
     90deg,
-    #1760d9 0%,
-    #2384ff 52%,
-    #3296ff 100%
+    #1b62cf 0%,
+    #2c79e9 52%,
+    #5b9ff5 100%
   );
   --landing-button-shadow:
-    0 14px 26px -16px rgba(37, 99, 235, 0.42),
-    inset 0 1px 0 rgba(186, 230, 253, 0.24);
+    0 12px 24px -16px rgba(37, 99, 235, 0.28),
+    inset 0 1px 0 rgba(186, 230, 253, 0.18);
   --landing-card-blur: 20px;
   --landing-input-inset-shadow:
-    inset 0 1px 2px rgba(2, 6, 23, 0.54), 0 0 0 1px rgba(37, 99, 235, 0.18);
+    inset 0 1px 2px rgba(2, 6, 23, 0.48), 0 0 0 1px rgba(37, 99, 235, 0.14);
   --landing-card-spotlight: radial-gradient(
     circle at 50% 50%,
-    rgba(56, 189, 248, 0.24),
-    rgba(59, 130, 246, 0.14) 30%,
-    transparent 68%
+    rgba(56, 189, 248, 0.1),
+    rgba(59, 130, 246, 0.065) 32%,
+    transparent 74%
   );
 }
 
@@ -270,6 +270,7 @@
   html {
     @apply font-sans;
     color-scheme: light;
+    scroll-behavior: smooth;
   }
   html.dark {
     color-scheme: dark;
@@ -292,52 +293,50 @@
     --landing-page-gradient:
       radial-gradient(
         circle at 50% 16%,
-        rgba(27, 86, 146, 0.28),
-        transparent 34%
+        rgba(27, 86, 146, 0.12),
+        transparent 40%
       ),
-      linear-gradient(180deg, #061323 0%, #06101d 42%, #05101b 100%);
-    --landing-grid-line: rgba(58, 116, 177, 0.05);
+      linear-gradient(180deg, #050f1b 0%, #050d17 44%, #040c14 100%);
+    --landing-grid-line: rgba(58, 116, 177, 0.032);
     --landing-vignette: linear-gradient(
       180deg,
-      rgba(2, 8, 18, 0.16),
-      rgba(2, 8, 18, 0.44)
+      rgba(2, 8, 18, 0.1),
+      rgba(2, 8, 18, 0.3)
     );
     --landing-glow-top-left: radial-gradient(
       circle at 50% 0%,
-      rgba(36, 109, 182, 0.2),
-      transparent 42%
+      rgba(36, 109, 182, 0.1),
+      transparent 48%
     );
     --landing-glow-bottom-right: radial-gradient(
       circle at 90% 96%,
-      rgba(22, 71, 122, 0.13),
-      transparent 42%
+      rgba(22, 71, 122, 0.065),
+      transparent 48%
     );
     --landing-card-bg: linear-gradient(
       180deg,
-      rgba(11, 27, 44, 0.96) 0%,
-      rgba(9, 22, 38, 0.97) 100%
+      rgba(8, 22, 36, 0.93) 0%,
+      rgba(7, 18, 30, 0.96) 100%
     );
-    --landing-card-border: rgba(34, 63, 92, 0.72);
+    --landing-card-border: rgba(34, 63, 92, 0.5);
     --landing-card-shadow:
-      0 15px 30px -18px rgba(0, 0, 0, 0.46),
-      0 0 14px rgba(40, 121, 214, 0.06),
-      inset 0 1px 0 rgba(160, 197, 235, 0.05);
+      0 14px 26px -18px rgba(0, 0, 0, 0.4), 0 0 10px rgba(40, 121, 214, 0.03),
+      inset 0 1px 0 rgba(160, 197, 235, 0.04);
     --landing-text-primary: #cbd9eb;
     --landing-text-secondary: #93a7bd;
     --landing-text-muted: #60758b;
-    --landing-input-bg: rgba(26, 43, 62, 0.95);
-    --landing-input-border: rgba(60, 82, 106, 0.84);
+    --landing-input-bg: rgba(24, 38, 55, 0.92);
+    --landing-input-border: rgba(60, 82, 106, 0.72);
     --landing-input-placeholder: rgba(132, 151, 170, 0.95);
     --landing-input-text: #d9e7f7;
-    --landing-focus-ring: rgba(79, 163, 255, 0.24);
-    --landing-button-bg: linear-gradient(180deg, #60adff 0%, #56a4fb 100%);
+    --landing-focus-ring: rgba(79, 163, 255, 0.2);
+    --landing-button-bg: linear-gradient(180deg, #5fa6f2 0%, #5a9cf0 100%);
     --landing-button-shadow:
-      0 10px 20px -14px rgba(71, 157, 255, 0.48),
-      inset 0 1px 0 rgba(212, 233, 255, 0.2);
+      0 9px 18px -14px rgba(71, 157, 255, 0.32),
+      inset 0 1px 0 rgba(212, 233, 255, 0.14);
     --landing-card-blur: 16px;
     --landing-input-inset-shadow:
-      inset 0 1px 2px rgba(0, 0, 0, 0.2),
-      0 0 0 1px rgba(75, 113, 151, 0.16);
+      inset 0 1px 2px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(75, 113, 151, 0.12);
   }
 }
 
@@ -356,7 +355,7 @@
       linear-gradient(var(--landing-grid-line) 1px, transparent 1px),
       linear-gradient(90deg, var(--landing-grid-line) 1px, transparent 1px);
     background-size: 72px 72px;
-    opacity: 0.38;
+    opacity: 0.24;
   }
 
   .landing-glow-top-left {
@@ -392,9 +391,9 @@
     .landing-card-surface:hover {
       transform: translateY(-1px);
       box-shadow:
-        0 32px 62px -34px rgba(15, 23, 42, 0.68),
-        0 12px 24px -16px rgba(59, 130, 246, 0.2),
-        inset 0 1px 0 rgba(226, 232, 240, 0.26);
+        0 26px 52px -34px rgba(15, 23, 42, 0.5),
+        0 10px 20px -17px rgba(59, 130, 246, 0.1),
+        inset 0 1px 0 rgba(226, 232, 240, 0.18);
     }
   }
 
@@ -467,7 +466,7 @@
     border-color: var(--landing-accent);
     box-shadow:
       0 0 0 3px var(--landing-focus-ring),
-      0 0 14px rgba(59, 130, 246, 0.14);
+      0 0 12px rgba(59, 130, 246, 0.1);
   }
 
   .landing-form-input-readonly {
@@ -522,7 +521,7 @@
   @media (max-width: 1023px) {
     .landing-grid-overlay {
       background-size: 56px 56px;
-      opacity: 0.36;
+      opacity: 0.22;
     }
 
     .landing-step-labels-grid {
@@ -534,7 +533,7 @@
   @media (max-width: 767px) {
     .landing-grid-overlay {
       background-size: 44px 44px;
-      opacity: 0.32;
+      opacity: 0.18;
     }
 
     .landing-step-labels-grid {
@@ -559,7 +558,7 @@
   @media (max-width: 639px) {
     .landing-grid-overlay {
       background-size: 50px 50px;
-      opacity: 0.13;
+      opacity: 0.08;
     }
 
     .landing-vignette {

@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Loader2, RefreshCw, ShieldAlert, Undo2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+  Undo2,
+} from 'lucide-react';
 import {
   AdminApiAuthError,
   fetchEnrollments,
@@ -13,7 +19,13 @@ import { useAdminAuth } from '@/features/admin/auth/AdminAuthContext';
 import { EnrollmentRecord } from '@/features/admin/auth/types';
 import { useAdminToast } from '@/features/admin/ui/AdminToastProvider';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 type ResetDialogState = {
@@ -55,7 +67,11 @@ export function ApprovedEnrollmentsView() {
     (errorValue: unknown): boolean => {
       if (errorValue instanceof AdminApiAuthError) {
         clearSession();
-        showToast({ title: 'Session expired', message: errorValue.message, variant: 'error' });
+        showToast({
+          title: 'Session expired',
+          message: errorValue.message,
+          variant: 'error',
+        });
         router.replace('/admin/login');
         return true;
       }
@@ -80,13 +96,21 @@ export function ApprovedEnrollmentsView() {
 
       try {
         const nextRows = await fetchEnrollments(token);
-        setRows(nextRows.filter((item) => item.status === 'approved' || item.status === 'processed'));
+        setRows(
+          nextRows.filter(
+            (item) => item.status === 'approved' || item.status === 'processed'
+          )
+        );
       } catch (errorValue) {
         if (handleAuthFailure(errorValue)) {
           return;
         }
 
-        setError(errorValue instanceof Error ? errorValue.message : 'Failed to load approved enrollments.');
+        setError(
+          errorValue instanceof Error
+            ? errorValue.message
+            : 'Failed to load approved enrollments.'
+        );
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -113,11 +137,19 @@ export function ApprovedEnrollmentsView() {
     try {
       const result = await resetEnrollment(token, resetDialog.studentId);
       if (!result.success) {
-        showToast({ title: 'Reset failed', message: result.message, variant: 'error' });
+        showToast({
+          title: 'Reset failed',
+          message: result.message,
+          variant: 'error',
+        });
         return;
       }
 
-      showToast({ title: 'Enrollment reset', message: result.message, variant: 'success' });
+      showToast({
+        title: 'Enrollment reset',
+        message: result.message,
+        variant: 'success',
+      });
       await loadApproved(false);
       setResetDialog(null);
     } catch (errorValue) {
@@ -127,7 +159,10 @@ export function ApprovedEnrollmentsView() {
 
       showToast({
         title: 'Request failed',
-        message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
+        message:
+          errorValue instanceof Error
+            ? errorValue.message
+            : 'Unexpected error occurred.',
         variant: 'error',
       });
     } finally {
@@ -145,7 +180,11 @@ export function ApprovedEnrollmentsView() {
 
     try {
       const result = await processEnrollment(token, item.student_id);
-      if (!result.success || !result.processing_passed || result.embeddings_generated_count <= 0) {
+      if (
+        !result.success ||
+        !result.processing_passed ||
+        result.embeddings_generated_count <= 0
+      ) {
         const message = !result.success
           ? result.message
           : result.embeddings_generated_count <= 0
@@ -169,7 +208,10 @@ export function ApprovedEnrollmentsView() {
 
       showToast({
         title: 'Request failed',
-        message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
+        message:
+          errorValue instanceof Error
+            ? errorValue.message
+            : 'Unexpected error occurred.',
         variant: 'error',
       });
     } finally {
@@ -195,7 +237,9 @@ export function ApprovedEnrollmentsView() {
       <Card className="border-border bg-card text-foreground">
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-foreground">Approved Enrollment Management</CardTitle>
+            <CardTitle className="text-foreground">
+              Approved Enrollment Management
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               Reset is available only here and only for approved students.
             </CardDescription>
@@ -207,7 +251,9 @@ export function ApprovedEnrollmentsView() {
             onClick={() => loadApproved(false)}
             disabled={isRefreshing || actionKey !== null}
           >
-            <RefreshCw className={cn('size-4', isRefreshing ? 'animate-spin' : '')} />
+            <RefreshCw
+              className={cn('size-4', isRefreshing ? 'animate-spin' : '')}
+            />
             Refresh
           </Button>
         </CardHeader>
@@ -256,26 +302,42 @@ export function ApprovedEnrollmentsView() {
                   {rows.map((item) => {
                     const resetKey = `reset:${item.student_id}`;
                     const processKey = `process:${item.student_id}`;
-                    const rowBusy = actionKey === resetKey || actionKey === processKey;
+                    const rowBusy =
+                      actionKey === resetKey || actionKey === processKey;
                     const processingState = item.processing_state;
                     const isProcessed = processingState === 'processed';
-                    const isProcessingFailed = processingState === 'processing_failed';
-                    const needsProcessing = processingState === 'needs_processing';
+                    const isProcessingFailed =
+                      processingState === 'processing_failed';
+                    const needsProcessing =
+                      processingState === 'needs_processing';
                     const canProcess = needsProcessing || isProcessingFailed;
 
                     return (
-                      <tr key={item.student_id} className="border-t border-border/60 align-top">
+                      <tr
+                        key={item.student_id}
+                        className="border-t border-border/60 align-top"
+                      >
                         <td className="px-3 py-3">
-                          <p className="font-medium text-foreground">{item.full_name || '-'}</p>
-                          <p className="text-xs text-muted-foreground">ID: {item.student_id}</p>
+                          <p className="font-medium text-foreground">
+                            {item.full_name || '-'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {item.student_id}
+                          </p>
                         </td>
                         <td className="px-3 py-3 text-xs text-muted-foreground">
                           <p>{item.university_email || '-'}</p>
                           <p>{item.phone || '-'}</p>
                         </td>
                         <td className="px-3 py-3 text-xs text-muted-foreground">
-                          <p>{formatDate(item.updated_at || item.created_at)}</p>
-                          <p>{item.updated_at ? `Created: ${formatDate(item.created_at)}` : ''}</p>
+                          <p>
+                            {formatDate(item.updated_at || item.created_at)}
+                          </p>
+                          <p>
+                            {item.updated_at
+                              ? `Created: ${formatDate(item.created_at)}`
+                              : ''}
+                          </p>
                         </td>
                         <td className="px-3 py-3">
                           {isProcessed ? (
@@ -292,7 +354,9 @@ export function ApprovedEnrollmentsView() {
                               Needs processing
                             </span>
                           ) : (
-                            <span className="text-xs text-muted-foreground">Not applicable</span>
+                            <span className="text-xs text-muted-foreground">
+                              Not applicable
+                            </span>
                           )}
                           {item.last_processing_message ? (
                             <p className="mt-1 max-w-xs text-[11px] text-muted-foreground">
@@ -311,7 +375,11 @@ export function ApprovedEnrollmentsView() {
                               {actionKey === processKey ? (
                                 <Loader2 className="size-3.5 animate-spin" />
                               ) : null}
-                              {isProcessingFailed ? 'Retry Process' : isProcessed ? 'Processed' : 'Process'}
+                              {isProcessingFailed
+                                ? 'Retry Process'
+                                : isProcessed
+                                  ? 'Processed'
+                                  : 'Process'}
                             </Button>
 
                             {isSuperAdmin ? (
@@ -331,7 +399,9 @@ export function ApprovedEnrollmentsView() {
                                 Reset
                               </Button>
                             ) : (
-                              <span className="text-xs text-muted-foreground">Reset not allowed</span>
+                              <span className="text-xs text-muted-foreground">
+                                Reset not allowed
+                              </span>
                             )}
                           </div>
                         </td>
@@ -355,12 +425,14 @@ export function ApprovedEnrollmentsView() {
               </CardTitle>
               <CardDescription>
                 Reset will remove approved operational data for{' '}
-                <strong>{resetDialog.fullName || resetDialog.studentId}</strong>.
+                <strong>{resetDialog.fullName || resetDialog.studentId}</strong>
+                .
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                This is destructive. Student will need to register again from scratch.
+                This is destructive. Student will need to register again from
+                scratch.
               </p>
 
               <div className="flex flex-wrap justify-end gap-2">

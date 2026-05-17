@@ -13,7 +13,13 @@ import { useAdminAuth } from '@/features/admin/auth/AdminAuthContext';
 import { EnrollmentRecord } from '@/features/admin/auth/types';
 import { useAdminToast } from '@/features/admin/ui/AdminToastProvider';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -50,7 +56,9 @@ export function EnrollmentsView() {
   const [error, setError] = useState<string | null>(null);
   const [actionKey, setActionKey] = useState<string | null>(null);
 
-  const [rejectDialog, setRejectDialog] = useState<RejectDialogState | null>(null);
+  const [rejectDialog, setRejectDialog] = useState<RejectDialogState | null>(
+    null
+  );
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState<string | null>(null);
 
@@ -58,7 +66,11 @@ export function EnrollmentsView() {
     (errorValue: unknown): boolean => {
       if (errorValue instanceof AdminApiAuthError) {
         clearSession();
-        showToast({ title: 'Session expired', message: errorValue.message, variant: 'error' });
+        showToast({
+          title: 'Session expired',
+          message: errorValue.message,
+          variant: 'error',
+        });
         router.replace('/admin/login');
         return true;
       }
@@ -89,7 +101,11 @@ export function EnrollmentsView() {
           return;
         }
 
-        setError(errorValue instanceof Error ? errorValue.message : 'Failed to load enrollments.');
+        setError(
+          errorValue instanceof Error
+            ? errorValue.message
+            : 'Failed to load enrollments.'
+        );
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -119,7 +135,11 @@ export function EnrollmentsView() {
     try {
       const result = await action();
       if (!result.success) {
-        showToast({ title: 'Action failed', message: result.message, variant: 'error' });
+        showToast({
+          title: 'Action failed',
+          message: result.message,
+          variant: 'error',
+        });
         return false;
       }
 
@@ -127,7 +147,11 @@ export function EnrollmentsView() {
         onSuccess();
       }
 
-      showToast({ title: successTitle, message: result.message, variant: 'success' });
+      showToast({
+        title: successTitle,
+        message: result.message,
+        variant: 'success',
+      });
       await loadEnrollments(false);
       return true;
     } catch (errorValue) {
@@ -137,7 +161,10 @@ export function EnrollmentsView() {
 
       showToast({
         title: 'Request failed',
-        message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
+        message:
+          errorValue instanceof Error
+            ? errorValue.message
+            : 'Unexpected error occurred.',
         variant: 'error',
       });
       return false;
@@ -155,7 +182,11 @@ export function EnrollmentsView() {
     try {
       const result = await approveEnrollment(token, studentId);
       if (!result.success || !result.approved) {
-        showToast({ title: 'Approval failed', message: result.message, variant: 'error' });
+        showToast({
+          title: 'Approval failed',
+          message: result.message,
+          variant: 'error',
+        });
         return;
       }
 
@@ -183,7 +214,10 @@ export function EnrollmentsView() {
       }
       showToast({
         title: 'Request failed',
-        message: errorValue instanceof Error ? errorValue.message : 'Unexpected error occurred.',
+        message:
+          errorValue instanceof Error
+            ? errorValue.message
+            : 'Unexpected error occurred.',
         variant: 'error',
       });
     } finally {
@@ -199,14 +233,17 @@ export function EnrollmentsView() {
     }
 
     const targetStudentId = rejectDialog.studentId;
-    const isStillReviewable = enrollments.some((item) => item.student_id === targetStudentId);
+    const isStillReviewable = enrollments.some(
+      (item) => item.student_id === targetStudentId
+    );
     if (!isStillReviewable) {
       setRejectDialog(null);
       setRejectReason('');
       setRejectError(null);
       showToast({
         title: 'Already updated',
-        message: 'This enrollment is no longer in the review queue. Refreshing list.',
+        message:
+          'This enrollment is no longer in the review queue. Refreshing list.',
         variant: 'error',
       });
       await loadEnrollments(false);
@@ -216,7 +253,9 @@ export function EnrollmentsView() {
     const reason = rejectReason.trim();
 
     if (reason.length < 3) {
-      setRejectError('Please enter a rejection reason (at least 3 characters).');
+      setRejectError(
+        'Please enter a rejection reason (at least 3 characters).'
+      );
       return;
     }
 
@@ -227,7 +266,9 @@ export function EnrollmentsView() {
       () => rejectEnrollment(token, targetStudentId, reason),
       'Enrollment rejected',
       () => {
-        setEnrollments((current) => current.filter((item) => item.student_id !== targetStudentId));
+        setEnrollments((current) =>
+          current.filter((item) => item.student_id !== targetStudentId)
+        );
       }
     );
 
@@ -253,7 +294,11 @@ export function EnrollmentsView() {
   return (
     <div className="grid gap-6">
       <section className="grid gap-4 md:grid-cols-1">
-        <MetricCard title="Validated Enrollments" value={validatedCount} tone="pending" />
+        <MetricCard
+          title="Validated Enrollments"
+          value={validatedCount}
+          tone="pending"
+        />
       </section>
 
       <Card className="border-border bg-card text-foreground">
@@ -271,7 +316,9 @@ export function EnrollmentsView() {
             onClick={() => loadEnrollments(false)}
             disabled={isRefreshing || actionKey !== null}
           >
-            <RefreshCw className={cn('size-4', isRefreshing ? 'animate-spin' : '')} />
+            <RefreshCw
+              className={cn('size-4', isRefreshing ? 'animate-spin' : '')}
+            />
             Refresh
           </Button>
         </CardHeader>
@@ -314,13 +361,21 @@ export function EnrollmentsView() {
                   {enrollments.map((item) => {
                     const approveKey = `approve:${item.student_id}`;
                     const rejectKey = `reject:${item.student_id}`;
-                    const rowBusy = actionKey === approveKey || actionKey === rejectKey;
+                    const rowBusy =
+                      actionKey === approveKey || actionKey === rejectKey;
 
                     return (
-                      <tr key={item.student_id} className="border-t border-border/60 align-top">
+                      <tr
+                        key={item.student_id}
+                        className="border-t border-border/60 align-top"
+                      >
                         <td className="px-3 py-3">
-                          <p className="font-medium text-foreground">{item.full_name || '-'}</p>
-                          <p className="text-xs text-muted-foreground">ID: {item.student_id}</p>
+                          <p className="font-medium text-foreground">
+                            {item.full_name || '-'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {item.student_id}
+                          </p>
                         </td>
                         <td className="px-3 py-3 text-xs text-muted-foreground">
                           <p>{item.university_email || '-'}</p>
@@ -328,18 +383,27 @@ export function EnrollmentsView() {
                         </td>
                         <td className="px-3 py-3 text-xs">
                           <p className="text-muted-foreground">
-                            {item.verification_completed ? 'Completed' : 'Not completed'}
+                            {item.verification_completed
+                              ? 'Completed'
+                              : 'Not completed'}
                           </p>
                           {typeof item.total_accepted_shots === 'number' &&
                           typeof item.total_required_shots === 'number' ? (
                             <p className="text-muted-foreground">
-                              {item.total_accepted_shots}/{item.total_required_shots} shots accepted
+                              {item.total_accepted_shots}/
+                              {item.total_required_shots} shots accepted
                             </p>
                           ) : null}
                         </td>
                         <td className="px-3 py-3 text-xs text-muted-foreground">
-                          <p>{formatDate(item.updated_at || item.created_at)}</p>
-                          <p>{item.updated_at ? `Created: ${formatDate(item.created_at)}` : ''}</p>
+                          <p>
+                            {formatDate(item.updated_at || item.created_at)}
+                          </p>
+                          <p>
+                            {item.updated_at
+                              ? `Created: ${formatDate(item.created_at)}`
+                              : ''}
+                          </p>
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-2">
@@ -381,7 +445,8 @@ export function EnrollmentsView() {
           ) : null}
 
           <p className="text-xs text-muted-foreground">
-            Reset actions for approved students are available in the approved management page.
+            Reset actions for approved students are available in the approved
+            management page.
           </p>
         </CardContent>
       </Card>
@@ -392,11 +457,18 @@ export function EnrollmentsView() {
             <CardHeader>
               <CardTitle>Reject Enrollment</CardTitle>
               <CardDescription>
-                Provide a reason for rejecting <strong>{rejectDialog.fullName || rejectDialog.studentId}</strong>.
+                Provide a reason for rejecting{' '}
+                <strong>
+                  {rejectDialog.fullName || rejectDialog.studentId}
+                </strong>
+                .
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4" onSubmit={onRejectSubmit}>
+              <form
+                className="space-y-4"
+                onSubmit={onRejectSubmit}
+              >
                 <div className="space-y-2">
                   <Label htmlFor="reject-reason">Reason</Label>
                   <Input
@@ -424,7 +496,10 @@ export function EnrollmentsView() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={actionKey === `reject:${rejectDialog.studentId}`}>
+                  <Button
+                    type="submit"
+                    disabled={actionKey === `reject:${rejectDialog.studentId}`}
+                  >
                     {actionKey === `reject:${rejectDialog.studentId}` ? (
                       <>
                         <Loader2 className="size-4 animate-spin" />
@@ -465,8 +540,14 @@ function MetricCard({
   return (
     <Card className="border-border bg-card text-foreground">
       <CardHeader>
-        <CardDescription className="text-muted-foreground">{title}</CardDescription>
-        <CardTitle className={cn('text-3xl font-semibold tracking-tight', toneClass)}>{value}</CardTitle>
+        <CardDescription className="text-muted-foreground">
+          {title}
+        </CardDescription>
+        <CardTitle
+          className={cn('text-3xl font-semibold tracking-tight', toneClass)}
+        >
+          {value}
+        </CardTitle>
       </CardHeader>
     </Card>
   );

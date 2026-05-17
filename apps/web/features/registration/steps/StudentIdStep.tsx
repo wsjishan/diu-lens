@@ -17,11 +17,11 @@ export function StudentIdStep({
 }: StudentIdStepProps) {
   return (
     <div className="space-y-5">
-      <header className="space-y-2">
-        <h3 className="landing-text-primary text-[1.68rem] leading-[1.1] font-semibold tracking-[-0.016em]">
+      <header className="space-y-2.5 sm:space-y-2">
+        <h3 className="landing-text-primary text-[1.48rem] leading-[1.12] font-semibold tracking-[-0.014em] sm:text-[1.68rem] sm:leading-[1.1] sm:tracking-[-0.016em]">
           Check Registration Status
         </h3>
-        <p className="landing-text-secondary max-w-[29ch] text-[0.86rem] leading-[1.45]">
+        <p className="landing-text-secondary max-w-[31ch] text-[0.84rem] leading-[1.48] sm:max-w-[29ch] sm:text-[0.86rem] sm:leading-[1.45]">
           Enter your student ID to continue with DIU Lens.
         </p>
       </header>

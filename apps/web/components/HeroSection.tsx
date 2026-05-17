@@ -49,7 +49,7 @@ export function HeroSection({ activeStep = 0 }: HeroSectionProps) {
   const currentHeroStep = heroSteps[heroStepIndex];
 
   return (
-    <section className="space-y-3 text-left sm:space-y-4 lg:space-y-[1.65rem]">
+    <section className="space-y-5 text-left sm:space-y-5 lg:space-y-[1.65rem]">
       <AnimatePresence
         mode="wait"
         initial={false}
@@ -67,8 +67,8 @@ export function HeroSection({ activeStep = 0 }: HeroSectionProps) {
         </motion.div>
       </AnimatePresence>
 
-      <div className="space-y-3 lg:space-y-[1.125rem]">
-        <h1 className="landing-text-primary max-w-[11.2ch] text-[2.2rem] leading-[1.08] font-semibold tracking-[-0.028em] sm:max-w-[12.5ch] sm:text-[2.45rem] lg:max-w-[10.1ch] lg:text-[4.08rem]">
+      <div className="space-y-3.5 sm:space-y-4 lg:space-y-[1.125rem]">
+        <h1 className="landing-text-primary max-w-[12.75ch] text-[2.02rem] leading-[1.1] font-semibold tracking-[-0.024em] min-[390px]:max-w-[13.6ch] min-[390px]:text-[2.12rem] sm:max-w-[12.5ch] sm:text-[2.45rem] sm:tracking-[-0.028em] lg:max-w-[10.1ch] lg:text-[4.08rem]">
           Smart{' '}
           <span className="bg-linear-to-r from-[#164eaf] via-[#2871d8] to-[#3c92ff] bg-clip-text text-transparent dark:from-[#ecf2ff] dark:via-[#98c6ff] dark:to-[#5ea7ff]">
             Identification
@@ -77,7 +77,7 @@ export function HeroSection({ activeStep = 0 }: HeroSectionProps) {
           for DIU Campus
         </h1>
 
-        <p className="landing-text-secondary max-w-[25ch] text-[0.82rem] leading-[1.52] text-slate-600/90 dark:text-slate-300/85 sm:max-w-[28rem] sm:text-[0.88rem] lg:max-w-[31.5rem] lg:text-[0.93rem]">
+        <p className="landing-text-secondary max-w-[33ch] text-[0.84rem] leading-[1.5] text-slate-600/90 dark:text-slate-300/85 min-[390px]:max-w-[35ch] sm:max-w-[28rem] sm:text-[0.88rem] lg:max-w-[31.5rem] lg:text-[0.93rem]">
           Secure your campus identity with AI-powered facial verification
           designed for faster access, safer authentication, and a smarter
           student experience. DIU Lens helps reduce impersonation risks while
@@ -87,34 +87,34 @@ export function HeroSection({ activeStep = 0 }: HeroSectionProps) {
 
       <div
         id="for-students"
-        className="pt-0.5"
+        className="pt-1"
       >
-        <ol className="grid max-w-[19rem] grid-cols-3 gap-2.5 sm:max-w-none sm:gap-3 lg:max-w-[31.25rem]">
+        <ol className="grid max-w-[22rem] grid-cols-3 gap-3 sm:max-w-none sm:gap-3.5 lg:max-w-[31.25rem]">
           {heroSteps.map((item, index, arr) => (
             <li
               key={item.id}
-              className="relative flex flex-col items-start gap-2 text-left"
+              className="relative flex min-w-0 flex-col items-start gap-2.5 text-left"
             >
               <div className="relative w-full">
                 {index < arr.length - 1 ? (
                   <span
                     aria-hidden="true"
-                    className="absolute left-[2.45rem] right-1 top-1/2 h-px -translate-y-1/2 bg-linear-to-r from-blue-300/56 to-slate-500/26 lg:left-[3.05rem]"
+                    className="absolute left-[2.4rem] right-1 top-1/2 h-px -translate-y-1/2 bg-linear-to-r from-blue-300/50 to-slate-500/22 sm:left-[2.55rem] lg:left-[3.05rem]"
                   />
                 ) : null}
                 <span
                   className={
                     index === heroStepIndex
-                      ? 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full bg-linear-to-b from-[#2f8dff] to-[#1a67e5] text-[0.86rem] font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.55)] ring-1 ring-blue-200/76 lg:size-[2.375rem] lg:text-[0.98rem]'
+                      ? 'relative z-10 inline-flex size-8 items-center justify-center rounded-full bg-linear-to-b from-[#2f8dff] to-[#1a67e5] text-[0.82rem] font-semibold text-white shadow-[0_0_18px_rgba(37,99,235,0.45)] ring-1 ring-blue-200/76 lg:size-[2.375rem] lg:text-[0.98rem]'
                       : index < heroStepIndex
-                        ? 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full bg-linear-to-b from-[#206bcf] to-[#1a5ec6] text-[0.86rem] font-semibold text-white shadow-[0_0_16px_rgba(37,99,235,0.32)] ring-1 ring-blue-200/55 lg:size-[2.375rem] lg:text-[0.98rem]'
-                        : 'relative z-10 inline-flex size-[1.95rem] items-center justify-center rounded-full border border-slate-300/76 bg-slate-100/78 text-[0.8rem] font-medium text-slate-600 dark:border-slate-400/43 dark:bg-[#192844]/62 dark:text-slate-300 lg:size-[2.375rem] lg:text-[0.93rem]'
+                        ? 'relative z-10 inline-flex size-8 items-center justify-center rounded-full bg-linear-to-b from-[#206bcf] to-[#1a5ec6] text-[0.82rem] font-semibold text-white shadow-[0_0_14px_rgba(37,99,235,0.28)] ring-1 ring-blue-200/55 lg:size-[2.375rem] lg:text-[0.98rem]'
+                        : 'relative z-10 inline-flex size-8 items-center justify-center rounded-full border border-slate-300/76 bg-slate-100/78 text-[0.78rem] font-medium text-slate-600 dark:border-slate-400/43 dark:bg-[#192844]/62 dark:text-slate-300 lg:size-[2.375rem] lg:text-[0.93rem]'
                   }
                 >
                   {item.id}
                 </span>
               </div>
-              <span className="landing-text-secondary text-[0.68rem] leading-tight sm:text-[0.72rem] lg:text-[0.9rem]">
+              <span className="landing-text-secondary max-w-[7.3rem] text-[0.67rem] leading-[1.18] sm:max-w-none sm:text-[0.72rem] lg:text-[0.9rem]">
                 {item.label}
               </span>
             </li>

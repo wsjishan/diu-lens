@@ -22,9 +22,9 @@ export default function Home() {
         className="landing-glow-bottom-right pointer-events-none absolute inset-0"
       />
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-6 lg:px-11 lg:pb-8 lg:pt-8 xl:px-12">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-5 pb-6 pt-4 sm:px-6 sm:pb-7 sm:pt-6 lg:px-11 lg:pb-8 lg:pt-8 xl:px-12">
         <Header />
-        <main className="flex flex-1 items-center py-5 sm:py-7 lg:py-8">
+        <main className="flex flex-1 items-start py-7 sm:py-8 md:items-center md:py-7 lg:py-8">
           <HomeOnboardingSection />
         </main>
         <Footer />

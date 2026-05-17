@@ -27,19 +27,19 @@ export function RegistrationShell({
   return (
     <Card
       className={cn(
-        'landing-card-surface flex w-full flex-col rounded-[1.3rem] border px-[1.375rem] py-[1.4rem] shadow-none',
+        'landing-card-surface flex w-full flex-col rounded-[1.25rem] border px-5 py-5 shadow-none sm:rounded-[1.3rem] sm:px-[1.375rem] sm:py-[1.4rem]',
         className
       )}
     >
-      <CardContent className="space-y-[1.1rem] p-0">
-        <header className="space-y-2.5">
+      <CardContent className="space-y-5 p-0 sm:space-y-[1.1rem]">
+        <header className="space-y-3 sm:space-y-2.5">
           <div>
-            <h2 className="landing-text-primary text-center text-[1.72rem] leading-none font-semibold tracking-[-0.015em]">
+            <h2 className="landing-text-primary text-center text-[1.48rem] leading-none font-semibold tracking-[-0.012em] sm:text-[1.72rem] sm:tracking-[-0.015em]">
               Onboarding
             </h2>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2 sm:space-y-1.5">
             <p className="landing-text-secondary text-[0.8rem]">
               Step {normalizedActiveIndex + 1} of {totalSteps}
             </p>
@@ -58,7 +58,7 @@ export function RegistrationShell({
                 <span
                   key={step.id}
                   className={cn(
-                    'text-[0.72rem] whitespace-nowrap',
+                    'text-[0.68rem] whitespace-nowrap sm:text-[0.72rem]',
                     index <= normalizedActiveIndex
                       ? 'landing-text-secondary'
                       : 'landing-text-muted'
@@ -71,7 +71,7 @@ export function RegistrationShell({
           </div>
         </header>
 
-        <div className="space-y-4">
+        <div className="space-y-5 sm:space-y-4">
           {children}
         </div>
       </CardContent>

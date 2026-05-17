@@ -17,10 +17,10 @@ export function HomeOnboardingSection() {
         className="landing-card-spotlight pointer-events-none absolute right-[-8%] top-1/2 hidden h-[26.5rem] w-[34rem] -translate-y-1/2 rounded-full blur-3xl lg:block"
       />
 
-      <div className="w-full grid grid-cols-1 gap-6 px-0 pb-6 pt-2 sm:gap-7 sm:pb-7 sm:pt-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] md:items-center md:gap-10 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:gap-[4rem]">
+      <div className="grid w-full grid-cols-1 gap-8 px-0 pb-8 pt-1 sm:gap-9 sm:pb-9 sm:pt-2 md:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] md:items-center md:gap-10 md:pb-7 md:pt-3.5 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:gap-[4rem]">
         <div
           className={cn(
-            'mx-auto w-full max-w-[21.5rem] transition-all duration-400 ease-out sm:max-w-[29rem] md:mx-0 md:max-w-[38.5rem] lg:pr-2',
+            'mx-auto w-full max-w-[22.75rem] transition-all duration-400 ease-out sm:max-w-[29rem] md:mx-0 md:max-w-[38.5rem] lg:pr-2',
             activeStep > 0 && !isVerificationStep
               ? 'lg:opacity-70 lg:blur-[1px]'
               : 'lg:opacity-100'
@@ -29,7 +29,7 @@ export function HomeOnboardingSection() {
           <HeroSection activeStep={activeStep} />
         </div>
 
-        <div className="relative mx-auto mt-1 flex w-full max-w-[22.75rem] justify-center sm:mt-0 sm:max-w-[27rem] md:mx-0 md:max-w-none md:justify-end lg:pr-1">
+        <div className="relative mx-auto flex w-full max-w-[23.5rem] justify-center sm:max-w-[27rem] md:mx-0 md:max-w-none md:justify-end lg:pr-1">
           <RegistrationCard onStepIndexChange={setActiveStep} />
         </div>
       </div>
